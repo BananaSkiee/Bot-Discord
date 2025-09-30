@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Grafik BTC</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: monospace;
+      white-space: pre;
+      font-size: 16px;
+    }
+    #chart {
+      line-height: 1.1;
+    }
+  </style>
+</head>
+<body>
+  <div id="chart"></div>
+
+  <script>
+    const chartWidth = 20;
+    const chartHeight = 10;
+    const chartElement = document.getElementById("chart");
+
+    let prices = Array(chartWidth).fill(50000);
+    let currentPrice = 50000;
+
+    function generateChart() {
+      // Simulasi perubahan harga (acak naik-turun 1-300 poin)
+      const change = Math.floor(Math.random() * 600 - 300);
+      currentPrice += change;
+      prices.push(currentPrice);
+      if (prices.length > chartWidth) prices.shift();
+
+      const max = Math.max(...prices);
+      const min = Math.min(...prices);
+      const diff = max - min || 1;
+
+      let rows = [];
+
+      for (let y = chartHeight; y >= 0; y--) {
+        let row = '';
+        for (let i = 0; i < prices.length; i++) {
+          let level = Math.round(((prices[i] - min) / diff) * chartHeight);
+          row += (level >= y) ? "█" : " ";
+        }
+        rows.push(row);
+      }
+
+      const bottomLine = "-".repeat(prices.length);
+      const priceStr = `BTC: $${currentPrice.toLocaleString()} (${change >= 0 ? "+" : ""}${change})`;
+
+      chartElement.textContent = rows.join("\n") + "\n" + bottomLine + "\n" + priceStr;
+    }
+
+    setInterval(generateChart, 1000);
+    generateChart();
+  </script>
+</body>
+</html>
