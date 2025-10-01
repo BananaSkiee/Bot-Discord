@@ -13,7 +13,7 @@ const generateTextGraph = require('./modules/generateTextGraph');
 const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
-
+const slashCommandSetup = require("./modules/slashCommandSetup");
 
 const client = new Client({
   intents: [
