@@ -11,6 +11,7 @@ const autoDelete = require("../modules/autoDeleteCryptoMessages.js");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const autoChat = require("../modules/autoChat");
 const beritaModule = require("../modules/autoNews");
+const rainbowRole = require("../modules/rainbowRole");
 
 module.exports = {
   name: "ready",
@@ -45,12 +46,18 @@ module.exports = {
 
     try { autoChat(client); } catch (err) { console.error("❌ Auto chat error:", err); }
 
-    // Setup slash commands
-    await slashCommandSetup(client);
+    // 🟩 Setup slash command
+    try {
+      await slashCommandSetup(client);
+    } catch (err) {
+      console.error("❌ Gagal setup slash command:", err);
+    }
 
     // 🔁 Auto berita
     try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
-
+    
+    try { rainbowRole(client, 60_000); } catch (err) { console.error("❌ Rainbow role error:", err); }
+    
     // Update pesan grafik BTC
     setInterval(() => {
       const newContent = "📈 BTC: $65,000 (+0.4%)"; // bisa dari API
