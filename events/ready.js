@@ -43,7 +43,7 @@ module.exports = {
     // Simulasi BTC
     simulateBTC(client);
 
-    autoChat(client);
+    try { autoChat(client); } catch (err) { console.error("❌ Auto chat error:", err); }
 
     // Setup slash commands
     await slashCommandSetup(client);
