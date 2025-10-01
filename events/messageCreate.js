@@ -12,6 +12,7 @@ const autoReply = require("../modules/autoReply");
 const autoChat = require("../modules/autoChat");
 const generateWelcomeCard = require("../modules/welcomeCard");
 const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-nya
+const beritaCmd = require("../modules/beritaCmd.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
@@ -78,6 +79,10 @@ const command = commandRaw.toLowerCase();
 // Di dalam messageCreate:
 if (command === "meme") {
   return memeCommand.execute(message);
+}
+    
+if (command === "berita") {
+    await beritaCmd(message);
 }
 
 // GANTI BLOK LAMA !testwelcome DI messageCreate.js ANDA DENGAN INI
