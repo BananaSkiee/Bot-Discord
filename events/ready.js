@@ -10,6 +10,7 @@ const autoSendMeme = require("../modules/autoMeme");
 const autoDelete = require("../modules/autoDeleteCryptoMessages.js");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const autoChat = require("../modules/autoChat");
+const beritaModule = require("../modules/autoNews");
 
 module.exports = {
   name: "ready",
@@ -46,6 +47,9 @@ module.exports = {
 
     // Setup slash commands
     await slashCommandSetup(client);
+
+    // 🔁 Auto berita
+    try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
 
     // Update pesan grafik BTC
     setInterval(() => {
