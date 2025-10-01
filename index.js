@@ -12,6 +12,7 @@ const updateTimeChannel = require("./modules/updateTimeChannel");
 const generateTextGraph = require('./modules/generateTextGraph');
 const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
+const invitesTracker = require("./modules/invitesTracker");
 
 
 const client = new Client({
@@ -74,6 +75,7 @@ client.on("interactionCreate", async (interaction) => {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   stickyHandler(client, message);
+  invitesTracker(client);
 });
 
 // 🚀 Auto Greeting ketika user join
