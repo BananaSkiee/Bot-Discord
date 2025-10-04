@@ -1,43 +1,45 @@
+// SINTAKS YANG BENAR UNTUK GOOGLE GEMINI
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Pastikan API Key tersedia
-if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY belum diatur di environment variables!");
-  process.exit(1); // Hentikan proses jika tidak ada API key
-}
-
+// Inisialisasi Gemini dengan API Key dari Environment Variables
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Ganti dengan ID channel kamu yang benar
 const AI_CHANNEL_ID = "1394478754297811034";
 
 module.exports = async (message) => {
-  // Abaikan pesan dari bot atau channel yang tidak sesuai
+  // Jangan proses pesan dari bot lain atau dari channel yang salah
   if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
 
   try {
-    await message.channel.sendTyping(); // Menampilkan indikator mengetik...
+    // Kirim status "sedang mengetik..."
+    await message.channel.sendTyping();
 
+    // --- PERUBAHAN DI SINI ---
+    // Pilih model Gemini terbaru yang direkomendasikan.
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+
+    // Ambil konten pesan dari user
     const prompt = message.content;
 
-    // Inisialisasi model Gemini
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro-latest",
-    });
-
+    // Panggil API Gemini untuk menghasilkan konten
     const result = await model.generateContent(prompt);
     const response = await result.response;
-
+    
+    // Ambil teks balasan dari Gemini
     const reply = response.text();
 
-    if (reply && reply.trim()) {
-      await message.reply(reply.trim());
+    if (reply) {
+      // Balas pesan user
+      await message.reply(reply);
     } else {
-      await message.reply("🤔 Maaf, saya tidak bisa memberikan jawaban saat ini.");
+      // Jika Gemini tidak memberikan balasan
+      await message.reply("Maaf, saya tidak bisa memikirkan balasan saat ini.");
     }
 
   } catch (error) {
+    // Tangani error dari API Gemini
     console.error("❌ Gemini AI error:", error);
-    await message.reply("⚠️ Maaf, terjadi kesalahan saat saya mencoba menjawab. Coba lagi nanti.");
+    await message.reply("⚠️ Maaf, terjadi kesalahan saat saya mencoba berpikir. Coba lagi nanti.");
   }
 };
