@@ -20,7 +20,7 @@ module.exports = function rainbowRole(client, interval = 5000) {
     }
 
     // Role ID langsung (ganti dengan role ID yang benar)
-    const roleIds = ["", "ROLE_ID_2"]; // Ganti dengan role ID yang sebenarnya
+    const roleIds = ["1401061819195592785", "ROLE_ID_2"]; // Ganti dengan role ID yang sebenarnya
     
     if (roleIds.length === 0 || roleIds[0] === "ROLE_ID_1") {
       console.log("❌ Role IDs belum dikonfigurasi untuk rainbowRole");
