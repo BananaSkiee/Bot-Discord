@@ -14,6 +14,7 @@ const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const slashCommandSetup = require("./modules/slashCommandSetup");
+const srvName = require("./modules/srvName.js"); 
 
 const client = new Client({
   intents: [
@@ -45,6 +46,8 @@ fs.readdirSync("./events").forEach((file) => {
     client.on(event.name, (...args) => event.execute(...args, client));
   }
 });
+
+srvName(client);
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
