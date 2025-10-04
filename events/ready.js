@@ -3,7 +3,6 @@ const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
 const joinvoice = require("../modules/joinvoice");
 const countValidator = require("../modules/countValidator");
-const textCounter = require("../modules/textCounter");
 const simulateBTC = require("../modules/cryptoSimulator");
 const updateCryptoMessage = require("../modules/updateCrypto");
 const autoSendMeme = require("../modules/autoMeme");
