@@ -1,5 +1,5 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
-const ShotgunDuels = require('./shotgunDuels');
+const { SlashCommandBuilder } = require('discord.js');
+const ShotgunDuels = require('../modules/shotgunDuels');
 
 const gameManager = new ShotgunDuels();
 
