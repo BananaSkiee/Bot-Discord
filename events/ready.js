@@ -27,18 +27,22 @@ module.exports = {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    // Update online VC
-    await updateOnline(guild);
-    setInterval(() => updateOnline(guild), 10000);
+    // 🔁 Fitur online VC counter
+    const guild = client.guilds.cache.first();
+    if (guild) {
+      try {
+        await updateOnline(guild);
+        setInterval(() => updateOnline(guild), 60_000);
+      } catch (err) {
+        console.error("❌ Gagal update online VC:", err);
+      }
+    }
 
     // Sticky Message
     stickyHandler(client);
 
     // Auto Greeting
     autoGreeting(client);
-
-    // 🔢 Counter
-    countValidator(client);
 
     // Simulasi BTC
     simulateBTC(client);
@@ -62,8 +66,8 @@ module.exports = {
       const newContent = "📈 BTC: $65,000 (+0.4%)"; // bisa dari API
       updateCryptoMessage(client, newContent);
     }, 60_000);
-
-    // Status berkelas berganti-ganti
+    
+    // 💡 Status bot berganti tiap 1 menit
     const statuses = [
       "🌌 Menembus batas kemungkinan",
       "📖 Membaca alur takdir",
@@ -82,26 +86,30 @@ module.exports = {
 
     let index = 0;
     const updateStatus = () => {
-      const status = statuses[index % statuses.length];
-      client.user.setActivity(status, { type: 0 });
-      index++;
+      try {
+        const status = statuses[index % statuses.length];
+        client.user.setActivity(status, { type: 0 });
+        index++;
+      } catch (err) {
+        console.error("❌ Update status error:", err);
+      }
     };
     updateStatus();
     setInterval(updateStatus, 60_000);
 
-    // ✅ Auto meme tiap 1 jam
-    try {
-      const channel = await client.channels.fetch("1352404777513783336");
-      setInterval(() => autoSendMeme(channel), 3600000);
-    } catch (err) {
-      console.error("❌ Gagal fetch channel untuk auto meme:", err);
+    // 📸 Auto meme tiap 3 jam
+    const memeChannel = client.channels.cache.get(memeChannelId);
+    if (memeChannel) {
+        setInterval(() => {
+          autoSendMeme(memeChannel);
+        }, 10_800_000); // 3 jam dalam milidetik
+        console.log("✅ Fitur auto meme aktif.");
+    } else {
+        console.error("❌ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
     }
 
-    // ✅ Join voice channel saat online
-    try {
-      await joinvoice(client);
-    } catch (err) {
-      console.error("❌ Gagal join voice channel:", err);
-    }
+    // 🔊 Join VC otomatis saat bot online
+    try { await joinvoice(client); } catch (err) { console.error("❌ Gagal join voice channel:", err); }
   },
 };
+            
