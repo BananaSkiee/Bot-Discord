@@ -27,16 +27,9 @@ module.exports = {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    // 🔁 Fitur online VC counter
-    const guild = client.guilds.cache.first();
-    if (guild) {
-      try {
-        await updateOnline(guild);
-        setInterval(() => updateOnline(guild), 60_000);
-      } catch (err) {
-        console.error("❌ Gagal update online VC:", err);
-      }
-    }
+    // Update online VC
+    await updateOnline(guild);
+    setInterval(() => updateOnline(guild), 10000);
 
     // Sticky Message
     stickyHandler(client);
