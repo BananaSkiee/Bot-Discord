@@ -14,6 +14,7 @@ const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
+const countValidator = require("./modules/countValidator");
 
 const client = new Client({
   intents: [
@@ -72,11 +73,12 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// 📌 Sticky Message Handler
+// Di bagian messageCreate handler, tambahkan:
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   stickyHandler(client, message);
   invitesTracker(client);
+  countValidator.handleMessage(message);
 });
 
 // 🚀 Auto Greeting ketika user join
