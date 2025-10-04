@@ -90,17 +90,23 @@ module.exports = {
     updateStatus();
     setInterval(updateStatus, 60_000);
 
-    // 📸 Auto meme tiap 3 jam
+// 📸 Auto meme tiap 3 jam
+const memeChannelId = process.env.MEME_CHANNEL_ID; // Ambil dari environment variable
+
+if (memeChannelId) {
     const memeChannel = client.channels.cache.get(memeChannelId);
     if (memeChannel) {
         setInterval(() => {
-          autoSendMeme(memeChannel);
+            autoSendMeme(memeChannel);
         }, 10_800_000); // 3 jam dalam milidetik
         console.log("✅ Fitur auto meme aktif.");
     } else {
         console.error("❌ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
     }
-
+} else {
+    console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
+    }
+    
     // 🔊 Join VC otomatis saat bot online
     try { await joinvoice(client); } catch (err) { console.error("❌ Gagal join voice channel:", err); }
   },
