@@ -1,105 +1,83 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Pisahkan banyak API key dengan koma di Environment Variables Railway
 if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY belum diatur di Environment Variables (Koyeb)!");
+  console.error("❌ GEMINI_API_KEY belum diatur!");
   process.exit(1);
 }
 
 const apiKeys = process.env.GEMINI_API_KEY.split(",").map(k => k.trim());
 let currentKeyIndex = 0;
-let rateLimitReset = 0;
-
-function getGenAI() {
-  return new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
-}
 
 const AI_CHANNEL_ID = "1352635177536327760";
 
-// Cache untuk menghindari spam
-const userCooldown = new Map();
-const COOLDOWN_TIME = 3000; // 3 detik
-
 module.exports = async (message) => {
-  // Cek jika message dari bot atau bukan channel AI
   if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
-
-  // Cek cooldown
-  const now = Date.now();
-  const lastMessage = userCooldown.get(message.author.id);
-  if (lastMessage && (now - lastMessage) < COOLDOWN_TIME) {
-    await message.react('⏳');
-    return;
-  }
 
   try {
     await message.channel.sendTyping();
 
-    // Update cooldown
-    userCooldown.set(message.author.id, now);
-
-    // Cek rate limit
-    if (Date.now() < rateLimitReset) {
-      await message.reply("⏳ Lagi sibuk nih, coba lagi sebentar ya...");
-      return;
-    }
-
-    const model = getGenAI().getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+    const genAI = new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
+    
+    // COBA MODEL YANG BERBEDA - gemini-1.5-flash mungkin belum available
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash-latest",  // Coba versi latest
+      // model: "gemini-1.5-flash",      // Atau coba tanpa -latest
+      // model: "gemini-1.0-flash",      // Fallback 1
+      // model: "gemini-pro",            // Fallback 2 (pasti work)
       generationConfig: {
-        maxOutputTokens: 500, // Batasi output biar tidak kepanjangan
-        temperature: 0.7, // Sedikit kreatif tapi tetap konsisten
+        maxOutputTokens: 200,  // Lebih hemat
+        temperature: 0.8,
       }
     });
 
-    // PERBAIKAN: String template yang benar dan konsisten
-    const prompt = `Kamu adalah teman ngobrol yang asik di server Discord. 
-Karakteristik:
-- Panggil user dengan "bro", "sis", atau nama panggilan casual
-- Bahasa Indonesia sehari-hari yang natural
-- Boleh sarkas dikit-dikit tapi jangan berlebihan
-- Jawaban maksimal 200 karakter biar ga kepanjangan
-- Sesekali kasih reaksi pake emoji yang relevan
-- Kalau nggak ngerti, bilang aja jangan asal jawab
-
-Tone: Kayak temen deket yang lagi chat di WA/Telegram
-
-Pertanyaan: "${message.content}"
-
-Jawab dengan gaya obrolan santai:`;
+    // Prompt yang sudah bagus & hemat
+    const prompt = `Jawab dengan bahasa Indonesia gaul dan santai, maksimal 2 kalimat: ${message.content}`;
 
     const result = await model.generateContent(prompt);
-    const reply = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const reply = result.response.text(); // Simplifikasi, tidak perlu candidates
 
     if (reply.trim()) {
-      // Potong jika terlalu panjang untuk Discord
-      const finalReply = reply.trim().length > 2000 
-        ? reply.trim().substring(0, 1997) + "..." 
-        : reply.trim();
-      
-      await message.reply(finalReply);
+      await message.reply(reply.trim());
     } else {
-      await message.reply("🤔 Wah, aku bingung nangkep maksud lu. Coba ulangi dengan kata lain dong!");
+      await message.reply("🤔 Maaf, aku belum nemu jawabannya.");
     }
 
   } catch (error) {
-    console.error("❌ Gemini AI error:", error);
-
-    // Handle rate limit dengan lebih baik
-    if (error.status === 429) {
-      if (currentKeyIndex < apiKeys.length - 1) {
-        console.warn(`⚠️ API key ${currentKeyIndex + 1} limit, ganti ke key berikutnya...`);
-        currentKeyIndex++;
+    console.error("❌ Gemini AI error:", error.message);
+    
+    if (error.status === 429 && currentKeyIndex < apiKeys.length - 1) {
+      console.warn(`⚠️ API key ${currentKeyIndex + 1} limit, ganti key...`);
+      currentKeyIndex++;
+      return module.exports(message);
+    }
+    
+    // Handle model not found error
+    if (error.status === 404) {
+      console.log("🔄 Model tidak ditemukan, coba fallback ke gemini-pro...");
+      
+      // Fallback ke gemini-pro yang pasti work
+      try {
+        const genAI = new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
+        const fallbackModel = genAI.getGenerativeModel({ 
+          model: "gemini-pro",
+          generationConfig: {
+            maxOutputTokens: 150,
+            temperature: 0.8,
+          }
+        });
         
-        // Coba lagi dengan key baru
-        setTimeout(() => module.exports(message), 1000);
-      } else {
-        // Semua key habis
-        rateLimitReset = Date.now() + 60000; // 1 menit
-        await message.reply("🚫 Lagi banyak request nih, coba lagi nanti ya!");
+        const prompt = `Jawab singkat dengan bahasa Indonesia gaul: ${message.content}`;
+        const result = await fallbackModel.generateContent(prompt);
+        const reply = result.response.text();
+        
+        if (reply.trim()) {
+          await message.reply(reply.trim().substring(0, 1000));
+        }
+      } catch (fallbackError) {
+        await message.reply("⚠️ AI sedang maintenance, coba lagi nanti!");
       }
     } else {
-      await message.reply("😵 Lagi error nih, coba lagi sebentar ya!");
+      await message.reply("⚠️ Lagi error nih, coba lagi ya!");
     }
   }
 };
