@@ -221,6 +221,11 @@ class ShotgunDuels {
         }
 
         this.games.set(gameId, game);
+        
+        // Update game state after item use
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await this.sendGameState(game);
+        
         return true;
     }
 
