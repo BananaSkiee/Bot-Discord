@@ -21,7 +21,7 @@ module.exports = async (message) => {
   try {
     await message.channel.sendTyping();
 
-    const model = getGenAI().getGenerativeModel({ model: "gemini-pro" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-1.0-pro" });
 
     // Prompt khusus biar bahasanya gaul tapi sopan
     const prompt = `Kamu adalah AI temen ngobrol di Discord yang jawabnya pake bahasa Indonesia gaul, santai, kayak manusia biasa. 
