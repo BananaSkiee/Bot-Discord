@@ -77,6 +77,7 @@ client.on("interactionCreate", async (interaction) => {
 // 📌 Sticky Message Handler
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
+  await slashCommandSetup(client);
   stickyHandler(client, message);
   invitesTracker(client);
 });
