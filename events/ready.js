@@ -27,91 +27,41 @@ module.exports = {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    console.log("🔧 Memulai inisialisasi module...");
-
-    // 🟩 Setup slash command - PRIORITAS UTAMA
-    try {
-      await slashCommandSetup(client);
-      console.log("✅ slashCommandSetup: Completed");
-    } catch (err) {
-      console.error("❌ Gagal setup slash command:", err.message);
-    }
-
     // Update online VC
-    try {
-      await updateOnline(guild);
-      setInterval(() => updateOnline(guild), 10000);
-      console.log("✅ updateOnline: Active");
-    } catch (err) {
-      console.error("❌ updateOnline error:", err.message);
-    }
+    await updateOnline(guild);
+    setInterval(() => updateOnline(guild), 10000);
 
     // Sticky Message
-    try {
-      stickyHandler(client);
-      console.log("✅ stickyHandler: Active");
-    } catch (err) {
-      console.error("❌ stickyHandler error:", err.message);
-    }
+    stickyHandler(client);
 
     // Auto Greeting
-    try {
-      autoGreeting(client);
-      console.log("✅ autoGreeting: Active");
-    } catch (err) {
-      console.error("❌ autoGreeting error:", err.message);
-    }
+    autoGreeting(client);
 
     // 🔢 Counter
-    try {
-      countValidator(client);
-      console.log("✅ countValidator: Active");
-    } catch (err) {
-      console.error("❌ countValidator error:", err.message);
-    }
+    countValidator(client);
 
     // Simulasi BTC
-    try {
-      simulateBTC(client);
-      console.log("✅ simulateBTC: Active");
-    } catch (err) {
-      console.error("❌ simulateBTC error:", err.message);
-    }
+    simulateBTC(client);
 
-    // Auto Chat
-    try { 
-      autoChat(client);
-      console.log("✅ autoChat: Active");
-    } catch (err) { 
-      console.error("❌ Auto chat error:", err.message); 
+    try { autoChat(client); } catch (err) { console.error("❌ Auto chat error:", err); }
+
+    // 🟩 Setup slash command
+    try {
+      await slashCommandSetup(client);
+    } catch (err) {
+      console.error("❌ Gagal setup slash command:", err);
     }
 
     // 🔁 Auto berita
-    try { 
-      beritaModule(client);
-      console.log("✅ beritaModule: Active");
-    } catch (err) { 
-      console.error("❌ Auto berita error:", err.message); 
-    }
+    try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
     
-    // Rainbow Role
-    try { 
-      rainbowRole(client, 60_000);
-      console.log("✅ rainbowRole: Active");
-    } catch (err) { 
-      console.error("❌ Rainbow role error:", err.message); 
-    }
+    try { rainbowRole(client, 60_000); } catch (err) { console.error("❌ Rainbow role error:", err); }
     
     // Update pesan grafik BTC
-    try {
-      setInterval(() => {
-        const newContent = "📈 BTC: $65,000 (+0.4%)";
-        updateCryptoMessage(client, newContent);
-      }, 60_000);
-      console.log("✅ BTC message updater: Active");
-    } catch (err) {
-      console.error("❌ BTC message updater error:", err.message);
-    }
+    setInterval(() => {
+      const newContent = "📈 BTC: $65,000 (+0.4%)"; // bisa dari API
+      updateCryptoMessage(client, newContent);
+    }, 60_000);
 
     // Status berkelas berganti-ganti
     const statuses = [
@@ -130,37 +80,28 @@ module.exports = {
       "⏳ Waktu terus berjalan... dan aku tetap di sini",
     ];
 
-    try {
-      let index = 0;
-      const updateStatus = () => {
-        const status = statuses[index % statuses.length];
-        client.user.setActivity(status, { type: 0 });
-        index++;
-      };
-      updateStatus();
-      setInterval(updateStatus, 60_000);
-      console.log("✅ Status rotation: Active");
-    } catch (err) {
-      console.error("❌ Status rotation error:", err.message);
-    }
+    let index = 0;
+    const updateStatus = () => {
+      const status = statuses[index % statuses.length];
+      client.user.setActivity(status, { type: 0 });
+      index++;
+    };
+    updateStatus();
+    setInterval(updateStatus, 60_000);
 
     // ✅ Auto meme tiap 1 jam
     try {
       const channel = await client.channels.fetch("1352404777513783336");
       setInterval(() => autoSendMeme(channel), 3600000);
-      console.log("✅ autoSendMeme: Active");
     } catch (err) {
-      console.error("❌ Gagal setup auto meme:", err.message);
+      console.error("❌ Gagal fetch channel untuk auto meme:", err);
     }
 
     // ✅ Join voice channel saat online
     try {
       await joinvoice(client);
-      console.log("✅ joinvoice: Completed");
     } catch (err) {
-      console.error("❌ Gagal join voice channel:", err.message);
+      console.error("❌ Gagal join voice channel:", err);
     }
-
-    console.log("🎉 Semua module initialized!");
   },
 };
