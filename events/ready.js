@@ -8,7 +8,6 @@ const updateCryptoMessage = require("../modules/updateCrypto");
 const autoSendMeme = require("../modules/autoMeme");
 const autoDelete = require("../modules/autoDeleteCryptoMessages.js");
 const slashCommandSetup = require("../modules/slashCommandSetup");
-const autoChat = require("../modules/autoChat");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
 
@@ -39,8 +38,6 @@ module.exports = {
 
     // Simulasi BTC
     simulateBTC(client);
-
-    autoChat(client);
 
     try { autoChat(client); } catch (err) { console.error("❌ Auto chat error:", err); }
 
