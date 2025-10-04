@@ -2,12 +2,6 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async (client) => {
-  // Tunggu sampai client ready dan punya token
-  if (!client.isReady()) {
-    console.log("⏳ Menunggu client ready untuk slash command...");
-    return;
-  }
-
   client.commands = new Map();
 
   const commands = [];
@@ -24,15 +18,16 @@ module.exports = async (client) => {
 
   try {
     // 🔧 Gunakan GUILD ID biar pasti
-    const guild = await client.guilds.fetch("1347233781391560837").catch(console.error);
+    const guild = await client.guilds.fetch("1347233781391560837");
     if (guild) {
       await guild.commands.set(commands);
       console.log(`✅ Slash command berhasil didaftarkan di guild "${guild.name}" (${guild.id})`);
-    } else {
-      console.error("❌ Gagal fetch guild untuk slash command");
     }
 
+    // 🌐 Jika ingin global (non-dev):
+    // await client.application.commands.set(commands);
+
   } catch (error) {
-    console.error("❌ Gagal mendaftarkan slash command:", error.message);
+    console.error("❌ Gagal mendaftarkan slash command:", error);
   }
 };
