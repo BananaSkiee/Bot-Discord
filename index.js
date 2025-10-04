@@ -13,7 +13,6 @@ const generateTextGraph = require('./modules/generateTextGraph');
 const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
-const slashCommandSetup = require("./modules/slashCommandSetup");
 const srvName = require("./modules/srvName.js"); 
 
 const client = new Client({
@@ -27,7 +26,6 @@ const client = new Client({
   ],
 });
 
-require("./modules/slashCommandSetup")(client);
 client.commands = new Collection();
 
 // 🌐 Web server (Railway)
@@ -47,7 +45,7 @@ fs.readdirSync("./events").forEach((file) => {
   }
 });
 
-srvName(client);
+// ❌ HAPUS INI: srvName(client); (sudah dipanggil di ready.js)
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
@@ -83,7 +81,6 @@ client.on("messageCreate", async (message) => {
 
 // 🚀 Auto Greeting ketika user join
 client.on("guildMemberAdd", async (member) => {
-  // 1. Jalankan greeting tambahan (opsional)
   autoGreeting(client, member);
 });
 
