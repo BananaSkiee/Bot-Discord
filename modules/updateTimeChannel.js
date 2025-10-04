@@ -7,7 +7,7 @@ const CHANNEL_ID = "1360303391175217343"; // GANTI YAAA!
 // Mapping hari ke Bahasa Indonesia
 const hariIndonesia = {
   Sunday: "Minggu",
-  Monday: "Senin",
+  Monday: "Senin", 
   Tuesday: "Selasa",
   Wednesday: "Rabu",
   Thursday: "Kamis",
@@ -18,8 +18,12 @@ const hariIndonesia = {
 module.exports = (client) => {
   cron.schedule("* * * * *", async () => {
     try {
-      const channel = await client.channels.fetch(CHANNEL_ID);
-      if (!channel || !channel.setName) return;
+      // GUNAKAN CACHE, JANGAN FETCH
+      const channel = client.channels.cache.get(CHANNEL_ID);
+      if (!channel || !channel.setName) {
+        console.log("❌ Channel tidak ditemukan di cache atau bukan voice channel");
+        return;
+      }
 
       const now = moment().tz("Asia/Jakarta");
 
@@ -33,7 +37,7 @@ module.exports = (client) => {
 
       if (channel.name !== namaBaru) {
         await channel.setName(namaBaru);
-        console.log(`✅ Nama channel update: ${namaBaru}`);
+        console.log(`✅ Nama channel diupdate: ${namaBaru}`);
       }
     } catch (error) {
       console.error("❌ Gagal update voice channel waktu:", error.message);
