@@ -1,45 +1,52 @@
-// SINTAKS YANG BENAR UNTUK GOOGLE GEMINI
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-// Inisialisasi Gemini dengan API Key dari Environment Variables
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Pisahkan banyak API key dengan koma di Environment Variables Railway
+if (!process.env.GEMINI_API_KEY) {
+  console.error("❌ GEMINI_API_KEY belum diatur di Environment Variables (Koyeb)!");
+  process.exit(1);
+}
 
-// Ganti dengan ID channel kamu yang benar
-const AI_CHANNEL_ID = "1394478754297811034";
+const apiKeys = process.env.GEMINI_API_KEY.split(",").map(k => k.trim());
+let currentKeyIndex = 0;
+
+function getGenAI() {
+  return new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
+}
+
+const AI_CHANNEL_ID = "1352635177536327760";
 
 module.exports = async (message) => {
-  // Jangan proses pesan dari bot lain atau dari channel yang salah
   if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
 
   try {
-    // Kirim status "sedang mengetik..."
     await message.channel.sendTyping();
 
-    // --- PERUBAHAN DI SINI ---
-    // Pilih model Gemini terbaru yang direkomendasikan.
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Ambil konten pesan dari user
-    const prompt = message.content;
+    // Prompt khusus biar bahasanya gaul tapi sopan
+    const prompt = `Kamu adalah AI temen ngobrol di Discord yang jawabnya pake bahasa Indonesia gaul, santai, kayak manusia biasa. 
+Pake emoticon kadang-kadang biar nggak kaku, tapi jangan kebanyakan. 
+Jawaban harus singkat, nyambung, dan kalau bisa kasih sedikit candaan ringan. 
+Kalau ditanya serius, jawab serius tapi tetep santai. 
+Hindari bahasa formal banget. Jangan pake tanda bintang untuk aksi (*kayak gini*), fokus ke percakapan aja.:
+${message.content}`;
 
-    // Panggil API Gemini untuk menghasilkan konten
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    
-    // Ambil teks balasan dari Gemini
-    const reply = response.text();
+    const reply = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    if (reply) {
-      // Balas pesan user
-      await message.reply(reply);
+    if (reply.trim()) {
+      await message.reply(reply.trim());
     } else {
-      // Jika Gemini tidak memberikan balasan
-      await message.reply("Maaf, saya tidak bisa memikirkan balasan saat ini.");
+      await message.reply("🤔 Maaf, aku belum nemu jawabannya.");
     }
 
   } catch (error) {
-    // Tangani error dari API Gemini
+    if (error.status === 429 && currentKeyIndex < apiKeys.length - 1) {
+      console.warn(`⚠️ API key ${currentKeyIndex + 1} limit, ganti ke key berikutnya...`);
+      currentKeyIndex++;
+      return module.exports(message);
+    }
     console.error("❌ Gemini AI error:", error);
-    await message.reply("⚠️ Maaf, terjadi kesalahan saat saya mencoba berpikir. Coba lagi nanti.");
+    await message.reply("⚠️ Semua API key habis atau ada error.");
   }
 };
