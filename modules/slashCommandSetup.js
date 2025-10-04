@@ -1,3 +1,4 @@
+// modules/slashCommandSetup.js
 const fs = require("fs");
 const path = require("path");
 
@@ -9,22 +10,31 @@ module.exports = async (client) => {
   const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith(".js"));
 
   for (const file of commandFiles) {
-    const command = require(`${commandsPath}/${file}`);
-    if (command?.data && command?.execute) {
-      client.commands.set(command.data.name, command);
-      commands.push(command.data.toJSON());
+    try {
+      const command = require(`${commandsPath}/${file}`);
+      if (command?.data && command?.execute) {
+        client.commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
+      } else {
+        console.warn(`⚠️ Command "${file}" tidak punya data atau execute function.`);
+      }
+    } catch (err) {
+      console.error(`❌ Gagal load command "${file}":`, err);
     }
   }
 
   try {
-    // 🔧 Gunakan GUILD ID biar pasti
-    const guild = await client.guilds.fetch("1347233781391560837");
+    const guildId = process.env.GUILD_ID || "1347233781391560837"; // fallback ID
+    const guild = await client.guilds.fetch(guildId);
+
     if (guild) {
       await guild.commands.set(commands);
-      console.log(`✅ Slash command berhasil didaftarkan di guild "${guild.name}" (${guild.id})`);
+      console.log(`✅ ${commands.length} slash command terdaftar di guild "${guild.name}" (${guild.id})`);
+    } else {
+      console.warn("⚠️ Guild tidak ditemukan.");
     }
 
-    // 🌐 Jika ingin global (non-dev):
+    // 🌐 Untuk global commands:
     // await client.application.commands.set(commands);
 
   } catch (error) {
