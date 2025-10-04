@@ -38,18 +38,13 @@ module.exports = {
     // Auto Greeting
     autoGreeting(client);
 
-    // 🔢 Counter - HANYA INIT, handling di messageCreate
+    // 🔢 Counter
     countValidator(client);
 
     // Simulasi BTC
     simulateBTC(client);
 
-    // Auto Chat
-    try { 
-      autoChat(client); 
-    } catch (err) { 
-      console.error("❌ Auto chat error:", err); 
-    }
+    try { autoChat(client); } catch (err) { console.error("❌ Auto chat error:", err); }
 
     // 🟩 Setup slash command
     try {
@@ -59,22 +54,13 @@ module.exports = {
     }
 
     // 🔁 Auto berita
-    try { 
-      beritaModule(client); 
-    } catch (err) { 
-      console.error("❌ Auto berita error:", err); 
-    }
+    try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
     
-    // Rainbow Role - dengan error handling
-    try { 
-      rainbowRole(client, 60_000); 
-    } catch (err) { 
-      console.error("❌ Rainbow role error:", err); 
-    }
-
+    try { rainbowRole(client, 60_000); } catch (err) { console.error("❌ Rainbow role error:", err); }
+    
     // Update pesan grafik BTC
     setInterval(() => {
-      const newContent = "📈 BTC: $65,000 (+0.4%)";
+      const newContent = "📈 BTC: $65,000 (+0.4%)"; // bisa dari API
       updateCryptoMessage(client, newContent);
     }, 60_000);
 
