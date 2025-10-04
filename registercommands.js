@@ -1,52 +1,37 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { REST, Routes } = require("discord.js");
+require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 
-// Pisahkan banyak API key dengan koma di Environment Variables Railway
-if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY belum diatur di Environment Variables (Koyeb)!");
+const { CLIENT_ID, GUILD_ID, TOKEN } = process.env;
+
+if (!CLIENT_ID || !GUILD_ID || !TOKEN) {
+  console.error("❌ CLIENT_ID, GUILD_ID, atau TOKEN belum diatur di .env");
   process.exit(1);
 }
 
-const apiKeys = process.env.GEMINI_API_KEY.split(",").map(k => k.trim());
-let currentKeyIndex = 0;
+const commands = [];
+const commandsPath = path.join(__dirname, "commands");
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith(".js"));
 
-function getGenAI() {
-  return new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
+for (const file of commandFiles) {
+  const command = require(`./commands/${file}`);
+  if (command?.data) {
+    commands.push(command.data.toJSON());
+  }
 }
 
-const AI_CHANNEL_ID = "1352635177536327760";
+const rest = new REST({ version: "10" }).setToken(TOKEN);
 
-module.exports = async (message) => {
-  if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
-
+(async () => {
   try {
-    await message.channel.sendTyping();
-
-    const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // Prompt khusus biar bahasanya gaul tapi sopan
-    const prompt = `Kamu adalah AI temen ngobrol di Discord yang jawabnya pake bahasa Indonesia gaul, santai, kayak manusia biasa. 
-Pake emoticon kadang-kadang biar nggak kaku, tapi jangan kebanyakan. 
-Jawaban harus singkat, nyambung, dan kalau bisa kasih sedikit candaan ringan. 
-Kalau ditanya serius, jawab serius tapi tetep santai. 
-Hindari bahasa formal banget. Jangan pake tanda bintang untuk aksi (*kayak gini*), fokus ke percakapan aja.:
-${message.content}`;
-
-    const result = await model.generateContent(prompt);
-    const reply = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    if (reply.trim()) {
-      await message.reply(reply.trim());
-    } else {
-      await message.reply("🤔 Maaf, aku belum nemu jawabannya.");
-    }
-
+    console.log(`🚀 Registering ${commands.length} slash commands...`);
+    await rest.put(
+      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+      { body: commands }
+    );
+    console.log("✅ Slash commands berhasil didaftarkan!");
   } catch (error) {
-    if (error.status === 429 && currentKeyIndex < apiKeys.length - 1) {
-      console.warn(`⚠️ API key ${currentKeyIndex + 1} limit, ganti ke key berikutnya...`);
-      currentKeyIndex++;
-      return module.exports(message);
-    }
-    console.error("❌ Gemini AI error:", error);
-    await message.reply("⚠️ Semua API key habis atau ada error.");
+    console.error("❌ Gagal daftar commands:", error);
   }
-};
+})();
