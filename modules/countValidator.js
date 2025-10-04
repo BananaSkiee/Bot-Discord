@@ -9,7 +9,26 @@ if (!fs.existsSync(FILE_PATH)) {
   fs.writeFileSync(FILE_PATH, JSON.stringify({ lastCount: 122, lastUserId: null }, null, 2));
 }
 
-module.exports = async (message) => {
+module.exports = (client) => {
+  // Pastikan client ready
+  if (!client.isReady()) {
+    console.log("⏳ Menunggu client ready untuk countValidator...");
+    return;
+  }
+
+  try {
+    console.log("🔢 Count validator aktif");
+    
+    // Count validator sebenarnya butuh message event, jadi kita hanya log saja
+    // Function utama akan dipanggil dari messageCreate event
+    
+  } catch (error) {
+    console.error("❌ Error di countValidator:", error.message);
+  }
+};
+
+// Export function untuk handle message
+module.exports.handleMessage = async (message) => {
   if (message.channel.id !== CHANNEL_ID) return;
   if (message.author.bot) return;
 
