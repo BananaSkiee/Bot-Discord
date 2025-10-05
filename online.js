@@ -32,7 +32,7 @@ const logChannel = guild.channels.cache.get(process.env.LOG_CHANNEL_ID); // Log 
     }
 
   } catch (err) {
-    console.error("❌ Gagal update:", err.message);
+    console.error("❌ Gagal update online:", err.message);
     const logChannel = guild.channels.cache.get(config.logChannelId);
     if (logChannel && logChannel.isTextBased()) {
       logChannel.send(`❌ Error saat update: ${err.message}`);
