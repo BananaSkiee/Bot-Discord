@@ -30,12 +30,52 @@ const client = new Client({
 require("./modules/slashCommandSetup")(client);
 client.commands = new Collection();
 
-// 🌐 Web server (Railway)
+// 🌐 Web server (Koyeb)
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Health check endpoint
 app.get("/", (_, res) => res.send("✅ Bot Akira aktif"));
-app.listen(process.env.PORT || 3000, () => {
-  console.log("🌐 Web server hidup di port 3000");
+app.get("/health", (_, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
+  });
 });
+
+const server = app.listen(PORT, () => {
+  console.log("🌐 Web server hidup di port " + PORT);
+});
+
+// 🔄 Self-ping system untuk menjaga Koyeb tetap aktif
+function startSelfPing() {
+  const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
+  const PING_INTERVAL = 3 * 60 * 1000; // 3 menit
+  
+  console.log(`🔄 Starting self-ping system to: ${SELF_PING_URL}`);
+  
+  setInterval(async () => {
+    try {
+      const response = await fetch(SELF_PING_URL);
+      if (response.ok) {
+        console.log('✅ Self-ping successful -', new Date().toLocaleTimeString());
+      } else {
+        console.log('⚠️ Self-ping returned status:', response.status);
+      }
+    } catch (error) {
+      console.log('❌ Self-ping failed:', error.message);
+    }
+  }, PING_INTERVAL);
+  
+  // Ping immediately on startup
+  setTimeout(() => {
+    fetch(`https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/`)
+      .then(() => console.log('✅ Initial ping successful'))
+      .catch(err => console.log('❌ Initial ping failed:', err.message));
+  }, 5000);
+}
 
 // 📂 Load events dari folder /events
 fs.readdirSync("./events").forEach((file) => {
@@ -102,5 +142,21 @@ process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
 });
 
+// 🚀 Start bot dan self-ping system
+client.once("ready", () => {
+  console.log(`✅ ${client.user.tag} is now online!`);
+  startSelfPing(); // Start self-ping setelah bot ready
+});
+
 // 🔐 Login bot
 client.login(config.token);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully');
+  client.destroy();
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
+});
