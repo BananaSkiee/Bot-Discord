@@ -26,20 +26,21 @@ module.exports = {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
-    // Update online VC
-    await updateOnline(guild);
-    setInterval(() => updateOnline(guild), 10000);
+    // 🔁 Fitur online VC counter
+    const guild = client.guilds.cache.first();
+    if (guild) {
+      try {
+        await updateOnline(guild);
+        setInterval(() => updateOnline(guild), 60_000);
+      } catch (err) {
+        console.error("❌ Gagal update online VC:", err);
+      }
+    }
 
-    // Sticky Message
-    stickyHandler(client);
-
-    // Auto Greeting
-    autoGreeting(client);
-
-    // Simulasi BTC
-    simulateBTC(client);
-
-    try { autoChat(client); } catch (err) { console.error("❌ Auto chat error:", err); }
+    // 🔄 Jalankan semua fitur background
+    try { stickyHandler(client); } catch (err) { console.error("❌ Sticky handler error:", err); }
+    try { autoGreeting(client); } catch (err) { console.error("❌ Auto greeting error:", err); }
+    try { simulateBTC(client); } catch (err) { console.error("❌ Simulasi BTC error:", err); }
 
     // 🟩 Setup slash command
     try {
