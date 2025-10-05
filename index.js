@@ -128,10 +128,15 @@ client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
 });
 
-// 🔁 Update jumlah user online di VC
-client.on("presenceUpdate", () => updateOnline(client));
-client.on("voiceStateUpdate", () => updateOnline(client));
-
+// 🔁 Update jumlah online
+client.on("presenceUpdate", () => {
+  const guild = client.guilds.cache.first();
+  if (guild) updateOnline(guild);
+});
+client.on("voiceStateUpdate", () => {
+  const guild = client.guilds.cache.first();
+  if (guild) updateOnline(guild);
+});
 // ⏱ Update waktu di voice channel tiap 30 detik
 setInterval(() => {
   updateTimeChannel(client);
