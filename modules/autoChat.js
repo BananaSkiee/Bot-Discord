@@ -13,7 +13,7 @@ function getGenAI() {
   return new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
 }
 
-const AI_CHANNEL_ID = "1352800131933802547";
+const AI_CHANNEL_ID = "1352635177536327760";
 
 module.exports = async (message) => {
   if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
