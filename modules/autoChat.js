@@ -15,48 +15,6 @@ function getGenAI() {
 
 const AI_CHANNEL_ID = "1352800131933802547";
 
-// Cache untuk model yang berhasil
-let workingModel = null;
-
-// Function untuk mendapatkan model yang kompatibel
-async function getCompatibleModel(genAI) {
-  // Prioritaskan model yang paling dasar dan kompatibel
-  const compatibleModels = [
-    "gemini-pro",           // Model paling dasar
-    "models/gemini-pro",    // Format alternatif
-    "gemini-1.0-pro",       // Fallback ke versi 1.0
-  ];
-
-  for (const modelName of compatibleModels) {
-    try {
-      console.log(`🔍 Mencoba model: ${modelName}`);
-      const model = genAI.getGenerativeModel({ 
-        model: modelName,
-        generationConfig: {
-          temperature: 0.8,
-          topP: 0.9,
-          topK: 40,
-          maxOutputTokens: 1000,
-        }
-      });
-      
-      // Test kecil dengan prompt sederhana
-      const testResult = await model.generateContent("Hai");
-      const testReply = testResult.response?.text();
-      
-      if (testReply && testReply.trim()) {
-        console.log(`✅ Model ${modelName} berhasil!`);
-        return model;
-      }
-    } catch (error) {
-      console.log(`❌ Model ${modelName} gagal: ${error.message}`);
-      continue;
-    }
-  }
-  
-  return null;
-}
-
 module.exports = async (message) => {
   if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
 
@@ -65,14 +23,17 @@ module.exports = async (message) => {
 
     const genAI = getGenAI();
     
-    // Gunakan cached model atau cari yang kompatibel
-    if (!workingModel) {
-      workingModel = await getCompatibleModel(genAI);
-    }
-
-    if (!workingModel) {
-      throw new Error("Tidak ada model Gemini yang kompatibel");
-    }
+    // ✅ GUNAKAN MODEL YANG MODERN DAN TERBARU
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.0-flash-exp", // Model experimental terbaru
+      // model: "gemini-1.5-flash-latest", // Alternatif
+      generationConfig: {
+        temperature: 0.8,
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 1000,
+      }
+    });
 
     // Prompt khusus biar bahasanya gaul tapi sopan
     const prompt = `Kamu adalah AI temen ngobrol di Discord yang jawabnya pake bahasa Indonesia gaul, santai, kayak manusia biasa. 
@@ -84,7 +45,7 @@ Hindari bahasa formal banget. Jangan pake tanda bintang untuk aksi (*kayak gini*
 User: ${message.content}
 AI:`;
 
-    const result = await workingModel.generateContent(prompt);
+    const result = await model.generateContent(prompt);
     const reply = result.response?.text() || "";
 
     if (reply.trim()) {
@@ -99,20 +60,35 @@ AI:`;
     console.error("❌ Gemini AI error:", error);
     
     if (error.status === 404) {
-      // Model tidak ditemukan, reset cache
-      workingModel = null;
-      
-      if (currentKeyIndex < apiKeys.length - 1) {
-        console.warn(`🔄 Model tidak ditemukan, ganti API key...`);
-        currentKeyIndex++;
-        return module.exports(message);
-      } else {
-        await message.reply("🤖 Fitur AI sedang maintenance nih, coba lagi nanti ya!");
+      // Coba model alternatif
+      try {
+        const genAI = getGenAI();
+        const fallbackModel = genAI.getGenerativeModel({ 
+          model: "gemini-1.5-flash-latest",
+          generationConfig: {
+            temperature: 0.8,
+            topP: 0.9,
+            topK: 40,
+            maxOutputTokens: 1000,
+          }
+        });
+        
+        const result = await fallbackModel.generateContent(message.content);
+        const reply = result.response?.text() || "";
+        
+        if (reply.trim()) {
+          const trimmedReply = reply.length > 2000 ? reply.substring(0, 1997) + "..." : reply;
+          await message.reply(trimmedReply.trim());
+          return;
+        }
+      } catch (fallbackError) {
+        console.error("❌ Fallback model juga gagal:", fallbackError);
       }
+      
+      await message.reply("🤖 Fitur AI sedang update, coba lagi nanti ya!");
     }
     else if (error.status === 429 && currentKeyIndex < apiKeys.length - 1) {
       console.warn(`⚠️ API key ${currentKeyIndex + 1} limit, ganti key...`);
-      workingModel = null;
       currentKeyIndex++;
       return module.exports(message);
     } 
@@ -122,22 +98,21 @@ AI:`;
   }
 };
 
-// Cek kompatibilitas saat startup
+// Test koneksi dengan model modern
 setTimeout(async () => {
   try {
     const genAI = getGenAI();
-    console.log("🔄 Mengecek model Gemini yang tersedia...");
+    console.log("🔄 Testing Gemini API dengan model modern...");
     
-    // Coba langsung dengan model dasar
-    const testModel = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const testResult = await testModel.generateContent("Test");
-    console.log("✅ Gemini API terhubung dengan model 'gemini-pro'");
+    const testModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const testResult = await testModel.generateContent("Halo, test connection");
+    console.log("✅ Gemini API terhubung dengan model modern!");
     
   } catch (error) {
-    console.error("❌ Gagal terhubung ke Gemini API:", error.message);
-    console.log("💡 Tips: Pastikan:");
-    console.log("  1. API key valid dan memiliki akses Gemini");
-    console.log("  2. Package @google/generative-ai terupdate");
-    console.log("  3. Model 'gemini-pro' tersedia di region Anda");
+    console.error("❌ Gagal terhubung:", error.message);
+    console.log("🔧 Solusi:");
+    console.log("  1. Update package: npm install @google/generative-ai@latest");
+    console.log("  2. Cek API key di: https://aistudio.google.com/");
+    console.log("  3. Pastikan region tidak diblock");
   }
 }, 2000);
