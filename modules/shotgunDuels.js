@@ -41,129 +41,113 @@ class ShotgunDuels {
         return items;
     }
 
-    startGame(player1, player2, channel) {
+    // Di modules/shotgunDuels.js - GANTI startGame method
+startGame(player1, player2, channel) {
+    try {
+        console.log(`🎮 START GAME: ${player1.username} vs ${player2.username}`);
         const gameId = `${player1.id}-${player2.id}-${Date.now()}`;
         
-        console.log(`🎮 Starting game: ${gameId}`);
+        // PELURU DIACAK - 4 isi, 4 kosong
+        const loaded = 4;
+        const empty = 4;
+        const chambers = [
+            ...Array(loaded).fill('💥'), 
+            ...Array(empty).fill('⚪')
+        ].sort(() => Math.random() - 0.5);
         
-        const chambers = this.generateChambers();
+        console.log(`🔧 Chambers: ${chambers.join(' ')}`);
+        
         const game = {
             id: gameId,
             players: [player1, player2],
             currentPlayer: 0,
             chambers: chambers,
             currentChamber: 0,
-            items: {
-                [player1.id]: this.generateItems(),
-                [player2.id]: this.generateItems()
+            items: { 
+                [player1.id]: ['🚬', '🔪'], // Item test
+                [player2.id]: ['🍺', '🔎'] 
             },
-            health: {
-                [player1.id]: 5,
-                [player2.id]: 5
-            },
-            effects: {
-                [player1.id]: { kater: false, borgol: false, extraTurn: false },
-                [player2.id]: { kater: false, borgol: false, extraTurn: false }
-            },
+            health: { [player1.id]: 5, [player2.id]: 5 },
+            effects: { [player1.id]: {}, [player2.id]: {} },
             channel: channel,
-            revealedChamber: null
         };
 
         this.games.set(gameId, game);
         console.log(`✅ Game created: ${gameId}`);
+        
+        console.log(`📤 Calling sendGameState...`);
         this.sendGameState(game);
+        
         return gameId;
+    } catch (error) {
+        console.error('❌ Error in startGame:', error);
     }
+}
 
     async sendGameState(game) {
-        try {
-            console.log(`🔧 Sending game state for: ${game.id}`);
-            
-            const player = game.players[game.currentPlayer];
-            const opponent = game.players[1 - game.currentPlayer];
-            
-            const loadedCount = game.chambers.filter(c => c === '💥').length;
-            const emptyCount = game.chambers.filter(c => c === '⚪').length;
+    try {
+        console.log(`🎯 DEBUG: Sending game state for ${game.id}`);
+        
+        const player = game.players[game.currentPlayer];
+        const opponent = game.players[1 - game.currentPlayer];
+        
+        const loadedCount = game.chambers.filter(c => c === '💥').length;
+        const emptyCount = game.chambers.filter(c => c === '⚪').length;
+        
+        console.log(`🔫 Chamber info: ${loadedCount} loaded, ${emptyCount} empty`);
 
-            const embed = new EmbedBuilder()
-                .setTitle('🔫 **SHOTGUN DUELS** 🔫')
-                .setColor(0x00AE86)
-                .setDescription(`**${player.username}** vs **${opponent.username}**`)
-                .addFields(
-                    {
-                        name: '❤️ **DARAH**',
-                        value: `${game.players[0].username}: ${'❤️'.repeat(game.health[game.players[0].id])}${'♡'.repeat(5 - game.health[game.players[0].id])} (${game.health[game.players[0].id]}/5)\n${game.players[1].username}: ${'❤️'.repeat(game.health[game.players[1].id])}${'♡'.repeat(5 - game.health[game.players[1].id])} (${game.health[game.players[1].id]}/5)}`,
-                        inline: false
-                    },
-                    {
-                        name: '🔫 **PELURU**',
-                        value: `💥 Loaded: ${loadedCount} | ⚪ Empty: ${emptyCount}\nChamber saat ini: ${game.currentChamber + 1}/8`,
-                        inline: false
-                    },
-                    {
-                        name: '🎒 **ITEM KAMU**',
-                        value: game.items[player.id].length > 0 
-                            ? game.items[player.id].map(item => `${item} **${this.ITEMS[item].name}** - ${this.ITEMS[item].effect}`).join('\n')
-                            : '❌ Tidak ada item',
-                        inline: false
-                    }
-                )
-                .setFooter({ text: `Giliran: ${player.username} • Gunakan button di bawah untuk bermain` });
+        const embed = new EmbedBuilder()
+            .setTitle('🔫 SHOTGUN DUELS')
+            .setDescription(`**${player.username}** 🆚 **${opponent.username}**`)
+            .setColor(0xFF0000)
+            .addFields(
+                { 
+                    name: '❤️ DARAH', 
+                    value: `${player.username}: ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n${opponent.username}: ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`, 
+                    inline: false 
+                },
+                { 
+                    name: '🔫 PELURU', 
+                    value: `💥 Isi: ${loadedCount} | ⚪ Kosong: ${emptyCount}\nChamber: ${game.currentChamber + 1}/8`, 
+                    inline: true 
+                },
+                { 
+                    name: '🎒 ITEM', 
+                    value: game.items[player.id].map(item => item).join(' ') || 'Tidak ada', 
+                    inline: true 
+                }
+            )
+            .setFooter({ text: `Giliran: ${player.username}` });
 
-            const buttons = [];
-            
-            if (game.items[player.id].length > 0) {
-                game.items[player.id].forEach((item, index) => {
-                    buttons.push(
-                        new ButtonBuilder()
-                            .setCustomId(`use_item_${game.id}_${index}`)
-                            .setLabel(this.ITEMS[item].name)
-                            .setEmoji(item)
-                            .setStyle(ButtonStyle.Primary)
-                    );
-                });
-            }
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`shoot_self_${game.id}`)
+                .setLabel('Tembak Diri')
+                .setEmoji('🎯')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId(`shoot_opponent_${game.id}`)
+                .setLabel(`Tembak ${opponent.username}`)
+                .setEmoji('🔫')
+                .setStyle(ButtonStyle.Danger)
+        );
 
-            const actionButtons = [
-                new ButtonBuilder()
-                    .setCustomId(`shoot_self_${game.id}`)
-                    .setLabel('Tembak Diri Sendiri')
-                    .setEmoji('🎯')
-                    .setStyle(ButtonStyle.Danger),
-                new ButtonBuilder()
-                    .setCustomId(`shoot_opponent_${game.id}`)
-                    .setLabel('Tembak Lawan')
-                    .setEmoji('🔫')
-                    .setStyle(ButtonStyle.Success),
-                new ButtonBuilder()
-                    .setCustomId(`view_chamber_${game.id}`)
-                    .setLabel('Lihat Chamber')
-                    .setEmoji('🔍')
-                    .setStyle(ButtonStyle.Secondary)
-            ];
+        console.log(`📤 Sending to channel...`);
+        await game.channel.send({ 
+            content: `🎮 **GAME DIMULAI!**`,
+            embeds: [embed], 
+            components: [row] 
+        });
+        
+        console.log(`✅ Game state sent successfully!`);
 
-            const rows = [];
-            if (buttons.length > 0) {
-                const itemRow = new ActionRowBuilder().addComponents(buttons.slice(0, 3));
-                rows.push(itemRow);
-            }
-            if (buttons.length > 3) {
-                const itemRow2 = new ActionRowBuilder().addComponents(buttons.slice(3, 6));
-                rows.push(itemRow2);
-            }
-            
-            const actionRow = new ActionRowBuilder().addComponents(actionButtons);
-            rows.push(actionRow);
-
-            console.log(`📤 Sending embed to channel...`);
-            await game.channel.send({ embeds: [embed], components: rows });
-            console.log(`✅ Game state sent successfully!`);
-
-        } catch (error) {
-            console.error('❌ Error sending game state:', error);
-        }
+    } catch (error) {
+        console.error('❌ DEBUG: Error in sendGameState:', error);
+        console.error('❌ Error details:', error.message);
+        console.error('❌ Error stack:', error.stack);
     }
-
+}
+    
     async useItem(gameId, playerId, itemIndex) {
         const game = this.games.get(gameId);
         if (!game || game.players[game.currentPlayer].id !== playerId) return false;
