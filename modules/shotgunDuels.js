@@ -16,7 +16,7 @@ class ShotgunDuels {
     generateChambers() {
         let chambers;
         do {
-            const empty = Math.floor(Math.random() * 7) + 1;
+            const empty = Math.floor(Math.random() * 6) + 2; // 2-7 empty
             const loaded = 8 - empty;
             chambers = [
                 ...Array(loaded).fill('💥'),
@@ -41,112 +41,130 @@ class ShotgunDuels {
         return items;
     }
 
-    // Di modules/shotgunDuels.js - GANTI startGame method
-startGame(player1, player2, channel) {
-    try {
-        console.log(`🎮 START GAME: ${player1.username} vs ${player2.username}`);
-        const gameId = `${player1.id}-${player2.id}-${Date.now()}`;
-        
-        // PELURU DIACAK - 4 isi, 4 kosong
-        const loaded = 4;
-        const empty = 4;
-        const chambers = [
-            ...Array(loaded).fill('💥'), 
-            ...Array(empty).fill('⚪')
-        ].sort(() => Math.random() - 0.5);
-        
-        console.log(`🔧 Chambers: ${chambers.join(' ')}`);
-        
-        const game = {
-            id: gameId,
-            players: [player1, player2],
-            currentPlayer: 0,
-            chambers: chambers,
-            currentChamber: 0,
-            items: { 
-                [player1.id]: ['🚬', '🔪'], // Item test
-                [player2.id]: ['🍺', '🔎'] 
-            },
-            health: { [player1.id]: 5, [player2.id]: 5 },
-            effects: { [player1.id]: {}, [player2.id]: {} },
-            channel: channel,
-        };
+    startGame(player1, player2, channel) {
+        try {
+            console.log(`🎮 START GAME: ${player1.username} vs ${player2.username}`);
+            const gameId = `${player1.id}-${player2.id}-${Date.now()}`;
+            
+            const chambers = this.generateChambers();
+            
+            console.log(`🔫 Chambers: ${chambers.join(' ')}`);
+            
+            const game = {
+                id: gameId,
+                players: [player1, player2],
+                currentPlayer: 0,
+                chambers: chambers,
+                currentChamber: 0,
+                items: { 
+                    [player1.id]: this.generateItems(),
+                    [player2.id]: this.generateItems()
+                },
+                health: { [player1.id]: 5, [player2.id]: 5 },
+                effects: { [player1.id]: {}, [player2.id]: {} },
+                channel: channel,
+                revealedChamber: null
+            };
 
-        this.games.set(gameId, game);
-        console.log(`✅ Game created: ${gameId}`);
-        
-        console.log(`📤 Calling sendGameState...`);
-        this.sendGameState(game);
-        
-        return gameId;
-    } catch (error) {
-        console.error('❌ Error in startGame:', error);
+            this.games.set(gameId, game);
+            console.log(`✅ Game created: ${gameId}`);
+            
+            this.sendGameState(game);
+            
+            return gameId;
+        } catch (error) {
+            console.error('❌ Error in startGame:', error);
+            return null;
+        }
     }
-}
 
     async sendGameState(game) {
-    try {
-        console.log(`🎯 DEBUG: Sending game state for ${game.id}`);
-        
-        const player = game.players[game.currentPlayer];
-        const opponent = game.players[1 - game.currentPlayer];
-        
-        const loadedCount = game.chambers.filter(c => c === '💥').length;
-        const emptyCount = game.chambers.filter(c => c === '⚪').length;
-        
-        console.log(`🔫 Chamber info: ${loadedCount} loaded, ${emptyCount} empty`);
+        try {
+            const player = game.players[game.currentPlayer];
+            const opponent = game.players[1 - game.currentPlayer];
+            
+            const loadedCount = game.chambers.filter(c => c === '💥').length;
+            const emptyCount = game.chambers.filter(c => c === '⚪').length;
+            
+            // Chamber preview dengan revealed chamber
+            let chamberInfo = `💥 Isi: ${loadedCount} | ⚪ Kosong: ${emptyCount}\n`;
+            chamberInfo += `Chamber: ${game.currentChamber + 1}/8`;
+            
+            if (game.revealedChamber) {
+                chamberInfo += ` | 🔍 Next: ${game.revealedChamber === '💥' ? '💥 LOADED' : '⚪ EMPTY'}`;
+                game.revealedChamber = null; // Reset setelah ditampilkan
+            }
 
-        const embed = new EmbedBuilder()
-            .setTitle('🔫 SHOTGUN DUELS')
-            .setDescription(`**${player.username}** 🆚 **${opponent.username}**`)
-            .setColor(0xFF0000)
-            .addFields(
-                { 
-                    name: '❤️ DARAH', 
-                    value: `${player.username}: ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n${opponent.username}: ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`, 
-                    inline: false 
-                },
-                { 
-                    name: '🔫 PELURU', 
-                    value: `💥 Isi: ${loadedCount} | ⚪ Kosong: ${emptyCount}\nChamber: ${game.currentChamber + 1}/8`, 
-                    inline: true 
-                },
-                { 
-                    name: '🎒 ITEM', 
-                    value: game.items[player.id].map(item => item).join(' ') || 'Tidak ada', 
-                    inline: true 
-                }
-            )
-            .setFooter({ text: `Giliran: ${player.username}` });
+            const embed = new EmbedBuilder()
+                .setTitle('🔫 SHOTGUN DUELS')
+                .setDescription(`**${player.username}** 🆚 **${opponent.username}**`)
+                .setColor(0xFF0000)
+                .addFields(
+                    { 
+                        name: '❤️ DARAH', 
+                        value: `${player.username}: ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n${opponent.username}: ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '🔫 PELURU', 
+                        value: chamberInfo, 
+                        inline: true 
+                    },
+                    { 
+                        name: `🎒 ITEM ${player.username}`, 
+                        value: game.items[player.id].map((item, index) => `${item} ${this.ITEMS[item].name}`).join('\n') || 'Tidak ada item', 
+                        inline: true 
+                    }
+                )
+                .setFooter({ text: `Giliran: ${player.username}` });
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setCustomId(`shoot_self_${game.id}`)
-                .setLabel('Tembak Diri')
-                .setEmoji('🎯')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setCustomId(`shoot_opponent_${game.id}`)
-                .setLabel(`Tembak ${opponent.username}`)
-                .setEmoji('🔫')
-                .setStyle(ButtonStyle.Danger)
-        );
+            // Tombol Item
+            const itemButtons = [];
+            game.items[player.id].forEach((item, index) => {
+                itemButtons.push(
+                    new ButtonBuilder()
+                        .setCustomId(`use_item_${game.id}_${index}`)
+                        .setLabel(this.ITEMS[item].name)
+                        .setEmoji(item)
+                        .setStyle(ButtonStyle.Primary)
+                );
+            });
 
-        console.log(`📤 Sending to channel...`);
-        await game.channel.send({ 
-            content: `🎮 **GAME DIMULAI!**`,
-            embeds: [embed], 
-            components: [row] 
-        });
-        
-        console.log(`✅ Game state sent successfully!`);
+            const itemRow = itemButtons.length > 0 ? 
+                new ActionRowBuilder().addComponents(...itemButtons) : null;
 
-    } catch (error) {
-        console.error('❌ DEBUG: Error in sendGameState:', error);
-        console.error('❌ Error details:', error.message);
-        console.error('❌ Error stack:', error.stack);
+            // Tombol Aksi
+            const actionRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`shoot_self_${game.id}`)
+                    .setLabel('Tembak Diri')
+                    .setEmoji('🎯')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId(`shoot_opponent_${game.id}`)
+                    .setLabel(`Tembak ${opponent.username}`)
+                    .setEmoji('🔫')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId(`view_chamber_${game.id}`)
+                    .setLabel('Lihat Chamber')
+                    .setEmoji('🔍')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+            const components = [];
+            if (itemRow) components.push(itemRow);
+            components.push(actionRow);
+
+            await game.channel.send({ 
+                embeds: [embed], 
+                components: components 
+            });
+
+        } catch (error) {
+            console.error('❌ Error in sendGameState:', error);
+        }
     }
-}
     
     async useItem(gameId, playerId, itemIndex) {
         const game = this.games.get(gameId);
@@ -171,9 +189,14 @@ startGame(player1, player2, channel) {
                 break;
                 
             case '🍺':
-                const removed = game.chambers.shift();
-                game.currentChamber = Math.max(0, game.currentChamber - 1);
-                message = `**${game.players[game.currentPlayer].username}** menggunakan 🍺 **Minum**! Peluru terdepan dibuang (${removed === '💥' ? '💥 Loaded' : '⚪ Empty'})`;
+                if (game.chambers.length > 0) {
+                    const removed = game.chambers.shift();
+                    game.currentChamber = Math.max(0, game.currentChamber - 1);
+                    message = `**${game.players[game.currentPlayer].username}** menggunakan 🍺 **Minum**! Peluru terdepan dibuang (${removed === '💥' ? '💥 Loaded' : '⚪ Empty'})`;
+                    
+                    // Check if need reset
+                    this.checkChamberReset(game);
+                }
                 break;
                 
             case '🔪':
@@ -219,11 +242,14 @@ startGame(player1, player2, channel) {
         const playerEffects = game.effects[playerId];
 
         let damage = 0;
+        let extraTurn = false;
+
         if (isLoaded) {
             damage = playerEffects.kater ? 2 : 1;
             playerEffects.kater = false;
         }
 
+        // 🎯 ANIMASI TEMBAK
         const shootEmbed = new EmbedBuilder()
             .setColor(0xFF0000)
             .setDescription(`🔫 **${shooter.username}** menembak **${target === 'self' ? 'diri sendiri' : targetPlayer.username}**...`);
@@ -232,9 +258,9 @@ startGame(player1, player2, channel) {
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         let resultEmbed;
-        let extraTurn = false;
 
         if (isLoaded) {
+            // 💥 HIT - Kena damage
             game.health[targetPlayer.id] = Math.max(0, game.health[targetPlayer.id] - damage);
             
             resultEmbed = new EmbedBuilder()
@@ -242,49 +268,63 @@ startGame(player1, player2, channel) {
                 .setDescription(`💥 **HIT!** ${target === 'self' ? '**Diri sendiri**' : `**${targetPlayer.username}**`} kena ${damage} damage! ${damage > 1 ? '**(2x KATER!)**' : ''}\n❤️ ${targetPlayer.username}: ${game.health[targetPlayer.id]}/5`);
 
         } else {
+            // ⚪ MISS - Tidak kena damage
             resultEmbed = new EmbedBuilder()
                 .setColor(0x44FF44)
                 .setDescription(`⚪ **MISS!** ${target === 'self' ? '**Diri sendiri**' : `**${targetPlayer.username}**`} selamat!`);
 
+            // Bonus turn jika tembak diri sendiri dan miss
             if (target === 'self') {
                 extraTurn = true;
-                playerEffects.extraTurn = true;
+                resultEmbed.setDescription(resultEmbed.data.description + `\n\n🎉 **BONUS TURN!** ${shooter.username} dapat giliran lagi!`);
             }
         }
 
+        // Update chamber
         game.currentChamber++;
         if (game.currentChamber >= game.chambers.length) {
             game.currentChamber = 0;
         }
 
-        const loadedRemaining = game.chambers.filter(c => c === '💥').length;
-        const emptyRemaining = game.chambers.filter(c => c === '⚪').length;
-
-        if (loadedRemaining === 0 || emptyRemaining === 0) {
-            await this.resetChambers(game);
-        }
+        // Check chamber reset
+        this.checkChamberReset(game);
 
         await message.edit({ embeds: [resultEmbed] });
 
+        // Check game over
         if (game.health[targetPlayer.id] <= 0) {
             await this.endGame(game, shooter);
             return true;
         }
 
-        if (!extraTurn && !playerEffects.borgol) {
-            game.currentPlayer = 1 - game.currentPlayer;
-        } else if (playerEffects.borgol) {
+        // Update turn logic
+        if (playerEffects.borgol) {
+            // Borgol active - tetap giliran yang sama
             playerEffects.borgol = false;
-            if (!extraTurn) {
-                playerEffects.extraTurn = true;
-            }
+            resultEmbed.setDescription(resultEmbed.data.description + `\n\n🔗 **BORGOL ACTIVE!** ${shooter.username} dapat tembak lagi!`);
+            await message.edit({ embeds: [resultEmbed] });
+        } else if (!extraTurn) {
+            // Normal turn - pindah ke lawan
+            game.currentPlayer = 1 - game.currentPlayer;
         }
+        // Jika extraTurn true (tembak diri miss), tetap giliran yang sama
 
         this.games.set(gameId, game);
         await new Promise(resolve => setTimeout(resolve, 3000));
         await this.sendGameState(game);
 
         return true;
+    }
+
+    checkChamberReset(game) {
+        const loadedRemaining = game.chambers.filter(c => c === '💥').length;
+        const emptyRemaining = game.chambers.filter(c => c === '⚪').length;
+
+        if (loadedRemaining === 0 || emptyRemaining === 0) {
+            this.resetChambers(game);
+            return true;
+        }
+        return false;
     }
 
     async resetChambers(game) {
