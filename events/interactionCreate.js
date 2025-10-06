@@ -18,68 +18,68 @@ module.exports = {
       console.log("👉 Tombol ditekan:", interaction.customId);
 
       // ========== SHOTGUN DUELS BUTTON HANDLER - TAMBAHAN BARU ==========
-      if (interaction.isButton() && (
-        interaction.customId.startsWith('use_item_') || 
-        interaction.customId.startsWith('shoot_') || 
-        interaction.customId.startsWith('view_chamber_')
-      )) {
-        const customId = interaction.customId;
-        const parts = customId.split('_');
-        const action = parts[0] + '_' + parts[1];
-        const gameId = parts[2];
-        
-        const game = gameManager.getGame(gameId);
-        if (!game) {
-          await interaction.reply({ 
-            content: '❌ Game tidak ditemukan atau sudah selesai!', 
+if (interaction.isButton() && (
+    interaction.customId.startsWith('use_item_') || 
+    interaction.customId.startsWith('shoot_') || 
+    interaction.customId.startsWith('view_chamber_')
+)) {
+    const { gameManager } = require('../commands/shotgunCommand');
+    const customId = interaction.customId;
+    const parts = customId.split('_');
+    const action = parts[0] + '_' + parts[1];
+    const gameId = parts[2];
+    
+    const game = gameManager.getGame(gameId);
+    if (!game) {
+        await interaction.reply({ 
+            content: '❌ Game tidak ditemukan!', 
             ephemeral: true 
-          });
-          return;
-        }
+        });
+        return;
+    }
 
-        // Check if it's the player's turn
-        if (game.players[game.currentPlayer].id !== interaction.user.id) {
-          await interaction.reply({ 
+    if (game.players[game.currentPlayer].id !== interaction.user.id) {
+        await interaction.reply({ 
             content: '❌ Bukan giliran kamu!', 
             ephemeral: true 
-          });
-          return;
-        }
+        });
+        return;
+    }
 
-        await interaction.deferUpdate();
+    await interaction.deferUpdate();
 
-        try {
-          switch (action) {
+    try {
+        switch (action) {
             case 'use_item':
-              const itemIndex = parseInt(parts[3]);
-              await gameManager.useItem(gameId, interaction.user.id, itemIndex);
-              break;
-              
+                const itemIndex = parseInt(parts[3]);
+                await gameManager.useItem(gameId, interaction.user.id, itemIndex);
+                break;
+                
             case 'shoot_self':
-              await gameManager.shoot(gameId, interaction.user.id, 'self');
-              break;
-              
+                await gameManager.shoot(gameId, interaction.user.id, 'self');
+                break;
+                
             case 'shoot_opponent':
-              await gameManager.shoot(gameId, interaction.user.id, 'opponent');
-              break;
-              
+                await gameManager.shoot(gameId, interaction.user.id, 'opponent');
+                break;
+                
             case 'view_chamber':
-              const currentChamber = game.chambers[game.currentChamber];
-              await interaction.followUp({ 
-                content: `🔍 Chamber saat ini: ${currentChamber === '💥' ? '💥 **LOADED**' : '⚪ **EMPTY**'}`,
-                ephemeral: true 
-              });
-              break;
-          }
-        } catch (error) {
-          console.error('Error handling shotgun interaction:', error);
-          await interaction.followUp({ 
-            content: '❌ Terjadi error saat memproses aksi!', 
-            ephemeral: true 
-          });
+                const currentChamber = game.chambers[game.currentChamber];
+                await interaction.followUp({ 
+                    content: `🔍 Chamber saat ini: ${currentChamber === '💥' ? '💥 **LOADED**' : '⚪ **EMPTY**'}`,
+                    ephemeral: true 
+                });
+                break;
         }
-        return; // Stop execution here for shotgun game buttons
-      }
+    } catch (error) {
+        console.error('Error handling shotgun interaction:', error);
+        await interaction.followUp({ 
+            content: '❌ Terjadi error!', 
+            ephemeral: true 
+        });
+    }
+    return;
+}
 
       // ========== EXISTING CODE - JANGAN DIUBAH ==========
       const username = interaction.user.globalName ?? interaction.user.username;
