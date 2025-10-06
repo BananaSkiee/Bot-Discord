@@ -14,7 +14,7 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-      // ========== DUEL ACCEPT/REJECT HANDLER - BARU ==========
+      // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
           interaction.customId.startsWith('reject_duel_')
@@ -23,9 +23,8 @@ module.exports = {
           
           const parts = interaction.customId.split('_');
           const action = parts[0]; // accept or reject
-          const duelId = parts.slice(2).join('_'); // Handle IDs with underscores
+          const duelId = parts.slice(2).join('_');
           
-          // Import command handler
           const shotgunCommand = require('../commands/shotgunCommand');
           
           if (action === 'accept') {
@@ -41,7 +40,6 @@ module.exports = {
       if (interaction.isButton() && interaction.customId) {
         const customId = interaction.customId;
         
-        // Handle shotgun game buttons
         if (customId.includes('use_item_') || 
             customId.includes('shoot_') || 
             customId.includes('view_chamber_')) {
@@ -60,7 +58,6 @@ module.exports = {
             const action = parts[0] + '_' + parts[1];
             const gameId = parts.slice(2).join('_');
             
-            // Import game manager
             const { gameManager } = require('../commands/shotgunCommand');
             const game = gameManager.getGame(gameId);
             
@@ -96,15 +93,18 @@ module.exports = {
                             });
                             return;
                         }
-                        await gameManager.useItem(gameId, interaction.user.id, itemIndex);
+                        // FIX: Tambah parameter interaction
+                        await gameManager.useItem(gameId, interaction.user.id, itemIndex, interaction);
                         break;
                         
                     case 'shoot_self':
-                        await gameManager.shoot(gameId, interaction.user.id, 'self');
+                        // FIX: Tambah parameter interaction
+                        await gameManager.shoot(gameId, interaction.user.id, 'self', interaction);
                         break;
                         
                     case 'shoot_opponent':
-                        await gameManager.shoot(gameId, interaction.user.id, 'opponent');
+                        // FIX: Tambah parameter interaction
+                        await gameManager.shoot(gameId, interaction.user.id, 'opponent', interaction);
                         break;
                         
                     case 'view_chamber':
