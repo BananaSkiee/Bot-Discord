@@ -6,7 +6,6 @@ const countValidator = require("../modules/countValidator");
 const simulateBTC = require("../modules/cryptoSimulator");
 const updateCryptoMessage = require("../modules/updateCrypto");
 const autoSendMeme = require("../modules/autoMeme");
-const autoDelete = require("../modules/autoDeleteCryptoMessages.js");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
