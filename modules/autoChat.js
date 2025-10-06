@@ -1,4 +1,3 @@
-modules/autoChat.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Pisahkan banyak API key dengan koma di Environment Variables Railway
@@ -44,7 +43,9 @@ ${message.content}`;
     const reply = result.response?.text() || ""; // ✅ PERBAIKAN: Gunakan .text() method
 
     if (reply.trim()) {
-      await message.reply(reply.trim());
+      // Potong reply jika terlalu panjang untuk Discord
+      const trimmedReply = reply.length > 2000 ? reply.substring(0, 1997) + "..." : reply;
+      await message.reply(trimmedReply.trim());
     } else {
       await message.reply("🤔 Maaf, aku belum nemu jawabannya.");
     }
