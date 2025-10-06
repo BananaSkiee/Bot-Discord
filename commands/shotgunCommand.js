@@ -2,7 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const ShotgunDuels = require('../modules/shotgunDuels');
 
 const gameManager = new ShotgunDuels();
-const pendingDuels = new Map(); // Store pending duel requests
+const pendingDuels = new Map();
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -78,7 +78,7 @@ module.exports = {
                 );
 
             const embed = new EmbedBuilder()
-                .setTitle('🔫 SHOTGUN DUEL REQUEST')
+                .setTitle('🎯 SHOTGUN DUEL REQUEST')
                 .setDescription(`**${interaction.user.username}** menantang **${opponent.username}** untuk Shotgun Duel!`)
                 .addFields(
                     { name: '🎯 Challenger', value: `${interaction.user}`, inline: true },
@@ -149,7 +149,11 @@ module.exports = {
 
         const gameId = gameManager.startGame(duel.challenger, duel.opponent, duel.channel);
         
-        if (!gameId) {
+        if (gameId) {
+            // Kirim initial game state
+            const game = gameManager.getGame(gameId);
+            await gameManager.sendGameState(game, interaction);
+        } else {
             await interaction.followUp({
                 content: '❌ Gagal memulai game!'
             });
