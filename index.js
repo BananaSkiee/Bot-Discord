@@ -16,9 +16,6 @@ const invitesTracker = require("./modules/invitesTracker");
 const slashCommandSetup = require("./modules/slashCommandSetup");
 const srvName = require("./modules/srvName.js"); 
 
-// 🎮 Minecraft Module - SIMPLE
-const { initMinecraft } = require("./modules/minecraft");
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -52,22 +49,10 @@ const server = app.listen(PORT, () => {
   console.log("🌐 Web server hidup di port " + PORT);
 });
 
-// 🎮 Minecraft Config - SIMPLE
-const minecraftConfig = {
-  host: process.env.MINECRAFT_HOST || 'localhost',
-  port: parseInt(process.env.MINECRAFT_PORT) || 25565,
-  username: process.env.MINECRAFT_USERNAME || 'DiscordBot',
-  password: process.env.MINECRAFT_PASSWORD || '',
-  version: process.env.MINECRAFT_VERSION || '1.20.1',
-  auth: process.env.MINECRAFT_AUTH || 'mojang'
-};
-
-let minecraftManager;
-
-// 🔄 Self-ping system
+// 🔄 Self-ping system untuk menjaga Koyeb tetap aktif
 function startSelfPing() {
   const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
-  const PING_INTERVAL = 3 * 60 * 1000;
+  const PING_INTERVAL = 3 * 60 * 1000; // 3 menit
   
   console.log(`🔄 Starting self-ping system to: ${SELF_PING_URL}`);
   
@@ -75,15 +60,24 @@ function startSelfPing() {
     try {
       const response = await fetch(SELF_PING_URL);
       if (response.ok) {
-        console.log('✅ Self-ping successful');
+        console.log('✅ Self-ping successful -', new Date().toLocaleTimeString());
+      } else {
+        console.log('⚠️ Self-ping returned status:', response.status);
       }
     } catch (error) {
       console.log('❌ Self-ping failed:', error.message);
     }
   }, PING_INTERVAL);
+  
+  // Ping immediately on startup
+  setTimeout(() => {
+    fetch(`https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/`)
+      .then(() => console.log('✅ Initial ping successful'))
+      .catch(err => console.log('❌ Initial ping failed:', err.message));
+  }, 5000);
 }
 
-// 📂 Load events
+// 📂 Load events dari folder /events
 fs.readdirSync("./events").forEach((file) => {
   const event = require(`./events/${file}`);
   if (event.once) {
@@ -95,7 +89,7 @@ fs.readdirSync("./events").forEach((file) => {
 
 srvName(client);
 
-// 🟩 Slash Commands
+// 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
   try {
     if (!interaction.isChatInputCommand()) return;
@@ -106,6 +100,17 @@ client.on("interactionCreate", async (interaction) => {
     await command.execute(interaction, client);
   } catch (error) {
     console.error("❌ Interaction Error:", error);
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({
+        content: "❌ Terjadi error saat menjalankan perintah.",
+        ephemeral: true,
+      });
+    } else {
+      await interaction.reply({
+        content: "❌ Terjadi error saat menjalankan perintah.",
+        ephemeral: true,
+      });
+    }
   }
 });
 
@@ -117,8 +122,9 @@ client.on("messageCreate", async (message) => {
   invitesTracker(client);
 });
 
-// 🚀 Auto Greeting
+// 🚀 Auto Greeting ketika user join
 client.on("guildMemberAdd", async (member) => {
+  // 1. Jalankan greeting tambahan (opsional)
   autoGreeting(client, member);
 });
 
@@ -131,8 +137,7 @@ client.on("voiceStateUpdate", () => {
   const guild = client.guilds.cache.first();
   if (guild) updateOnline(guild);
 });
-
-// ⏱ Update waktu di voice channel
+// ⏱ Update waktu di voice channel tiap 30 detik
 setInterval(() => {
   updateTimeChannel(client);
 }, 30 * 1000);
@@ -142,16 +147,10 @@ process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
 });
 
-// 🚀 Start bot
+// 🚀 Start bot dan self-ping system
 client.once("ready", () => {
   console.log(`✅ ${client.user.tag} is now online!`);
-  startSelfPing();
-  
-  // 🎮 Start Minecraft bot - SIMPLE
-  if (process.env.ENABLE_MINECRAFT === 'true') {
-    console.log('🎮 Starting Minecraft bot...');
-    minecraftManager = initMinecraft(client, minecraftConfig);
-  }
+  startSelfPing(); // Start self-ping setelah bot ready
 });
 
 // 🔐 Login bot
@@ -159,12 +158,10 @@ client.login(config.token);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('🛑 Shutting down...');
-  if (minecraftManager) {
-    minecraftManager.disconnect();
-  }
+  console.log('🛑 Received SIGTERM, shutting down gracefully');
   client.destroy();
   server.close(() => {
+    console.log('✅ Server closed');
     process.exit(0);
   });
 });
