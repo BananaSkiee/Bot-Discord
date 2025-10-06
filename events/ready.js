@@ -9,6 +9,7 @@ const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
+const minecraft = require("../modules/minecraft");
 
 module.exports = {
   name: "ready",
@@ -16,6 +17,8 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 Bot siap sebagai ${client.user.tag}`);
 
+minecraft.init(client); // Letakkan setelah console.log(`🤖 Bot siap...`)  
+    
     // Menampilkan semua server tempat bot bergabung
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((guild) => {
