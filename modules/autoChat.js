@@ -1,3 +1,4 @@
+modules/autoChat.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Pisahkan banyak API key dengan koma di Environment Variables Railway
@@ -13,7 +14,7 @@ function getGenAI() {
   return new GoogleGenerativeAI(apiKeys[currentKeyIndex]);
 }
 
-const AI_CHANNEL_ID = "1352635177536327760";
+const AI_CHANNEL_ID = "1352800131933802547";
 
 module.exports = async (message) => {
   if (message.author.bot || message.channel.id !== AI_CHANNEL_ID) return;
@@ -21,7 +22,15 @@ module.exports = async (message) => {
   try {
     await message.channel.sendTyping();
 
-    const model = getGenAI().getGenerativeModel({ model: "gemini-1.0-pro" });
+    // ✅ PERBAIKAN: Ganti dengan model yang masih aktif
+    const model = getGenAI().getGenerativeModel({ 
+      model: "gemini-1.5-flash", // atau "gemini-1.5-pro"
+      generationConfig: {
+        temperature: 0.8, // Biar lebih kreatif dan gaul
+        topP: 0.9,
+        topK: 40,
+      }
+    });
 
     // Prompt khusus biar bahasanya gaul tapi sopan
     const prompt = `Kamu adalah AI temen ngobrol di Discord yang jawabnya pake bahasa Indonesia gaul, santai, kayak manusia biasa. 
@@ -32,7 +41,7 @@ Hindari bahasa formal banget. Jangan pake tanda bintang untuk aksi (*kayak gini*
 ${message.content}`;
 
     const result = await model.generateContent(prompt);
-    const reply = result.response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const reply = result.response?.text() || ""; // ✅ PERBAIKAN: Gunakan .text() method
 
     if (reply.trim()) {
       await message.reply(reply.trim());
@@ -47,6 +56,6 @@ ${message.content}`;
       return module.exports(message);
     }
     console.error("❌ Gemini AI error:", error);
-    await message.reply("⚠️ Semua API key habis atau ada error.");
+    await message.reply("⚠️ Lagi error nih, coba lagi nanti ya!");
   }
 };
