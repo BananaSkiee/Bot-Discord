@@ -11,6 +11,7 @@ class ShotgunDuels {
             '🔎': { name: 'Lup', effect: 'Lihat chamber berikutnya' },
             '🔗': { name: 'Borgol', effect: 'Dapat 2x tembak dalam 1 giliran' }
         };
+        this.gameMessages = new Map(); // Store message IDs for editing
     }
 
     generateChambers() {
@@ -63,13 +64,12 @@ class ShotgunDuels {
                 health: { [player1.id]: 5, [player2.id]: 5 },
                 effects: { [player1.id]: {}, [player2.id]: {} },
                 channel: channel,
-                revealedChamber: null
+                revealedChamber: null,
+                messageId: null // Store the main game message ID
             };
 
             this.games.set(gameId, game);
             console.log(`✅ Game created: ${gameId}`);
-            
-            this.sendGameState(game);
             
             return gameId;
         } catch (error) {
@@ -78,47 +78,56 @@ class ShotgunDuels {
         }
     }
 
-    async sendGameState(game) {
+    async sendGameState(game, interaction = null) {
         try {
             const player = game.players[game.currentPlayer];
             const opponent = game.players[1 - game.currentPlayer];
             
+            // Reset chamber jika sudah mencapai chamber 8
+            if (game.currentChamber >= 8) {
+                await this.resetChambers(game);
+                return await this.sendGameState(game, interaction);
+            }
+            
             const loadedCount = game.chambers.filter(c => c === '💥').length;
             const emptyCount = game.chambers.filter(c => c === '⚪').length;
             
-            // Chamber preview dengan revealed chamber
-            let chamberInfo = `💥 Isi: ${loadedCount} | ⚪ Kosong: ${emptyCount}\n`;
-            chamberInfo += `Chamber: ${game.currentChamber + 1}/8`;
+            // Chamber info
+            let chamberInfo = `**${game.currentChamber + 1}/8** • 💥 ${loadedCount} • ⚪ ${emptyCount}`;
             
             if (game.revealedChamber) {
-                chamberInfo += ` | 🔍 Next: ${game.revealedChamber === '💥' ? '💥 LOADED' : '⚪ EMPTY'}`;
-                game.revealedChamber = null; // Reset setelah ditampilkan
+                chamberInfo += `\n🔍 Next: ${game.revealedChamber === '💥' ? '💥 **LOADED**' : '⚪ **EMPTY**'}`;
+                game.revealedChamber = null;
             }
 
+            // Buat embed yang lebih bagus dan simetris
             const embed = new EmbedBuilder()
-                .setTitle('🔫 SHOTGUN DUELS')
+                .setTitle('🎯 SHOTGUN DUELS')
+                .setColor(0x2F3136)
                 .setDescription(`**${player.username}** 🆚 **${opponent.username}**`)
-                .setColor(0xFF0000)
                 .addFields(
-                    { 
-                        name: '❤️ DARAH', 
-                        value: `${player.username}: ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n${opponent.username}: ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`, 
-                        inline: false 
+                    {
+                        name: '❤️ HEALTH',
+                        value: `🟥 ${player.username}: ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])}\n🟦 ${opponent.username}: ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])}`,
+                        inline: true
                     },
-                    { 
-                        name: '🔫 PELURU', 
-                        value: chamberInfo, 
-                        inline: true 
+                    {
+                        name: '🔫 CHAMBER',
+                        value: chamberInfo,
+                        inline: true
                     },
-                    { 
-                        name: `🎒 ITEM ${player.username}`, 
-                        value: game.items[player.id].map((item, index) => `${item} ${this.ITEMS[item].name}`).join('\n') || 'Tidak ada item', 
-                        inline: true 
+                    {
+                        name: '🎒 ITEMS',
+                        value: `**${player.username}:**\n${game.items[player.id].map(item => `${item} ${this.ITEMS[item].name}`).join('\n') || 'No items'}\n\n**${opponent.username}:**\n${game.items[opponent.id].map(item => `${item} ${this.ITEMS[item].name}`).join('\n') || 'No items'}`,
+                        inline: false
                     }
                 )
-                .setFooter({ text: `Giliran: ${player.username}` });
+                .setFooter({ 
+                    text: `🎯 Turn: ${player.username} • Game ID: ${game.id.slice(-6)}` 
+                })
+                .setTimestamp();
 
-            // Tombol Item
+            // Tombol Item untuk player saat ini
             const itemButtons = [];
             game.items[player.id].forEach((item, index) => {
                 itemButtons.push(
@@ -131,23 +140,23 @@ class ShotgunDuels {
             });
 
             const itemRow = itemButtons.length > 0 ? 
-                new ActionRowBuilder().addComponents(...itemButtons) : null;
+                new ActionRowBuilder().addComponents(...itemButtons.slice(0, 5)) : null;
 
-            // Tombol Aksi
+            // Tombol Aksi utama
             const actionRow = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId(`shoot_self_${game.id}`)
-                    .setLabel('Tembak Diri')
+                    .setLabel('Shoot Self')
                     .setEmoji('🎯')
                     .setStyle(ButtonStyle.Secondary),
                 new ButtonBuilder()
                     .setCustomId(`shoot_opponent_${game.id}`)
-                    .setLabel(`Tembak ${opponent.username}`)
+                    .setLabel(`Shoot ${opponent.username}`)
                     .setEmoji('🔫')
                     .setStyle(ButtonStyle.Danger),
                 new ButtonBuilder()
                     .setCustomId(`view_chamber_${game.id}`)
-                    .setLabel('Lihat Chamber')
+                    .setLabel('View Chamber')
                     .setEmoji('🔍')
                     .setStyle(ButtonStyle.Success)
             );
@@ -156,22 +165,63 @@ class ShotgunDuels {
             if (itemRow) components.push(itemRow);
             components.push(actionRow);
 
-            await game.channel.send({ 
-                embeds: [embed], 
-                components: components 
-            });
+            // Edit message yang existing atau buat baru
+            if (game.messageId && interaction) {
+                try {
+                    const message = await interaction.channel.messages.fetch(game.messageId);
+                    await message.edit({ 
+                        embeds: [embed], 
+                        components: components 
+                    });
+                } catch (error) {
+                    // Jika message tidak ditemukan, buat baru
+                    const newMessage = await interaction.channel.send({ 
+                        embeds: [embed], 
+                        components: components 
+                    });
+                    game.messageId = newMessage.id;
+                }
+            } else {
+                const message = await game.channel.send({ 
+                    embeds: [embed], 
+                    components: components 
+                });
+                game.messageId = message.id;
+            }
+
+            this.games.set(game.id, game);
 
         } catch (error) {
             console.error('❌ Error in sendGameState:', error);
         }
     }
     
-    async useItem(gameId, playerId, itemIndex) {
+    async useItem(gameId, playerId, itemIndex, interaction) {
         const game = this.games.get(gameId);
-        if (!game || game.players[game.currentPlayer].id !== playerId) return false;
+        if (!game) {
+            await interaction.followUp({ 
+                content: '❌ Game tidak ditemukan!', 
+                ephemeral: true 
+            });
+            return false;
+        }
+
+        if (game.players[game.currentPlayer].id !== playerId) {
+            await interaction.followUp({ 
+                content: '❌ Bukan giliran kamu!', 
+                ephemeral: true 
+            });
+            return false;
+        }
 
         const items = game.items[playerId];
-        if (itemIndex >= items.length) return false;
+        if (itemIndex >= items.length) {
+            await interaction.followUp({ 
+                content: '❌ Item tidak valid!', 
+                ephemeral: true 
+            });
+            return false;
+        }
 
         const item = items[itemIndex];
         const playerEffects = game.effects[playerId];
@@ -194,8 +244,10 @@ class ShotgunDuels {
                     game.currentChamber = Math.max(0, game.currentChamber - 1);
                     message = `**${game.players[game.currentPlayer].username}** menggunakan 🍺 **Minum**! Peluru terdepan dibuang (${removed === '💥' ? '💥 Loaded' : '⚪ Empty'})`;
                     
-                    // Check if need reset
-                    this.checkChamberReset(game);
+                    // Check chamber reset
+                    if (this.checkChamberReset(game)) {
+                        message += '\n\n🔄 **CHAMBER RESET!** Semua peluru habis!';
+                    }
                 }
                 break;
                 
@@ -222,18 +274,32 @@ class ShotgunDuels {
         if (message) {
             const embed = new EmbedBuilder()
                 .setColor(0xFFA500)
-                .setDescription(`🎁 **ITEM DIGUNAKAN**\n${message}`);
-            await game.channel.send({ embeds: [embed] });
+                .setDescription(`🎁 **ITEM USED**\n${message}`);
+            await interaction.followUp({ embeds: [embed] });
         }
 
         this.games.set(gameId, game);
-        await this.sendGameState(game);
+        await this.sendGameState(game, interaction);
         return true;
     }
 
-    async shoot(gameId, playerId, target) {
+    async shoot(gameId, playerId, target, interaction) {
         const game = this.games.get(gameId);
-        if (!game || game.players[game.currentPlayer].id !== playerId) return false;
+        if (!game) {
+            await interaction.followUp({ 
+                content: '❌ Game tidak ditemukan!', 
+                ephemeral: true 
+            });
+            return false;
+        }
+
+        if (game.players[game.currentPlayer].id !== playerId) {
+            await interaction.followUp({ 
+                content: '❌ Bukan giliran kamu!', 
+                ephemeral: true 
+            });
+            return false;
+        }
 
         const shooter = game.players[game.currentPlayer];
         const targetPlayer = target === 'self' ? shooter : game.players[1 - game.currentPlayer];
@@ -254,7 +320,7 @@ class ShotgunDuels {
             .setColor(0xFF0000)
             .setDescription(`🔫 **${shooter.username}** menembak **${target === 'self' ? 'diri sendiri' : targetPlayer.username}**...`);
         
-        const message = await game.channel.send({ embeds: [shootEmbed] });
+        const message = await interaction.followUp({ embeds: [shootEmbed], fetchReply: true });
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         let resultEmbed;
@@ -280,20 +346,20 @@ class ShotgunDuels {
             }
         }
 
-        // Update chamber
+        // Update chamber position
         game.currentChamber++;
-        if (game.currentChamber >= game.chambers.length) {
-            game.currentChamber = 0;
-        }
 
-        // Check chamber reset
-        this.checkChamberReset(game);
+        // Check chamber reset jika mencapai chamber 8 atau peluru habis
+        if (game.currentChamber >= 8 || this.checkChamberReset(game)) {
+            await this.resetChambers(game);
+            resultEmbed.setDescription(resultEmbed.data.description + `\n\n🔄 **CHAMBER RESET!** Chamber dan item direset ulang!`);
+        }
 
         await message.edit({ embeds: [resultEmbed] });
 
         // Check game over
         if (game.health[targetPlayer.id] <= 0) {
-            await this.endGame(game, shooter);
+            await this.endGame(game, shooter, interaction);
             return true;
         }
 
@@ -311,7 +377,7 @@ class ShotgunDuels {
 
         this.games.set(gameId, game);
         await new Promise(resolve => setTimeout(resolve, 3000));
-        await this.sendGameState(game);
+        await this.sendGameState(game, interaction);
 
         return true;
     }
@@ -320,11 +386,7 @@ class ShotgunDuels {
         const loadedRemaining = game.chambers.filter(c => c === '💥').length;
         const emptyRemaining = game.chambers.filter(c => c === '⚪').length;
 
-        if (loadedRemaining === 0 || emptyRemaining === 0) {
-            this.resetChambers(game);
-            return true;
-        }
-        return false;
+        return loadedRemaining === 0 || emptyRemaining === 0;
     }
 
     async resetChambers(game) {
@@ -332,15 +394,11 @@ class ShotgunDuels {
         game.currentChamber = 0;
         game.items[game.players[0].id] = this.generateItems();
         game.items[game.players[1].id] = this.generateItems();
-
-        const resetEmbed = new EmbedBuilder()
-            .setColor(0x8844FF)
-            .setDescription('🔄 **CHAMBER RESET!**\nSemua peluru habis! Chamber dan item direset ulang!');
         
-        await game.channel.send({ embeds: [resetEmbed] });
+        this.games.set(game.id, game);
     }
 
-    async endGame(game, winner) {
+    async endGame(game, winner, interaction) {
         const loser = game.players.find(p => p.id !== winner.id);
         
         const embed = new EmbedBuilder()
@@ -349,7 +407,7 @@ class ShotgunDuels {
             .setDescription(`**${winner.username}** MENANG! 🏆\n\n**${loser.username}** kalah dengan heroik!`)
             .addFields(
                 {
-                    name: '❤️ DARAH AKHIR',
+                    name: '❤️ FINAL HEALTH',
                     value: `${winner.username}: ${game.health[winner.id]}/5\n${loser.username}: ${game.health[loser.id]}/5`,
                     inline: true
                 }
@@ -357,7 +415,18 @@ class ShotgunDuels {
             .setThumbnail(winner.displayAvatarURL())
             .setTimestamp();
 
-        await game.channel.send({ embeds: [embed] });
+        await interaction.followUp({ embeds: [embed] });
+        
+        // Hapus game message
+        if (game.messageId) {
+            try {
+                const message = await interaction.channel.messages.fetch(game.messageId);
+                await message.edit({ components: [] }); // Remove buttons
+            } catch (error) {
+                console.error('Error removing game message:', error);
+            }
+        }
+        
         this.games.delete(game.id);
     }
 
