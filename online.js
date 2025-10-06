@@ -10,9 +10,9 @@ module.exports = async function updateOnline(guild) {
         ["online", "idle", "dnd"].includes(m.presence?.status)
     ).size;
 
-const voiceChannel = guild.channels.cache.get(process.env.VOICE_CHANNEL_ID);
-const logChannel = guild.channels.cache.get(process.env.LOG_CHANNEL_ID); // Log ke sini
-
+const voiceChannel = guild.channels.cache.get(config.voiceChannelId);
+const logChannel = guild.channels.cache.get(config.logChannelId);
+    
     if (voiceChannel && voiceChannel.isVoiceBased()) {
       await voiceChannel.setName(`「 Online: ${onlineCount} 」`);
       console.log(`✅ Channel rename → Online: ${onlineCount}`);
@@ -31,11 +31,11 @@ const logChannel = guild.channels.cache.get(process.env.LOG_CHANNEL_ID); // Log 
       }
     }
 
-  } catch (err) {
-    console.error("❌ Gagal update online:", err.message);
-    const logChannel = guild.channels.cache.get(config.logChannelId);
-    if (logChannel && logChannel.isTextBased()) {
-      logChannel.send(`❌ Error saat update: ${err.message}`);
+} catch (err) {
+  console.error("❌ Gagal update online:", err.message);
+  const logChannel = guild.channels.cache.get(config.logChannelId);
+  if (logChannel && logChannel.isTextBased()) {
+    logChannel.send(`❌ Error saat update: ${err.message}`);
     }
   }
 };
