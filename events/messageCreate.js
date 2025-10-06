@@ -6,7 +6,6 @@ const countValidator = require("../modules/countValidator");
 const handleHapusTag = require("../modules/hapusTagCommand");
 const translateHandler = require("../modules/translate");
 const memeCommand = require("../modules/memeCommand");
-const autoDeleteCrypto = require("../modules/autoDeleteCryptoMessages.js");
 const autoReply = require("../modules/autoReply");
 const autoChat = require("../modules/autoChat");
 const generateWelcomeCard = require("../modules/welcomeCard");
@@ -61,7 +60,6 @@ module.exports = {
     if (message.author.bot) return;
  // Panggil fungsi-fungsinya saat ada pesan baru
     await countValidator(message);
-    await autoDeleteCrypto(message);
     await autoReply(message);
     await autoChat(message);
     await autoEmoji(message);
