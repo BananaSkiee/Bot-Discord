@@ -7,16 +7,14 @@ class MinecraftManager extends EventEmitter {
         this.config = config;
         this.bot = null;
         this.isConnected = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
         this.players = new Map();
-        this.chatHistory = [];
-        this.maxChatHistory = 50;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
     }
 
     async connect() {
         try {
-            console.log('🟡 [Minecraft] Connecting to Minecraft server...');
+            console.log('🟡 [Minecraft] Connecting to server...');
             
             this.bot = mineflayer.createBot({
                 host: this.config.host || 'localhost',
@@ -24,36 +22,35 @@ class MinecraftManager extends EventEmitter {
                 username: this.config.username || 'DiscordBot',
                 password: this.config.password || '',
                 version: this.config.version || '1.20.1',
-                auth: this.config.auth || 'mojang'
+                auth: this.config.auth || 'mojang',
+                checkTimeoutInterval: 60 * 1000 // Check connection every minute
             });
 
             this.setupEventHandlers();
             
         } catch (error) {
-            console.error('❌ [Minecraft] Failed to create Minecraft bot:', error);
+            console.error('❌ [Minecraft] Failed to connect:', error);
             this.scheduleReconnect();
         }
     }
 
     setupEventHandlers() {
         this.bot.on('login', () => {
-            console.log('🟢 [Minecraft] Bot connected successfully!');
+            console.log('🟢 [Minecraft] Connected to server!');
             this.isConnected = true;
             this.reconnectAttempts = 0;
             this.emit('connected');
         });
 
         this.bot.on('error', (err) => {
-            console.error('❌ [Minecraft] Bot error:', err);
+            console.error('❌ [Minecraft] Error:', err);
             this.isConnected = false;
-            this.emit('error', err);
             this.scheduleReconnect();
         });
 
         this.bot.on('end', () => {
-            console.log('🔴 [Minecraft] Bot disconnected');
+            console.log('🔴 [Minecraft] Disconnected');
             this.isConnected = false;
-            this.emit('disconnected');
             this.scheduleReconnect();
         });
 
@@ -61,63 +58,66 @@ class MinecraftManager extends EventEmitter {
             const message = jsonMsg.toString().trim();
             if (this.isValidChatMessage(message)) {
                 console.log(`💬 [Minecraft] ${message}`);
-                
-                // Add to chat history
-                this.chatHistory.push({
-                    timestamp: new Date(),
-                    message: message,
-                    type: 'minecraft'
-                });
-                
-                // Keep only recent messages
-                if (this.chatHistory.length > this.maxChatHistory) {
-                    this.chatHistory = this.chatHistory.slice(-this.maxChatHistory);
-                }
-                
                 this.emit('chat', message);
             }
         });
 
         this.bot.on('playerJoined', (player) => {
-            console.log(`🟢 [Minecraft] Player joined: ${player.username}`);
+            console.log(`🟢 [Minecraft] ${player.username} joined`);
             this.players.set(player.username, player);
             this.emit('playerJoined', player.username);
         });
 
         this.bot.on('playerLeft', (player) => {
-            console.log(`🔴 [Minecraft] Player left: ${player.username}`);
+            console.log(`🔴 [Minecraft] ${player.username} left`);
             this.players.delete(player.username);
             this.emit('playerLeft', player.username);
         });
 
-        this.bot.on('kicked', (reason) => {
-            console.log(`🚫 [Minecraft] Bot kicked: ${reason}`);
-            this.emit('kicked', reason);
-        });
-
-        this.bot.on('spawn', () => {
-            console.log('📍 [Minecraft] Bot spawned in world');
-            this.emit('spawned');
-        });
-
+        // Auto re-spawn jika mati
         this.bot.on('death', () => {
-            console.log('💀 [Minecraft] Bot died');
-            this.emit('death');
+            console.log('💀 [Minecraft] Bot died, auto respawning...');
+            setTimeout(() => {
+                if (this.bot) {
+                    this.bot.chat('/spawn');
+                }
+            }, 2000);
         });
+
+        // Periodic connection check
+        setInterval(() => {
+            if (this.bot && !this.bot.connected) {
+                console.log('🟡 [Minecraft] Connection lost, reconnecting...');
+                this.isConnected = false;
+                this.scheduleReconnect();
+            }
+        }, 30000);
+    }
+
+    scheduleReconnect() {
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = Math.min(30000, this.reconnectAttempts * 5000); // Max 30 detik
+            
+            console.log(`🟡 [Minecraft] Reconnecting in ${delay/1000} seconds... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+            
+            setTimeout(() => {
+                if (!this.isConnected) {
+                    this.connect();
+                }
+            }, delay);
+        } else {
+            console.error('❌ [Minecraft] Max reconnection attempts reached. Giving up.');
+            this.emit('reconnectFailed');
+        }
     }
 
     isValidChatMessage(message) {
-        // Filter out system messages and join/leave messages
         return message && 
                !message.includes('joined the game') && 
                !message.includes('left the game') &&
                !message.includes('Advanced to') &&
-               !message.includes('Completed') &&
-               !message.includes('has made the advancement') &&
-               !message.includes('achievement') &&
-               message.length > 2 &&
-               !message.startsWith('<') && // Skip formatted chat if any
-               !message.startsWith('>');
+               message.length > 2;
     }
 
     sendChat(message) {
@@ -128,219 +128,97 @@ class MinecraftManager extends EventEmitter {
         return false;
     }
 
-    sendCommand(command) {
-        if (this.bot && this.isConnected) {
-            this.bot.chat(`/${command}`);
-            return true;
-        }
-        return false;
-    }
-
     getOnlinePlayers() {
         return Array.from(this.players.keys());
-    }
-
-    getPlayerCount() {
-        return this.players.size;
-    }
-
-    getChatHistory(limit = 10) {
-        return this.chatHistory.slice(-limit);
-    }
-
-    getBotPosition() {
-        if (this.bot && this.bot.entity) {
-            return {
-                x: Math.floor(this.bot.entity.position.x),
-                y: Math.floor(this.bot.entity.position.y),
-                z: Math.floor(this.bot.entity.position.z),
-                dimension: this.bot.game.dimension || 'unknown'
-            };
-        }
-        return null;
-    }
-
-    getBotHealth() {
-        if (this.bot && this.bot.health) {
-            return {
-                health: this.bot.health,
-                food: this.bot.food,
-                saturation: this.bot.foodSaturation
-            };
-        }
-        return null;
-    }
-
-    scheduleReconnect() {
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            const delay = Math.min(30000, this.reconnectAttempts * 5000);
-            
-            console.log(`🟡 [Minecraft] Reconnecting in ${delay/1000}s... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            
-            setTimeout(() => {
-                if (!this.isConnected) {
-                    this.connect();
-                }
-            }, delay);
-        } else {
-            console.error('❌ [Minecraft] Max reconnection attempts reached');
-            this.emit('reconnectFailed');
-        }
     }
 
     disconnect() {
         if (this.bot) {
             this.bot.end();
             this.isConnected = false;
-            console.log('🛑 [Minecraft] Bot disconnected');
         }
     }
 
-    // Utility method to check if bot is alive
-    isAlive() {
-        return this.bot && this.bot.health > 0;
+    // Force reconnect manual
+    reconnect() {
+        console.log('🔄 [Minecraft] Manual reconnect requested');
+        this.disconnect();
+        setTimeout(() => this.connect(), 2000);
     }
 }
 
-// Function to initialize Minecraft manager
+// Initialize Minecraft dengan auto connect
 function initMinecraft(client, config) {
     const minecraftManager = new MinecraftManager(config);
     
-    // Connect to Minecraft server
+    // Connect to Minecraft
     minecraftManager.connect();
     
-    // Setup Discord command handlers for Minecraft
-    setupMinecraftCommands(client, minecraftManager);
+    // Setup Discord integration
+    setupDiscordIntegration(client, minecraftManager);
     
     return minecraftManager;
 }
 
-// Setup Discord commands for Minecraft
-function setupMinecraftCommands(client, minecraftManager) {
+function setupDiscordIntegration(client, minecraftManager) {
+    // Handle messages di channel Minecraft
     client.on('messageCreate', async (message) => {
         if (message.author.bot) return;
         
-        // Only respond to commands in specific channels or DMs
-        const allowedChannels = process.env.MINECRAFT_CHANNELS ? 
-            process.env.MINECRAFT_CHANNELS.split(',') : [];
-        
-        if (message.channel.type !== 1 && !allowedChannels.includes(message.channel.id)) {
-            return;
-        }
+        const minecraftChannel = process.env.MINECRAFT_CHANNEL_ID;
+        if (!minecraftChannel || message.channel.id !== minecraftChannel) return;
 
-        if (message.content.startsWith('!mc ')) {
-            const command = message.content.slice(4).trim();
-            
-            if (command) {
-                if (minecraftManager.isConnected) {
-                    const success = minecraftManager.sendChat(command);
-                    if (success) {
-                        message.reply(`✅ **Minecraft Command Executed:** \`${command}\``);
-                    } else {
-                        message.reply('❌ **Failed to send command to Minecraft**');
-                    }
+        // Kirim chat ke Minecraft
+        if (message.content.startsWith('!m ')) {
+            const text = message.content.slice(3).trim();
+            if (text) {
+                const success = minecraftManager.sendChat(text);
+                if (success) {
+                    message.react('✅');
                 } else {
-                    message.reply('❌ **Minecraft bot is not connected**');
+                    message.reply('❌ Minecraft bot tidak terhubung');
                 }
             }
         }
 
-        if (message.content === '!mc status') {
-            const status = minecraftManager.isConnected ? '🟢 **Connected**' : '🔴 **Disconnected**';
+        // Cek status Minecraft
+        if (message.content === '!m status') {
+            const status = minecraftManager.isConnected ? '🟢 Connected' : '🔴 Disconnected';
             const players = minecraftManager.getOnlinePlayers();
-            const position = minecraftManager.getBotPosition();
-            const health = minecraftManager.getBotHealth();
             
-            let statusMessage = `## 🎮 Minecraft Bot Status\n`;
-            statusMessage += `${status}\n`;
-            statusMessage += `**Players Online:** ${players.length}\n`;
+            let reply = `## 🎮 Minecraft Server\n` +
+                       `**Status:** ${status}\n` +
+                       `**Players Online:** ${players.length}\n`;
             
             if (players.length > 0) {
-                statusMessage += `**Online:** ${players.join(', ')}\n`;
+                reply += `**Players:** ${players.join(', ')}`;
             }
             
-            if (position) {
-                statusMessage += `**Position:** ${position.x}, ${position.y}, ${position.z} (${position.dimension})\n`;
-            }
-            
-            if (health) {
-                statusMessage += `**Health:** ❤️ ${health.health} | 🍖 ${health.food}`;
-            }
-            
-            message.reply(statusMessage);
+            message.reply(reply);
         }
 
-        if (message.content === '!mc players') {
-            const players = minecraftManager.getOnlinePlayers();
-            if (players.length > 0) {
-                message.reply(`## 👥 Minecraft Players (${players.length})\n${players.join('\n')}`);
-            } else {
-                message.reply('## 👥 Minecraft Players\n**No players online**');
-            }
+        // Reconnect manual
+        if (message.content === '!m reconnect') {
+            minecraftManager.reconnect();
+            message.reply('🔄 Reconnecting to Minecraft server...');
         }
 
-        if (message.content === '!mc chat') {
-            const chatHistory = minecraftManager.getChatHistory(5);
-            if (chatHistory.length > 0) {
-                const chatText = chatHistory.map(entry => 
-                    `[${entry.timestamp.toLocaleTimeString()}] ${entry.message}`
-                ).join('\n');
-                message.reply(`## 💬 Recent Minecraft Chat\n${chatText}`);
-            } else {
-                message.reply('## 💬 Recent Minecraft Chat\n**No recent chat messages**');
-            }
-        }
+        // Help
+        if (message.content === '!m help') {
+            const help = `
+## 🎮 Minecraft Commands
+**!m <message>** - Kirim chat ke Minecraft
+**!m status** - Cek status server
+**!m reconnect** - Reconnect manual
+**!m help** - Show this help
 
-        if (message.content === '!mc help') {
-            const helpEmbed = {
-                color: 0x00FF00,
-                title: '🎮 Minecraft Bot Commands',
-                fields: [
-                    {
-                        name: '!mc <message>',
-                        value: 'Send chat message to Minecraft',
-                        inline: false
-                    },
-                    {
-                        name: '!mc status',
-                        value: 'Check Minecraft bot status',
-                        inline: false
-                    },
-                    {
-                        name: '!mc players',
-                        value: 'List online players',
-                        inline: false
-                    },
-                    {
-                        name: '!mc chat',
-                        value: 'Show recent chat history',
-                        inline: false
-                    },
-                    {
-                        name: '!mc help',
-                        value: 'Show this help message',
-                        inline: false
-                    }
-                ],
-                timestamp: new Date().toISOString(),
-            };
-            message.reply({ embeds: [helpEmbed] });
-        }
-    });
-}
-
-// Auto-reconnect when Discord bot restarts
-function setupAutoFeatures(client, minecraftManager) {
-    // Reconnect when Discord bot is ready
-    client.on('ready', () => {
-        if (!minecraftManager.isConnected) {
-            console.log('🔄 [Minecraft] Attempting to reconnect...');
-            minecraftManager.connect();
+Chat otomatis sync antara Discord ↔ Minecraft
+            `;
+            message.reply(help);
         }
     });
 
-    // Sync Minecraft chat to Discord
+    // Forward Minecraft chat to Discord
     minecraftManager.on('chat', (message) => {
         const channelId = process.env.MINECRAFT_CHANNEL_ID;
         if (channelId) {
@@ -356,7 +234,7 @@ function setupAutoFeatures(client, minecraftManager) {
         if (channelId) {
             const channel = client.channels.cache.get(channelId);
             if (channel) {
-                channel.send(`🟢 **${playerName}** joined the Minecraft server`);
+                channel.send(`🟢 **${playerName}** joined the game`);
             }
         }
     });
@@ -366,7 +244,27 @@ function setupAutoFeatures(client, minecraftManager) {
         if (channelId) {
             const channel = client.channels.cache.get(channelId);
             if (channel) {
-                channel.send(`🔴 **${playerName}** left the Minecraft server`);
+                channel.send(`🔴 **${playerName}** left the game`);
+            }
+        }
+    });
+
+    minecraftManager.on('connected', () => {
+        const channelId = process.env.MINECRAFT_CHANNEL_ID;
+        if (channelId) {
+            const channel = client.channels.cache.get(channelId);
+            if (channel) {
+                channel.send('🟢 **Minecraft bot connected!**');
+            }
+        }
+    });
+
+    minecraftManager.on('disconnected', () => {
+        const channelId = process.env.MINECRAFT_CHANNEL_ID;
+        if (channelId) {
+            const channel = client.channels.cache.get(channelId);
+            if (channel) {
+                channel.send('🔴 **Minecraft bot disconnected**');
             }
         }
     });
@@ -374,7 +272,5 @@ function setupAutoFeatures(client, minecraftManager) {
 
 module.exports = {
     MinecraftManager,
-    initMinecraft,
-    setupMinecraftCommands,
-    setupAutoFeatures
+    initMinecraft
 };
