@@ -43,14 +43,10 @@ class ShotgunDuels {
 
     startGame(player1, player2, channel) {
         try {
-            console.log(`🎮 START GAME: ${player1.username} vs ${player2.username}`);
             const gameId = `${player1.id}-${player2.id}-${Date.now()}`;
-            
             const chambers = this.generateChambers();
             const loadedCount = chambers.filter(c => c === '💥').length;
             const emptyCount = chambers.filter(c => c === '⚪').length;
-            
-            console.log(`🔫 Chambers: ${chambers.join(' ')}`);
             
             // Acak siapa yang mulai pertama
             const randomStarter = Math.random() < 0.5 ? 0 : 1;
@@ -67,31 +63,23 @@ class ShotgunDuels {
                     [players[1].id]: this.generateItems()
                 },
                 health: { [players[0].id]: 5, [players[1].id]: 5 },
-                effects: { [players[0].id]: {}, [players[1].id]: {} },
+                effects: { 
+                    [players[0].id]: { kater: false, borgol: false },
+                    [players[1].id]: { kater: false, borgol: false }
+                },
                 channel: channel,
-                revealedChamber: null,
                 messageId: null,
-                actionMessageId: null, // ID untuk message action log
-                actionLog: [],
+                actionMessageId: null,
                 initialChamberState: `💥 ${loadedCount} • ⚪ ${emptyCount}`,
                 showChamberBriefly: true
             };
 
             this.games.set(gameId, game);
-            console.log(`✅ Game created: ${gameId}`);
-            console.log(`🎲 Starter: ${players[0].username}`);
-            
+            console.log(`🎮 Game started: ${players[0].username} vs ${players[1].username}`);
             return gameId;
         } catch (error) {
             console.error('❌ Error in startGame:', error);
             return null;
-        }
-    }
-
-    addActionLog(game, message) {
-        game.actionLog.push(message);
-        if (game.actionLog.length > 5) {
-            game.actionLog.shift();
         }
     }
 
@@ -140,11 +128,11 @@ class ShotgunDuels {
                 chamberInfo = `**Chamber ${game.currentChamber + 1}/8**\n🎯 ???? • ????`;
             }
 
-            // Buat embed menu utama (TANPA ACTION LOG)
+            // Buat embed menu utama dengan spacing yang baik
             const embed = new EmbedBuilder()
                 .setTitle('🔫 SHOTGUN DUELS')
                 .setColor(0x1a1a1a)
-                .setDescription(`### ⚔️ ${player.username} **VS** ${opponent.username}`)
+                .setDescription(`### ⚔️ ${player.username} **VS** ${opponent.username}\n‎`)
                 .addFields(
                     {
                         name: '❤️ **HEALTH**',
@@ -162,13 +150,13 @@ class ShotgunDuels {
                         inline: true
                     },
                     {
-                        name: `🎒 ${player.username}'s ITEMS`,
-                        value: game.items[player.id].map(item => `${item} **${this.ITEMS[item].name}**`).join('\n') || 'No items',
+                        name: `\n🎒 **${player.username}'s ITEMS**`,
+                        value: game.items[player.id].map(item => `• ${item} **${this.ITEMS[item].name}**`).join('\n') || '• No items',
                         inline: true
                     },
                     {
-                        name: `🛡️ ${opponent.username}'s ITEMS`,
-                        value: game.items[opponent.id].map(item => `${item} **${this.ITEMS[item].name}**`).join('\n') || 'No items',
+                        name: `\n🛡️ **${opponent.username}'s ITEMS**`,
+                        value: game.items[opponent.id].map(item => `• ${item} **${this.ITEMS[item].name}**`).join('\n') || '• No items',
                         inline: true
                     }
                 )
@@ -177,9 +165,11 @@ class ShotgunDuels {
                 })
                 .setTimestamp();
 
-            // Tombol Item
+            // Tombol Item - FIX: Pastikan tombol sesuai dengan items yang ada
             const itemButtons = [];
-            game.items[player.id].forEach((item, index) => {
+            const currentItems = game.items[player.id];
+            
+            currentItems.forEach((item, index) => {
                 itemButtons.push(
                     new ButtonBuilder()
                         .setCustomId(`item_${game.id}_${index}`)
@@ -286,13 +276,15 @@ class ShotgunDuels {
         
         switch (item) {
             case '🚬':
+                // FIX: Rokok - jika HP penuh, tetap hapus itemnya
                 if (game.health[playerId] < 5) {
                     game.health[playerId] = Math.min(5, game.health[playerId] + 1);
                     message = `**${player.username}** used 🚬 **Rokok** → +1 HP (❤️ ${game.health[playerId]}/5)`;
+                    shouldRemoveItem = false; // Rokok reusable
                 } else {
-                    message = `**${player.username}** used 🚬 **Rokok** → HP sudah penuh`;
+                    message = `**${player.username}** used 🚬 **Rokok** → HP sudah penuh!`;
+                    shouldRemoveItem = true; // Hapus rokok meski HP penuh
                 }
-                shouldRemoveItem = false;
                 break;
                 
             case '🍺':
@@ -306,10 +298,18 @@ class ShotgunDuels {
                         message += `\n🔄 **CHAMBER RESET!**`;
                     }
                 }
-                shouldRemoveItem = false;
+                shouldRemoveItem = false; // Minum reusable
                 break;
                 
             case '🔪':
+                // FIX: Cek apakah kater sudah aktif
+                if (playerEffects.kater) {
+                    await interaction.followUp({ 
+                        content: '❌ Kater sudah aktif!', 
+                        ephemeral: true 
+                    });
+                    return false;
+                }
                 playerEffects.kater = true;
                 message = `**${player.username}** used 🔪 **Kater** → Next hit damage 2x!`;
                 break;
@@ -322,22 +322,26 @@ class ShotgunDuels {
                 break;
                 
             case '🔗':
+                // FIX: Cek apakah borgol sudah aktif
+                if (playerEffects.borgol) {
+                    await interaction.followUp({ 
+                        content: '❌ Borgol sudah aktif!', 
+                        ephemeral: true 
+                    });
+                    return false;
+                }
                 playerEffects.borgol = true;
                 message = `**${player.username}** used 🔗 **Borgol** → Dapat 2x tembak!`;
                 break;
         }
 
-        // Hapus item setelah digunakan (kecuali item reusable)
+        // FIX: Hapus item setelah digunakan
         if (shouldRemoveItem) {
             items.splice(itemIndex, 1);
         }
 
-        // Tambahkan ke action log
-        this.addActionLog(game, message);
-
         // Update action message
-        const actionLogText = game.actionLog.join('\n\n');
-        await this.sendActionMessage(game, interaction, actionLogText);
+        await this.sendActionMessage(game, interaction, message);
 
         this.games.set(gameId, game);
         await this.sendGameState(game, interaction);
@@ -374,13 +378,11 @@ class ShotgunDuels {
         if (isLoaded) {
             damage = playerEffects.kater ? 2 : 1;
             if (playerEffects.kater) {
-                playerEffects.kater = false;
+                playerEffects.kater = false; // Reset kater setelah digunakan
             }
         }
 
-        // Kirim embed shooting (akan di-edit nanti)
         let resultMessage = '';
-        let shootEmbed;
 
         if (isLoaded) {
             game.health[targetPlayer.id] = Math.max(0, game.health[targetPlayer.id] - damage);
@@ -391,10 +393,6 @@ class ShotgunDuels {
                 resultMessage = `**${shooter.username}** 🔫 shot **${targetPlayer.username}**\n💥 **HIT!** Took ${damage} damage\n❤️ ${targetPlayer.username}: ${game.health[targetPlayer.id]}/5`;
             }
 
-            shootEmbed = new EmbedBuilder()
-                .setColor(0xff4444)
-                .setDescription(resultMessage);
-
         } else {
             resultMessage = `**${shooter.username}** 🔫 shot **${targetPlayer.username}**\n⚪ **MISS!** Selamat!`;
 
@@ -402,13 +400,9 @@ class ShotgunDuels {
                 extraTurn = true;
                 resultMessage += `\n🎉 **BONUS TURN!**`;
             }
-
-            shootEmbed = new EmbedBuilder()
-                .setColor(0x44ff44)
-                .setDescription(resultMessage);
         }
 
-        // Kirim/Edit action message
+        // Kirim action message
         await this.sendActionMessage(game, interaction, resultMessage);
 
         game.currentChamber++;
@@ -417,11 +411,7 @@ class ShotgunDuels {
         if (game.currentChamber >= 8 || this.checkChamberReset(game)) {
             await this.resetChambers(game);
             const resetMessage = `🔄 **CHAMBER RESET!** Chamber dan item direset ulang!`;
-            this.addActionLog(game, resetMessage);
             await this.sendActionMessage(game, interaction, `${resultMessage}\n\n${resetMessage}`);
-        } else {
-            // Tambahkan ke action log untuk history
-            this.addActionLog(game, resultMessage);
         }
 
         // Check game over
@@ -430,13 +420,14 @@ class ShotgunDuels {
             return true;
         }
 
-        // Update turn logic
+        // FIX: Borgol logic - hanya bisa digunakan sekali per turn
+        let borgolActive = false;
         if (playerEffects.borgol) {
-            playerEffects.borgol = false;
+            playerEffects.borgol = false; // Reset borgol
+            borgolActive = true;
             const borgolMessage = `🔗 **BORGOL ACTIVE!** ${shooter.username} dapat tembak lagi!`;
-            this.addActionLog(game, borgolMessage);
             await this.sendActionMessage(game, interaction, `${resultMessage}\n\n${borgolMessage}`);
-        } else if (!extraTurn) {
+        } else if (!extraTurn && !borgolActive) {
             game.currentPlayer = 1 - game.currentPlayer;
         }
 
@@ -470,34 +461,7 @@ class ShotgunDuels {
         const surrenderMessage = `🏳️ **SURRENDER!**\n**${surrenderingPlayer.username}** menyerah!\n**${winner.username}** menang! 🏆`;
         
         await this.sendActionMessage(game, interaction, surrenderMessage);
-
-        const embed = new EmbedBuilder()
-            .setTitle('🏆 **VICTORY** 🏆')
-            .setColor(0xFFD700)
-            .setDescription(`### ${winner.username} WINS!\n\n**${surrenderingPlayer.username}** has surrendered!`)
-            .addFields(
-                {
-                    name: '📊 FINAL STATS',
-                    value: `**${winner.username}:** ❤️ ${game.health[winner.id]}/5\n**${surrenderingPlayer.username}:** ❤️ ${game.health[surrenderingPlayer.id]}/5`,
-                    inline: true
-                }
-            )
-            .setThumbnail(winner.displayAvatarURL())
-            .setFooter({ text: 'Game Over' })
-            .setTimestamp();
-
-        await interaction.followUp({ embeds: [embed] });
-        
-        if (game.messageId) {
-            try {
-                const message = await interaction.channel.messages.fetch(game.messageId);
-                await message.edit({ components: [] });
-            } catch (error) {
-                console.error('Error removing game message:', error);
-            }
-        }
-        
-        this.games.delete(game.id);
+        await this.endGame(game, winner, interaction, true);
         return true;
     }
 
@@ -518,43 +482,60 @@ class ShotgunDuels {
         game.showChamberBriefly = true;
         
         // Reset effects dan generate items baru
-        game.effects[game.players[0].id] = {};
-        game.effects[game.players[1].id] = {};
+        game.effects[game.players[0].id] = { kater: false, borgol: false };
+        game.effects[game.players[1].id] = { kater: false, borgol: false };
         game.items[game.players[0].id] = this.generateItems();
         game.items[game.players[1].id] = this.generateItems();
         
         this.games.set(game.id, game);
     }
 
-    async endGame(game, winner, interaction) {
+    async endGame(game, winner, interaction, isSurrender = false) {
         const loser = game.players.find(p => p.id !== winner.id);
         
-        const victoryMessage = `🏆 **VICTORY!**\n**${winner.username}** menang!\n**${loser.username}** kalah!`;
-        await this.sendActionMessage(game, interaction, victoryMessage);
+        const victoryGifs = [
+            'https://media.giphy.com/media/xULW8N9O5QLy9CaUu4/giphy.gif',
+            'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',
+            'https://media.giphy.com/media/3o7aD2s1V3x4NwWUZa/giphy.gif'
+        ];
+        
+        const randomGif = victoryGifs[Math.floor(Math.random() * victoryGifs.length)];
 
         const embed = new EmbedBuilder()
-            .setTitle('🏆 **VICTORY** 🏆')
+            .setTitle('🏆 **VICTORY ROYALE** 🏆')
             .setColor(0xFFD700)
-            .setDescription(`### ${winner.username} WINS!\n\n**${loser.username}** has been defeated!`)
+            .setDescription(`### ${winner.username} WINS THE DUEL! 🎉\n\n**${loser.username}** has been defeated! ⚔️`)
             .addFields(
                 {
-                    name: '📊 FINAL STATS',
+                    name: '📊 FINAL BATTLE STATS',
                     value: `**${winner.username}:** ❤️ ${game.health[winner.id]}/5\n**${loser.username}:** ❤️ ${game.health[loser.id]}/5`,
                     inline: true
                 }
             )
             .setThumbnail(winner.displayAvatarURL())
-            .setFooter({ text: 'Game Over' })
+            .setImage(randomGif)
+            .setFooter({ text: 'Game Over - Thanks for playing!' })
             .setTimestamp();
 
         await interaction.followUp({ embeds: [embed] });
         
+        // Hapus game message
         if (game.messageId) {
             try {
                 const message = await interaction.channel.messages.fetch(game.messageId);
                 await message.edit({ components: [] });
             } catch (error) {
                 console.error('Error removing game message:', error);
+            }
+        }
+        
+        // Hapus action message
+        if (game.actionMessageId) {
+            try {
+                const message = await interaction.channel.messages.fetch(game.actionMessageId);
+                await message.delete();
+            } catch (error) {
+                console.error('Error removing action message:', error);
             }
         }
         
