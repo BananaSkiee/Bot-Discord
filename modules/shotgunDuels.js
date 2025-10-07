@@ -50,26 +50,32 @@ class ShotgunDuels {
             
             console.log(`🔫 Chambers: ${chambers.join(' ')}`);
             
+            // Acak siapa yang mulai pertama
+            const randomStarter = Math.random() < 0.5 ? 0 : 1;
+            const players = randomStarter === 0 ? [player1, player2] : [player2, player1];
+            
             const game = {
                 id: gameId,
-                players: [player1, player2],
+                players: players,
                 currentPlayer: 0,
                 chambers: chambers,
                 currentChamber: 0,
                 items: { 
-                    [player1.id]: this.generateItems(),
-                    [player2.id]: this.generateItems()
+                    [players[0].id]: this.generateItems(),
+                    [players[1].id]: this.generateItems()
                 },
-                health: { [player1.id]: 5, [player2.id]: 5 },
-                effects: { [player1.id]: {}, [player2.id]: {} },
+                health: { [players[0].id]: 5, [players[1].id]: 5 },
+                effects: { [players[0].id]: {}, [players[1].id]: {} },
                 channel: channel,
                 revealedChamber: null,
                 messageId: null,
-                actionLog: []
+                actionLog: [],
+                initialChamberState: `${chambers.filter(c => c === '💥').length}/${chambers.filter(c => c === '⚪').length}` // Simpan state awal
             };
 
             this.games.set(gameId, game);
             console.log(`✅ Game created: ${gameId}`);
+            console.log(`🎲 Starter: ${players[0].username}`);
             
             return gameId;
         } catch (error) {
@@ -107,16 +113,12 @@ class ShotgunDuels {
             const loadedCount = game.chambers.filter(c => c === '💥').length;
             const emptyCount = game.chambers.filter(c => c === '⚪').length;
             
-            // Chamber info
-            let chamberInfo = `**${game.currentChamber + 1}/8** • 💥 ${loadedCount} • ⚪ ${emptyCount}`;
-            
-            if (game.revealedChamber) {
-                chamberInfo += `\n🔍 Next: ${game.revealedChamber === '💥' ? '💥 **LOADED**' : '⚪ **EMPTY**'}`;
-            }
+            // Chamber info - TETAP sama seperti awal
+            const chamberInfo = `**${game.currentChamber + 1}/8** • ${game.initialChamberState}`;
 
             // Buat action log text
             const actionLogText = game.actionLog.length > 0 
-                ? `📜 **Aksi Terakhir:**\n${game.actionLog.join('\n')}`
+                ? `\n\n📜 **Aksi Terakhir:**\n${game.actionLog.join('\n')}`
                 : '';
 
             // Dapatkan status efek untuk kedua pemain
@@ -127,30 +129,40 @@ class ShotgunDuels {
             const playerName = playerStatus ? `**${player.username}** ${playerStatus}` : `**${player.username}**`;
             const opponentName = opponentStatus ? `**${opponent.username}** ${opponentStatus}` : `**${opponent.username}**`;
 
-            // Buat embed
+            // Buat embed yang lebih bagus
             const embed = new EmbedBuilder()
                 .setTitle('🎯 SHOTGUN DUELS')
-                .setColor(0x2F3136)
-                .setDescription(`${playerName} 🆚 ${opponentName}\n${actionLogText}`)
+                .setColor(0x1E1E1E)
+                .setDescription(`### ${playerName} 🆚 ${opponentName}${actionLogText}`)
                 .addFields(
                     {
-                        name: '❤️ HEALTH',
-                        value: `🟥 ${player.username}: ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])}\n🟦 ${opponent.username}: ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])}`,
-                        inline: true
+                        name: '❤️ **HEALTH STATUS**',
+                        value: `🎖️ **${player.username}:** ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n🎖️ **${opponent.username}:** ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`,
+                        inline: false
                     },
                     {
-                        name: '🔫 CHAMBER',
+                        name: '🔫 **CHAMBER INFO**',
                         value: chamberInfo,
                         inline: true
                     },
                     {
-                        name: '🎒 ITEMS',
-                        value: `**${player.username}:**\n${game.items[player.id].map(item => `${item} ${this.ITEMS[item].name}`).join('\n') || 'No items'}\n\n**${opponent.username}:**\n${game.items[opponent.id].map(item => `${item} ${this.ITEMS[item].name}`).join('\n') || 'No items'}`,
-                        inline: false
+                        name: '🎯 **TURN INFO**',
+                        value: `**Giliran:** ${player.username}\n**Chamber:** ${game.currentChamber + 1}/8`,
+                        inline: true
+                    },
+                    {
+                        name: '🎒 **PLAYER ITEMS**',
+                        value: `**${player.username}:**\n${game.items[player.id].map(item => `• ${item} ${this.ITEMS[item].name}`).join('\n') || '• No items'}`,
+                        inline: true
+                    },
+                    {
+                        name: '🛡️ **OPPONENT ITEMS**',
+                        value: `**${opponent.username}:**\n${game.items[opponent.id].map(item => `• ${item} ${this.ITEMS[item].name}`).join('\n') || '• No items'}`,
+                        inline: true
                     }
                 )
                 .setFooter({ 
-                    text: `🎯 Turn: ${player.username} • Game ID: ${game.id.slice(-6)}` 
+                    text: `Game ID: ${game.id.slice(-6)} • Shotgun Duels` 
                 })
                 .setTimestamp();
 
@@ -192,7 +204,7 @@ class ShotgunDuels {
             if (itemRow) components.push(itemRow);
             components.push(actionRow);
 
-            // Edit atau buat message baru dengan TAG di luar embed
+            // Edit atau buat message baru
             const content = `**🎯 GILIRAN: ${player}**`;
             
             if (game.messageId && interaction) {
@@ -293,7 +305,6 @@ class ShotgunDuels {
             case '🔎':
                 if (game.currentChamber < game.chambers.length) {
                     const nextChamber = game.chambers[game.currentChamber];
-                    game.revealedChamber = nextChamber;
                     message = `🔎 **Lup** → Next: ${nextChamber === '💥' ? '💥 LOADED' : '⚪ EMPTY'}`;
                 }
                 break;
@@ -353,14 +364,7 @@ class ShotgunDuels {
             }
         }
 
-        // Tembak animation
-        const shootEmbed = new EmbedBuilder()
-            .setColor(0xFF0000)
-            .setDescription(`🔫 **${shooter.username}** menembak **${target === 'self' ? 'diri sendiri' : targetPlayer.username}**...`);
-        
-        const message = await interaction.followUp({ embeds: [shootEmbed], fetchReply: true });
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
+        // Langsung proses tanpa animasi tembak
         let resultMessage = '';
 
         if (isLoaded) {
@@ -404,7 +408,6 @@ class ShotgunDuels {
         }
 
         this.games.set(gameId, game);
-        await new Promise(resolve => setTimeout(resolve, 2000));
         await this.sendGameState(game, interaction);
 
         return true;
@@ -470,8 +473,10 @@ class ShotgunDuels {
     }
 
     async resetChambers(game) {
-        game.chambers = this.generateChambers();
+        const newChambers = this.generateChambers();
+        game.chambers = newChambers;
         game.currentChamber = 0;
+        game.initialChamberState = `${newChambers.filter(c => c === '💥').length}/${newChambers.filter(c => c === '⚪').length}`;
         // Reset effects setiap chamber reset
         game.effects[game.players[0].id] = {};
         game.effects[game.players[1].id] = {};
