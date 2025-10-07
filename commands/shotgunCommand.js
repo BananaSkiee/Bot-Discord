@@ -151,7 +151,8 @@ module.exports = {
             content: `🎮 **${duel.opponent.username} MENERIMA DUEL!**\n${duel.challenger} vs ${duel.opponent}\nMemulai game...`
         });
 
-        const gameId = gameManager.startGame(duel.challenger, duel.opponent, duel.channel);
+        // ✅ TAMBAH PARAMETER INTERACTION DI SINI
+        const gameId = gameManager.startGame(duel.challenger, duel.opponent, duel.channel, interaction);
         
         if (gameId) {
             const game = gameManager.getGame(gameId);
