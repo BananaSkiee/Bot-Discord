@@ -31,7 +31,7 @@ module.exports = {
                 });
             }
 
-            // Check if either player is already in a game - FIXED
+            // Check if either player is already in a game
             if (gameManager.isPlayerInGame(interaction.user.id)) {
                 return await interaction.editReply({ 
                     content: '❌ Kamu sedang dalam game!' 
@@ -72,24 +72,39 @@ module.exports = {
                     new ButtonBuilder()
                         .setCustomId(`accept_duel_${duelId}`)
                         .setLabel('Terima Duel')
-                        .setEmoji('✅')
+                        .setEmoji('⚔️')
                         .setStyle(ButtonStyle.Success),
                     new ButtonBuilder()
                         .setCustomId(`reject_duel_${duelId}`)
                         .setLabel('Tolak Duel')
-                        .setEmoji('❌')
+                        .setEmoji('🚫')
                         .setStyle(ButtonStyle.Danger)
                 );
 
             const embed = new EmbedBuilder()
                 .setTitle('🎯 SHOTGUN DUEL REQUEST')
-                .setDescription(`**${interaction.user.username}** menantang **${opponent.username}** untuk Shotgun Duel!`)
+                .setColor(0x5865F2)
+                .setDescription(`## ⚔️ TANTANGAN DUEL DITERBITKAN!\n\n**${interaction.user.username}** menantang **${opponent.username}** untuk Shotgun Duel!`)
                 .addFields(
-                    { name: '🎯 Challenger', value: `${interaction.user}`, inline: true },
-                    { name: '🛡️ Opponent', value: `${opponent}`, inline: true }
+                    { 
+                        name: '🎯 CHALLENGER', 
+                        value: `${interaction.user}\n\`${interaction.user.username}\``, 
+                        inline: true 
+                    },
+                    { 
+                        name: '🛡️ OPPONENT', 
+                        value: `${opponent}\n\`${opponent.username}\``, 
+                        inline: true 
+                    },
+                    {
+                        name: '📋 GAME INFO',
+                        value: '• 5 HP per pemain\n• 8 Chamber peluru\n• Item dan efek spesial\n• Strategi dan keberuntungan!',
+                        inline: false
+                    }
                 )
-                .setColor(0x00AE86)
-                .setFooter({ text: 'Duel akan expired dalam 1 menit' });
+                .setThumbnail('https://cdn.discordapp.com/emojis/1093993933549457448.webp')
+                .setFooter({ text: '⏰ Duel request akan expired dalam 1 menit' })
+                .setTimestamp();
 
             await interaction.editReply({ 
                 content: `${opponent}`, // Mention the opponent
@@ -101,9 +116,17 @@ module.exports = {
             setTimeout(() => {
                 if (pendingDuels.has(duelId)) {
                     pendingDuels.delete(duelId);
-                    interaction.followUp({
-                        content: `⏰ Duel request dari ${interaction.user} ke ${opponent} expired!`,
-                        ephemeral: false
+                    
+                    const expiredEmbed = new EmbedBuilder()
+                        .setColor(0xFF6B6B)
+                        .setTitle('⏰ DUEL EXPIRED')
+                        .setDescription(`**Duel request telah expired!**\n\n${interaction.user} → ${opponent}\n\n*Tantangan tidak direspons dalam waktu 1 menit.*`)
+                        .setFooter({ text: 'Gunakan /shotgun untuk membuat duel baru' });
+
+                    interaction.editReply({ 
+                        content: `${interaction.user} ${opponent}`,
+                        embeds: [expiredEmbed], 
+                        components: [] 
                     }).catch(console.error);
                 }
             }, 60000);
@@ -146,18 +169,37 @@ module.exports = {
         // Remove from pending
         pendingDuels.delete(duelId);
 
-        // Start the game
-        await interaction.reply({
-            content: `🎮 **${duel.opponent.username} MENERIMA DUEL!**\n${duel.challenger} vs ${duel.opponent}\nMemulai game...`
+        // Edit the original message to show accepted status
+        const acceptedEmbed = new EmbedBuilder()
+            .setTitle('🎮 DUEL DITERIMA!')
+            .setColor(0x00FF00)
+            .setDescription(`## ⚔️ DUEL SEDANG DIMULAI!\n\n**${duel.opponent.username}** menerima tantangan dari **${duel.challenger.username}**!`)
+            .addFields(
+                { 
+                    name: '🎯 PEMAIN', 
+                    value: `${duel.challenger}\n**VS**\n${duel.opponent}`, 
+                    inline: false 
+                },
+                {
+                    name: '🚀 STATUS',
+                    value: 'Mempersiapkan game...\n• Gacha items\n• Reveal chamber\n• Start gameplay',
+                    inline: false
+                }
+            )
+            .setThumbnail('https://cdn.discordapp.com/emojis/1093993933549457448.webp')
+            .setFooter({ text: 'Bersiaplah untuk duel!' })
+            .setTimestamp();
+
+        await interaction.update({ 
+            content: `${duel.challenger} ${duel.opponent}`,
+            embeds: [acceptedEmbed], 
+            components: [] 
         });
 
-        // ✅ TAMBAH PARAMETER INTERACTION DI SINI
-        const gameId = gameManager.startGame(duel.challenger, duel.opponent, duel.channel, interaction);
+        // Start the game
+        const gameId = await gameManager.startGame(duel.challenger, duel.opponent, duel.channel, interaction);
         
-        if (gameId) {
-            const game = gameManager.getGame(gameId);
-            await gameManager.sendGameState(game, interaction);
-        } else {
+        if (!gameId) {
             await interaction.followUp({
                 content: '❌ Gagal memulai game!'
             });
@@ -186,8 +228,29 @@ module.exports = {
         // Remove from pending
         pendingDuels.delete(duelId);
 
-        await interaction.reply({
-            content: `❌ **${duel.opponent.username} MENOLAK DUEL!**\n${duel.challenger} - duel dibatalkan.`
+        const rejectedEmbed = new EmbedBuilder()
+            .setTitle('🚫 DUEL DITOLAK')
+            .setColor(0xFF6B6B)
+            .setDescription(`## ❌ TANTANGAN DITOLAK!\n\n**${duel.opponent.username}** menolak tantangan dari **${duel.challenger.username}**!`)
+            .addFields(
+                { 
+                    name: '🎯 PEMAIN', 
+                    value: `${duel.challenger} → ${duel.opponent}`, 
+                    inline: false 
+                },
+                {
+                    name: '💡 SUGGESTION',
+                    value: 'Coba tantang pemain lain atau tunggu waktu yang lebih tepat!',
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Gunakan /shotgun untuk membuat duel baru' })
+            .setTimestamp();
+
+        await interaction.update({ 
+            content: `${duel.challenger} ${duel.opponent}`,
+            embeds: [rejectedEmbed], 
+            components: [] 
         });
     },
     
