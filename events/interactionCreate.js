@@ -40,23 +40,37 @@ module.exports = {
       if (interaction.isButton() && interaction.customId) {
         const customId = interaction.customId;
         
-        if (customId.includes('use_item_') || 
-            customId.includes('shoot_') || 
-            customId.includes('view_chamber_')) {
+        if (customId.startsWith('item_') || 
+            customId.startsWith('shoot_self_') || 
+            customId.startsWith('shoot_opponent_') ||
+            customId.startsWith('surrender_')) {
             
             console.log(`🎯 Processing shotgun button: ${customId}`);
             
-            const parts = customId.split('_');
-            if (parts.length < 3) {
+            let gameId, action, itemIndex;
+            
+            // FIX: Parsing yang benar untuk customId
+            if (customId.startsWith('item_')) {
+                const parts = customId.split('_');
+                gameId = parts[1];
+                itemIndex = parseInt(parts[2]);
+                action = 'use_item';
+            } else if (customId.startsWith('shoot_self_')) {
+                gameId = customId.replace('shoot_self_', '');
+                action = 'shoot_self';
+            } else if (customId.startsWith('shoot_opponent_')) {
+                gameId = customId.replace('shoot_opponent_', '');
+                action = 'shoot_opponent';
+            } else if (customId.startsWith('surrender_')) {
+                gameId = customId.replace('surrender_', '');
+                action = 'surrender';
+            } else {
                 await interaction.reply({ 
                     content: '❌ Invalid button!', 
                     ephemeral: true 
                 });
                 return;
             }
-            
-            const action = parts[0] + '_' + parts[1];
-            const gameId = parts.slice(2).join('_');
             
             const { gameManager } = require('../commands/shotgunCommand');
             const game = gameManager.getGame(gameId);
@@ -85,7 +99,6 @@ module.exports = {
             try {
                 switch (action) {
                     case 'use_item':
-                        const itemIndex = parseInt(parts[2]);
                         if (isNaN(itemIndex)) {
                             await interaction.followUp({ 
                                 content: '❌ Item tidak valid!', 
@@ -93,28 +106,19 @@ module.exports = {
                             });
                             return;
                         }
-                        // FIX: Tambah parameter interaction
                         await gameManager.useItem(gameId, interaction.user.id, itemIndex, interaction);
                         break;
                         
                     case 'shoot_self':
-                        // FIX: Tambah parameter interaction
                         await gameManager.shoot(gameId, interaction.user.id, 'self', interaction);
                         break;
                         
                     case 'shoot_opponent':
-                        // FIX: Tambah parameter interaction
                         await gameManager.shoot(gameId, interaction.user.id, 'opponent', interaction);
                         break;
                         
-                    case 'view_chamber':
-                        if (game.currentChamber < game.chambers.length) {
-                            const currentChamber = game.chambers[game.currentChamber];
-                            await interaction.followUp({ 
-                                content: `🔍 Chamber saat ini: ${currentChamber === '💥' ? '💥 **LOADED**' : '⚪ **EMPTY**'}`,
-                                ephemeral: true 
-                            });
-                        }
+                    case 'surrender':
+                        await gameManager.surrender(gameId, interaction.user.id, interaction);
                         break;
                         
                     default:
