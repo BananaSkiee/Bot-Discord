@@ -519,6 +519,33 @@ class ShotgunDuels {
 
     // ... (method lainnya tetap sama)
 
+    // Tambahkan method ini di class ShotgunDuels (di bagian bawah sebelum module.exports)
+
+getGame(gameId) {
+    return this.games.get(gameId);
+}
+
+isPlayerInGame(userId) {
+    for (const game of this.games.values()) {
+        if (game.players.some(player => player.id === userId)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+endGameById(gameId) {
+    if (this.afkTimeouts.has(gameId)) {
+        clearTimeout(this.afkTimeouts.get(gameId));
+        this.afkTimeouts.delete(gameId);
+    }
+    if (this.gachaTimeouts.has(gameId)) {
+        clearTimeout(this.gachaTimeouts.get(gameId));
+        this.gachaTimeouts.delete(gameId);
+    }
+    this.games.delete(gameId);
+}
+
 }
 
 module.exports = ShotgunDuels;
