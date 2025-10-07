@@ -31,13 +31,17 @@ module.exports = {
                 });
             }
 
-            // Check if either player is already in a game
-            for (const game of gameManager.games.values()) {
-                if (game.players.some(p => p.id === interaction.user.id || p.id === opponent.id)) {
-                    return await interaction.editReply({ 
-                        content: '❌ Salah satu pemain sedang dalam game!' 
-                    });
-                }
+            // Check if either player is already in a game - FIXED
+            if (gameManager.isPlayerInGame(interaction.user.id)) {
+                return await interaction.editReply({ 
+                    content: '❌ Kamu sedang dalam game!' 
+                });
+            }
+
+            if (gameManager.isPlayerInGame(opponent.id)) {
+                return await interaction.editReply({ 
+                    content: '❌ Lawan sedang dalam game!' 
+                });
             }
 
             // Check if there's already a pending duel
@@ -150,7 +154,6 @@ module.exports = {
         const gameId = gameManager.startGame(duel.challenger, duel.opponent, duel.channel);
         
         if (gameId) {
-            // Kirim initial game state
             const game = gameManager.getGame(gameId);
             await gameManager.sendGameState(game, interaction);
         } else {
