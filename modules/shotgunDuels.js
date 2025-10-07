@@ -3,7 +3,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('
 class ShotgunDuels {
     constructor() {
         this.games = new Map();
-        this.ROUND_START_ITEMS = [1, 2, 3, 4];
+        this.ROUND_START_ITEMS = [2, 3, 4]; // Minimal 2 item, maksimal 4
         this.ITEMS = {
             '🚬': { name: 'Rokok', effect: 'Heal +1 HP (max 5)', reusable: false },
             '🍺': { name: 'Minum', effect: 'Buang peluru terdepan', reusable: false },
@@ -47,7 +47,6 @@ class ShotgunDuels {
         try {
             const gameId = `${player1.id}-${player2.id}-${Date.now()}`;
             
-            // Acak siapa yang mulai pertama
             const randomStarter = Math.random() < 0.5 ? 0 : 1;
             const players = randomStarter === 0 ? [player1, player2] : [player2, player1];
             
@@ -76,7 +75,8 @@ class ShotgunDuels {
 
             this.games.set(gameId, game);
             
-            await this.sendGachaStage(game, interaction);
+            // Langsung mulai gacha sequence tanpa tombol
+            await this.startGachaSequence(game, interaction);
             return gameId;
         } catch (error) {
             console.error('❌ Error in startGame:', error);
@@ -84,303 +84,79 @@ class ShotgunDuels {
         }
     }
 
-    addActionLog(game, message) {
-        game.actionLog.push(message);
-        if (game.actionLog.length > 5) {
-            game.actionLog.shift();
-        }
-    }
+    async startGachaSequence(game, interaction) {
+        const player1 = game.players[0];
+        const player2 = game.players[1];
 
-    async sendActionMessage(game, interaction, content) {
-        const embed = new EmbedBuilder()
-            .setColor(0x2b2d31)
-            .setDescription(content)
-            .setFooter({ text: `Game ID: ${game.id.slice(-6)}` });
+        // 1. GACHA PLAYER 1
+        const player1Items = this.generateItems();
+        game.items[player1.id] = player1Items;
 
-        if (game.actionMessageId && interaction) {
-            try {
-                const message = await interaction.channel.messages.fetch(game.actionMessageId);
-                await message.edit({ embeds: [embed] });
-            } catch (error) {
-                const newMessage = await interaction.channel.send({ embeds: [embed] });
-                game.actionMessageId = newMessage.id;
-            }
-        } else {
-            const message = await game.channel.send({ embeds: [embed] });
-            game.actionMessageId = message.id;
-        }
-
-        this.games.set(game.id, game);
-    }
-
-    async sendGachaStage(game, interaction) {
-        // Clear existing timeout
-        if (this.gachaTimeouts.has(game.id)) {
-            clearTimeout(this.gachaTimeouts.get(game.id));
-        }
-
-        const player = game.players[0];
-        const opponent = game.players[1];
-        
-        let description = '';
-        let components = [];
-
-        if (game.gachaStage === 0) {
-            description = `## 🎁 WAKTU GACHA ITEM!\n\n**${player.username}** tekan tombol di bawah untuk gacha itemmu!\n\n*⏰ Otomatis gacha dalam 15 detik*`;
-            components = [
-                new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`gacha_items_${game.id}_0`)
-                        .setLabel('Gacha Items')
-                        .setEmoji('🎁')
-                        .setStyle(ButtonStyle.Success)
-                )
-            ];
-
-            // Auto-gacha untuk player 1
-            const timeout = setTimeout(async () => {
-                const currentGame = this.games.get(game.id);
-                if (currentGame && currentGame.gachaStage === 0) {
-                    console.log(`⏰ Auto-gacha untuk ${player.username}`);
-                    const items = this.generateItems();
-                    currentGame.items[player.id] = items;
-                    currentGame.gachaStage++;
-                    this.games.set(game.id, currentGame);
-
-                    // Kirim hasil gacha sebagai message baru (LOG)
-                    const autoGachaEmbed = new EmbedBuilder()
-                        .setColor(0xFFFF00)
-                        .setTitle('🎯 SHOTGUN DUELS - GACHA RESULT')
-                        .setDescription(`## ⏰ GACHA OTOMATIS!\n\n**${player.username}** mendapatkan items:\n${items.map(item => `${item} ${this.ITEMS[item].name}`).join('\n')}`)
-                        .setFooter({ text: 'Menunggu player 2...' });
-
-                    await game.channel.send({ 
-                        content: `${player}`,
-                        embeds: [autoGachaEmbed] 
-                    });
-
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    await this.sendGachaStage(currentGame, interaction);
-                }
-            }, 15000);
-
-            this.gachaTimeouts.set(game.id, timeout);
-
-        } else if (game.gachaStage === 1) {
-            description = `## 🎁 WAKTU GACHA ITEM!\n\n**${opponent.username}** tekan tombol di bawah untuk gacha itemmu!\n\n*⏰ Otomatis gacha dalam 15 detik*`;
-            components = [
-                new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`gacha_items_${game.id}_1`)
-                        .setLabel('Gacha Items')
-                        .setEmoji('🎁')
-                        .setStyle(ButtonStyle.Success)
-                )
-            ];
-
-            // Auto-gacha untuk player 2
-            const timeout = setTimeout(async () => {
-                const currentGame = this.games.get(game.id);
-                if (currentGame && currentGame.gachaStage === 1) {
-                    console.log(`⏰ Auto-gacha untuk ${opponent.username}`);
-                    const items = this.generateItems();
-                    currentGame.items[opponent.id] = items;
-                    currentGame.gachaStage++;
-                    this.games.set(game.id, currentGame);
-
-                    // Kirim hasil gacha sebagai message baru (LOG)
-                    const autoGachaEmbed = new EmbedBuilder()
-                        .setColor(0xFFFF00)
-                        .setTitle('🎯 SHOTGUN DUELS - GACHA RESULT')
-                        .setDescription(`## ⏰ GACHA OTOMATIS!\n\n**${opponent.username}** mendapatkan items:\n${items.map(item => `${item} ${this.ITEMS[item].name}`).join('\n')}`)
-                        .setFooter({ text: 'Beralih ke reveal chamber...' });
-
-                    await game.channel.send({ 
-                        content: `${opponent}`,
-                        embeds: [autoGachaEmbed] 
-                    });
-
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    await this.sendGachaStage(currentGame, interaction);
-                }
-            }, 15000);
-
-            this.gachaTimeouts.set(game.id, timeout);
-
-        } else if (game.gachaStage === 2) {
-            description = `## 🔫 REVEAL CHAMBER!\n\nTekan tombol untuk melihat chamber!\n\n*⏰ Otomatis reveal dalam 15 detik*`;
-            components = [
-                new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`reveal_chamber_${game.id}`)
-                        .setLabel('Reveal Chamber')
-                        .setEmoji('🔫')
-                        .setStyle(ButtonStyle.Primary)
-                )
-            ];
-
-            // Auto-reveal chamber
-            const timeout = setTimeout(async () => {
-                const currentGame = this.games.get(game.id);
-                if (currentGame && currentGame.gachaStage === 2) {
-                    console.log(`⏰ Auto-reveal chamber`);
-                    await this.revealChamber(game.id, interaction);
-                }
-            }, 15000);
-
-            this.gachaTimeouts.set(game.id, timeout);
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle('🎯 SHOTGUN DUELS - PREPARATION')
-            .setColor(0x5865F2)
-            .setDescription(description);
-
-        let content = '';
-        if (game.gachaStage === 0) content = `**🎮 ${player.username} 🆚 ${opponent.username}**\n${player}`;
-        else if (game.gachaStage === 1) content = `**🎮 ${player.username} 🆚 ${opponent.username}**\n${opponent}`;
-        else content = `**🎮 ${player.username} 🆚 ${opponent.username}**`;
-
-        if (game.messageId) {
-            try {
-                const message = await game.channel.messages.fetch(game.messageId);
-                await message.edit({ 
-                    content: content,
-                    embeds: [embed], 
-                    components: components 
-                });
-            } catch (error) {
-                console.error('❌ Error editing message:', error);
-                const newMessage = await game.channel.send({ 
-                    content: content,
-                    embeds: [embed], 
-                    components: components 
-                });
-                game.messageId = newMessage.id;
-            }
-        } else {
-            const message = await game.channel.send({ 
-                content: content,
-                embeds: [embed], 
-                components: components 
-            });
-            game.messageId = message.id;
-        }
-
-        this.games.set(game.id, game);
-    }
-
-    async processGacha(gameId, playerIndex, interaction) {
-        const game = this.games.get(gameId);
-        if (!game) {
-            await interaction.reply({ content: '❌ Game tidak ditemukan!', ephemeral: true });
-            return;
-        }
-
-        // Clear timeout jika user klik manual
-        if (this.gachaTimeouts.has(gameId)) {
-            clearTimeout(this.gachaTimeouts.get(gameId));
-            this.gachaTimeouts.delete(gameId);
-        }
-
-        const player = game.players[playerIndex];
-        const items = this.generateItems();
-        game.items[player.id] = items;
-
-        // 1. TAMPILKAN ANIMASI GACHA DI MESSAGE UTAMA
-        const gachaEmbed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle('🎯 SHOTGUN DUELS - PREPARATION')
-            .setDescription(`## 🎰 SEDANG GACHA ITEM!\n\n**${player.username}** sedang gacha items...\n\n${'🎰 '.repeat(5)}`);
-
-        try {
-            await interaction.update({ 
-                embeds: [gachaEmbed], 
-                components: [] // Hilangkan tombol selama animasi
-            });
-        } catch (error) {
-            console.error('❌ Error updating interaction:', error);
-            return;
-        }
-
-        // 2. TUNGGU 2 DETIK UNTUK ANIMASI
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // 3. TAMPILKAN HASIL GACHA DI MESSAGE UTAMA
-        const resultEmbed = new EmbedBuilder()
+        const player1Embed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle('🎯 SHOTGUN DUELS - PREPARATION')
-            .setDescription(`## 🎁 ITEM DIDAPATKAN!\n\n**${player.username}** mendapatkan items:\n${items.map(item => `${item} ${this.ITEMS[item].name}`).join('\n')}`);
+            .setDescription(`## 🎁 GACHA ITEM PLAYER 1!\n\n**${player1.username}** mendapatkan items:\n${player1Items.map(item => `${item} ${this.ITEMS[item].name}`).join('\n')}`);
 
         await interaction.editReply({ 
-            embeds: [resultEmbed] 
+            content: `**🎮 ${player1.username} 🆚 ${player2.username}**\n${player1}`,
+            embeds: [player1Embed] 
         });
 
-        // 4. KIRIM HASIL GACHA SEBAGAI MESSAGE BARU (LOG)
-        const logEmbed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('🎯 SHOTGUN DUELS - GACHA RESULT')
-            .setDescription(`## 🎁 HASIL GACHA!\n\n**${player.username}** mendapatkan items:\n${items.map(item => `${item} ${this.ITEMS[item].name}`).join('\n')}`)
-            .setFooter({ text: 'Gacha manual - lebih banyak item!' });
-
-        await game.channel.send({ 
-            content: `${player}`,
-            embeds: [logEmbed] 
-        });
-
-        // 5. LANJUT KE PLAYER BERIKUTNYA ATAU REVEAL CHAMBER
-        game.gachaStage++;
-        this.games.set(game.id, game);
-
-        // Tunggu 3 detik sebelum lanjut
         await new Promise(resolve => setTimeout(resolve, 3000));
 
-        await this.sendGachaStage(game, interaction);
+        // 2. GACHA PLAYER 2
+        const player2Items = this.generateItems();
+        game.items[player2.id] = player2Items;
+
+        const player2Embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🎯 SHOTGUN DUELS - PREPARATION')
+            .setDescription(`## 🎁 GACHA ITEM PLAYER 2!\n\n**${player2.username}** mendapatkan items:\n${player2Items.map(item => `${item} ${this.ITEMS[item].name}`).join('\n')}`);
+
+        await interaction.editReply({ 
+            content: `**🎮 ${player1.username} 🆚 ${player2.username}**\n${player2}`,
+            embeds: [player2Embed] 
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // 3. LANGSUNG KE REVEAL CHAMBER
+        await this.revealChamber(game.id, interaction);
     }
 
     async revealChamber(gameId, interaction) {
         const game = this.games.get(gameId);
         if (!game) return;
 
-        // Clear timeout
-        if (this.gachaTimeouts.has(gameId)) {
-            clearTimeout(this.gachaTimeouts.get(gameId));
-            this.gachaTimeouts.delete(gameId);
-        }
-
         game.chambers = this.generateChambers();
         const loadedCount = game.chambers.filter(c => c === '💥').length;
         const emptyCount = game.chambers.filter(c => c === '⚪').length;
 
-        // 1. ANIMASI REVEAL DI MESSAGE UTAMA
+        // ANIMASI REVEAL
         const revealEmbed = new EmbedBuilder()
             .setColor(0xFF6B6B)
             .setTitle('🎯 SHOTGUN DUELS - PREPARATION')
             .setDescription(`## 🔫 CHAMBER REVEAL!\n\nMengungkap chamber...\n\n${'❓'.repeat(8)}`);
 
-        try {
-            await interaction.update({ 
-                embeds: [revealEmbed], 
-                components: [] 
-            });
-        } catch (error) {
-            console.error('❌ Error updating interaction:', error);
-            return;
-        }
-        
+        await interaction.editReply({ 
+            content: `**🎮 ${game.players[0].username} 🆚 ${game.players[1].username}**`,
+            embeds: [revealEmbed] 
+        });
+
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // 2. TAMPILKAN HASIL REVEAL DI MESSAGE UTAMA
+        // HASIL REVEAL
         const resultEmbed = new EmbedBuilder()
             .setColor(0x2F3136)
             .setTitle('🎯 SHOTGUN DUELS - PREPARATION')
             .setDescription(`## 🔫 CHAMBER TERUNGKAP!\n\n**💥 ${loadedCount} Loaded • ⚪ ${emptyCount} Empty**\n\n*Game akan dimulai dalam 3 detik!*`);
 
         await interaction.editReply({ 
+            content: `**🎮 ${game.players[0].username} 🆚 ${game.players[1].username}**`,
             embeds: [resultEmbed] 
         });
 
-        // 3. KIRIM HASIL REVEAL SEBAGAI MESSAGE BARU (LOG)
+        // LOG CHAMBER
         const logEmbed = new EmbedBuilder()
             .setColor(0x2F3136)
             .setTitle('🎯 SHOTGUN DUELS - CHAMBER INFO')
@@ -406,7 +182,7 @@ class ShotgunDuels {
         await this.sendGameState(game, interaction);
     }
 
-    // ... (method sendGameState dan lainnya tetap sama)
+    // ... (method sendGameState, useItem, shoot, dll tetap sama seperti sebelumnya)
 
     async sendGameState(game, interaction = null) {
         try {
@@ -519,33 +295,30 @@ class ShotgunDuels {
 
     // ... (method lainnya tetap sama)
 
-    // Tambahkan method ini di class ShotgunDuels (di bagian bawah sebelum module.exports)
+    getGame(gameId) {
+        return this.games.get(gameId);
+    }
 
-getGame(gameId) {
-    return this.games.get(gameId);
-}
-
-isPlayerInGame(userId) {
-    for (const game of this.games.values()) {
-        if (game.players.some(player => player.id === userId)) {
-            return true;
+    isPlayerInGame(userId) {
+        for (const game of this.games.values()) {
+            if (game.players.some(player => player.id === userId)) {
+                return true;
+            }
         }
+        return false;
     }
-    return false;
-}
 
-endGameById(gameId) {
-    if (this.afkTimeouts.has(gameId)) {
-        clearTimeout(this.afkTimeouts.get(gameId));
-        this.afkTimeouts.delete(gameId);
+    endGameById(gameId) {
+        if (this.afkTimeouts.has(gameId)) {
+            clearTimeout(this.afkTimeouts.get(gameId));
+            this.afkTimeouts.delete(gameId);
+        }
+        if (this.gachaTimeouts.has(gameId)) {
+            clearTimeout(this.gachaTimeouts.get(gameId));
+            this.gachaTimeouts.delete(gameId);
+        }
+        this.games.delete(gameId);
     }
-    if (this.gachaTimeouts.has(gameId)) {
-        clearTimeout(this.gachaTimeouts.get(gameId));
-        this.gachaTimeouts.delete(gameId);
-    }
-    this.games.delete(gameId);
-}
-
 }
 
 module.exports = ShotgunDuels;
