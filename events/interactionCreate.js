@@ -44,8 +44,8 @@ module.exports = {
             customId.startsWith('shoot_self_') || 
             customId.startsWith('shoot_opponent_') ||
             customId.startsWith('surrender_') ||
-            customId.startsWith('gacha_items_') ||  // ← TAMBAHAN
-            customId.startsWith('reveal_chamber_')) { // ← TAMBAHAN
+            customId.startsWith('gacha_items_') ||  
+            customId.startsWith('reveal_chamber_')) { 
             
             console.log(`🎯 Processing shotgun button: ${customId}`);
             
