@@ -43,11 +43,13 @@ module.exports = {
         if (customId.startsWith('item_') || 
             customId.startsWith('shoot_self_') || 
             customId.startsWith('shoot_opponent_') ||
-            customId.startsWith('surrender_')) {
+            customId.startsWith('surrender_') ||
+            customId.startsWith('gacha_items_') ||  // ← TAMBAHAN
+            customId.startsWith('reveal_chamber_')) { // ← TAMBAHAN
             
             console.log(`🎯 Processing shotgun button: ${customId}`);
             
-            let gameId, action, itemIndex;
+            let gameId, action, itemIndex, playerIndex;
             
             // FIX: Parsing yang benar untuk customId
             if (customId.startsWith('item_')) {
@@ -64,6 +66,16 @@ module.exports = {
             } else if (customId.startsWith('surrender_')) {
                 gameId = customId.replace('surrender_', '');
                 action = 'surrender';
+            } else if (customId.startsWith('gacha_items_')) {
+                // HANDLE GACHA ITEMS
+                const parts = customId.split('_');
+                gameId = parts[2];
+                playerIndex = parseInt(parts[3]);
+                action = 'gacha_items';
+            } else if (customId.startsWith('reveal_chamber_')) {
+                // HANDLE REVEAL CHAMBER  
+                gameId = customId.replace('reveal_chamber_', '');
+                action = 'reveal_chamber';
             } else {
                 await interaction.reply({ 
                     content: '❌ Invalid button!', 
@@ -83,14 +95,17 @@ module.exports = {
                 return;
             }
 
-            // Check if it's user's turn
-            const currentPlayer = game.players[game.currentPlayer];
-            if (!currentPlayer || currentPlayer.id !== interaction.user.id) {
-                await interaction.reply({ 
-                    content: '❌ Bukan giliran kamu!', 
-                    ephemeral: true 
-                });
-                return;
+            // Untuk gacha dan reveal chamber, tidak perlu cek giliran
+            if (action !== 'gacha_items' && action !== 'reveal_chamber') {
+                // Check if it's user's turn (hanya untuk gameplay actions)
+                const currentPlayer = game.players[game.currentPlayer];
+                if (!currentPlayer || currentPlayer.id !== interaction.user.id) {
+                    await interaction.reply({ 
+                        content: '❌ Bukan giliran kamu!', 
+                        ephemeral: true 
+                    });
+                    return;
+                }
             }
 
             // Defer update untuk button interactions
@@ -119,6 +134,16 @@ module.exports = {
                         
                     case 'surrender':
                         await gameManager.surrender(gameId, interaction.user.id, interaction);
+                        break;
+                        
+                    case 'gacha_items':
+                        // TAMBAHAN: Handle gacha items
+                        await gameManager.processGacha(gameId, playerIndex, interaction);
+                        break;
+                        
+                    case 'reveal_chamber':
+                        // TAMBAHAN: Handle reveal chamber
+                        await gameManager.revealChamber(gameId, interaction);
                         break;
                         
                     default:
