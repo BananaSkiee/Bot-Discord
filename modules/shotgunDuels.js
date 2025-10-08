@@ -358,16 +358,16 @@ class ShotgunDuels {
                 .addFields(
                     {
                         name: '❤️ HEALTH STATUS',
-                        value: `⚔️ **${player.username}:** ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n⚔️ **${opponent.username}:** ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`,
+                        value: `🟥 **${player.username}:** ${'❤️'.repeat(game.health[player.id])}${'♡'.repeat(5 - game.health[player.id])} (${game.health[player.id]}/5)\n🟦 **${opponent.username}:** ${'❤️'.repeat(game.health[opponent.id])}${'♡'.repeat(5 - game.health[opponent.id])} (${game.health[opponent.id]}/5)`,
                         inline: true
                     },
                     {
-                        name: '\n🔫 CHAMBER INFO',
+                        name: '🔫 CHAMBER INFO',
                         value: chamberInfo,
                         inline: true
                     },
                     {
-                        name: '\n🎒 INVENTORY',
+                        name: '🎒 INVENTORY',
                         value: `**${player.username}:**\n${game.items[player.id].map(item => `${item} ${this.ITEMS[item].name}`).join('\n') || 'No items'}\n\n**${opponent.username}:**\n${game.items[opponent.id].map(item => `${item} ${this.ITEMS[item].name}`).join('\n') || 'No items'}`,
                         inline: false
                     }
@@ -552,8 +552,6 @@ class ShotgunDuels {
         return true;
     }
 
-    // ... (method shoot, surrender, checkChamberReset, resetChambers, endGame tetap sama)
-
     async shoot(gameId, playerId, target, interaction) {
         const game = this.games.get(gameId);
         if (!game) {
@@ -647,7 +645,34 @@ class ShotgunDuels {
         return true;
     }
 
-    // ... (method lainnya tetap sama)
+    async surrender(gameId, playerId, interaction) {
+        const game = this.games.get(gameId);
+        if (!game) {
+            await interaction.reply({ 
+                content: '❌ Game tidak ditemukan!', 
+                ephemeral: true 
+            });
+            return false;
+        }
+
+        const surrenderingPlayer = game.players.find(p => p.id === playerId);
+        const winner = game.players.find(p => p.id !== playerId);
+
+        if (!surrenderingPlayer || !winner) {
+            await interaction.reply({ 
+                content: '❌ Pemain tidak ditemukan!', 
+                ephemeral: true 
+            });
+            return false;
+        }
+
+        const surrenderMessage = `🏳️ **SURRENDER!**\n**${surrenderingPlayer.username}** menyerah!\n**${winner.username}** menang! 🏆`;
+        
+        this.addActionLog(game, surrenderMessage);
+        await this.sendActionMessage(game, interaction, surrenderMessage);
+        await this.endGame(gameId, winner, interaction, false);
+        return true;
+    }
 
     addActionLog(game, message) {
         game.actionLog.push(message);
@@ -679,8 +704,170 @@ class ShotgunDuels {
         this.games.set(game.id, game);
     }
 
-    // ... (method lainnya)
+    checkChamberReset(game) {
+        const loadedRemaining = game.chambers.slice(game.currentChamber).filter(c => c === '💥').length;
+        const emptyRemaining = game.chambers.slice(game.currentChamber).filter(c => c === '⚪').length;
+        return loadedRemaining === 0 || emptyRemaining === 0;
+    }
 
+    async resetChambers(game, interaction = null) {
+        try {
+            game.chambers = this.generateChambers();
+            game.currentChamber = 0;
+            
+            const player1Items = this.generateItems();
+            const player2Items = this.generateItems();
+            
+            game.items[game.players[0].id] = player1Items;
+            game.items[game.players[1].id] = player2Items;
+            
+            game.effects[game.players[0].id] = { kater: false, borgol: false, borgolShots: 0 };
+            game.effects[game.players[1].id] = { kater: false, borgol: false, borgolShots: 0 };
+            
+            const resetEmbed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle("🔄 CHAMBER & ITEM RESET!")
+                .setDescription(`**Chamber telah direset dan kalian dapat item baru!**\n\n` +
+                    `**${game.players[0].username}:**\n${player1Items.map(item => `${item} ${this.ITEMS[item].name}`).join(', ') || 'No items'}\n\n` +
+                    `**${game.players[1].username}:**\n${player2Items.map(item => `${item} ${this.ITEMS[item].name}`).join(', ') || 'No items'}`)
+                .setFooter({ text: "Item lama hilang, dapat yang baru!" });
+
+            if (interaction) {
+                await interaction.followUp({ embeds: [resetEmbed] });
+            } else if (game.channel) {
+                await game.channel.send({ embeds: [resetEmbed] });
+            }
+
+            this.games.set(game.id, game);
+            return true;
+        } catch (error) {
+            console.error('❌ Error in resetChambers:', error);
+            return false;
+        }
+    }
+
+    setAfkTimeout(gameId, duration) {
+        if (this.afkTimeouts.has(gameId)) {
+            clearTimeout(this.afkTimeouts.get(gameId));
+        }
+
+        const timeout = setTimeout(async () => {
+            const game = this.games.get(gameId);
+            if (!game) return;
+
+            const afkPlayer = game.players[game.currentPlayer];
+            const winner = game.players[1 - game.currentPlayer];
+
+            const afkEmbed = new EmbedBuilder()
+                .setColor(0xFF6B6B)
+                .setDescription(`**${afkPlayer.username}** AFK terlalu lama!\n**${winner.username}** menang otomatis! 🏆`);
+
+            try {
+                const message = await game.channel.messages.fetch(game.messageId);
+                await message.reply({ embeds: [afkEmbed] });
+            } catch (error) {
+                await game.channel.send({ embeds: [afkEmbed] });
+            }
+
+            await this.endGame(gameId, winner, null, true);
+        }, duration);
+
+        this.afkTimeouts.set(gameId, timeout);
+    }
+
+    async endGame(gameId, winner, interaction, isAfk = false) {
+        const game = this.games.get(gameId);
+        if (!game) return;
+
+        if (this.afkTimeouts.has(gameId)) {
+            clearTimeout(this.afkTimeouts.get(gameId));
+            this.afkTimeouts.delete(gameId);
+        }
+
+        const loser = game.players.find(p => p.id !== winner.id);
+        
+        const victoryGifs = [
+            'https://media.giphy.com/media/xULW8N9O5QLy9CaUu4/giphy.gif',
+            'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',
+            'https://media.giphy.com/media/3o7aD2s1V3x4NwWUZa/giphy.gif'
+        ];
+        
+        const randomGif = victoryGifs[Math.floor(Math.random() * victoryGifs.length)];
+
+        let description = '';
+        if (isAfk) {
+            description = `### ${winner.username} WINS! 🎉\n\n**${loser.username}** AFK terlalu lama! ⏰`;
+        } else {
+            description = `### ${winner.username} WINS THE DUEL! 🎉\n\n**${loser.username}** has been defeated! ⚔️`;
+        }
+
+        const embed = new EmbedBuilder()
+            .setTitle('🏆 **VICTORY ROYALE** 🏆')
+            .setColor(0xFFD700)
+            .setDescription(description)
+            .addFields(
+                {
+                    name: '📊 FINAL BATTLE STATS',
+                    value: `**${winner.username}:** ❤️ ${game.health[winner.id]}/5\n**${loser.username}:** ❤️ ${game.health[loser.id]}/5`,
+                    inline: true
+                }
+            )
+            .setThumbnail(winner.displayAvatarURL())
+            .setImage(randomGif)
+            .setFooter({ text: 'Game Over - Thanks for playing!' })
+            .setTimestamp();
+
+        if (interaction) {
+            await interaction.followUp({ embeds: [embed] });
+        } else {
+            await game.channel.send({ embeds: [embed] });
+        }
+        
+        if (game.messageId) {
+            try {
+                const message = await game.channel.messages.fetch(game.messageId);
+                await message.edit({ components: [] });
+            } catch (error) {}
+        }
+        
+        if (game.actionMessageId) {
+            try {
+                const message = await game.channel.messages.fetch(game.actionMessageId);
+                await message.delete();
+            } catch (error) {}
+        }
+
+        if (game.logMessageId) {
+            try {
+                const message = await game.channel.messages.fetch(game.logMessageId);
+                await message.delete();
+            } catch (error) {}
+        }
+        
+        this.games.delete(gameId);
+    }
+
+    // ✅ METHOD YANG DIPERLUKAN
+    getGame(gameId) {
+        return this.games.get(gameId);
+    }
+
+    isPlayerInGame(userId) {
+        for (const game of this.games.values()) {
+            if (game.players.some(player => player.id === userId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    endGameById(gameId) {
+        if (this.afkTimeouts.has(gameId)) {
+            clearTimeout(this.afkTimeouts.get(gameId));
+            this.afkTimeouts.delete(gameId);
+        }
+        this.games.delete(gameId);
+    }
 }
 
 module.exports = ShotgunDuels;
