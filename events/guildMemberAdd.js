@@ -70,8 +70,8 @@ const testEmbed = new EmbedBuilder()
             await welcomeChannel.send({
                   content: `<a:BananaSkiee:1360541400382439475> <a:rflx:1361623860205715589> <a:rflx_e:1361624001939771413> <a:rflx_l:1361624056884887673> <a:rflx_c:1361624260434591855> <a:rflx_o:1361624335126626396> <a:rflx_m:1361624355771256956> <a:rflx_e:1361624001939771413> <a:BananaSkiee:1360541400382439475>
   
-Welcome       : <@${member.id}>
-To Server     : ${member.guild.name}
+Welcome             : <@${member.id}>
+To Server            : BananaSkiee Community
 Total Members : ${member.guild.memberCount}`,
   embeds: [testEmbed], 
   files: [attachment], 
