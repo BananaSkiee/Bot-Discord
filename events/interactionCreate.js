@@ -267,9 +267,9 @@ module.exports = {
         }
       }
 
-      // ========== EXISTING CODE - TIDAK DIUBAH ==========
       if (!interaction.isButton()) return;
       
+            // ========== EXISTING CODE - JANGAN DIUBAH ==========
       const username = interaction.user.globalName ?? interaction.user.username;
       const guild = interaction.client.guilds.cache.get(guildId);
       if (!guild) return;
@@ -321,7 +321,10 @@ module.exports = {
       }
 
       // ========== TOMBOL TEST ✅ / ❌ ==========
-      if (customId && (customId.startsWith("test_use_tag_") || customId.startsWith("test_remove_tag_"))) {
+      if (
+        customId.startsWith("test_use_tag_") ||
+        customId.startsWith("test_remove_tag_")
+      ) {
         const parts = customId.split("_");
         const action = parts[1];
         const roleId = parts[3];
