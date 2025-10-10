@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { ROLES, guildId } = require("../config");
+const { EmbedBuilder } = require("discord.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
@@ -13,6 +14,134 @@ module.exports = {
   async execute(interaction) {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
+
+      // 🆕 HANDLER BARU: SELECT MENU "FIND MORE INFO HERE"
+      if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
+        const selected = interaction.values[0];
+        
+        const rulesModule = require('../modules/rules');
+        const rules = await rulesModule.execute(interaction.client);
+        
+        let embed;
+        
+        switch(selected) {
+            case 'leveling':
+                embed = rules.levelingEmbed;
+                break;
+            case 'moderation':
+                embed = rules.modPolicyEmbed;
+                break;
+            case 'counting':
+                embed = rules.countingEmbed;
+                break;
+            default:
+                embed = new EmbedBuilder()
+                    .setTitle("❌ Informasi Tidak Ditemukan")
+                    .setDescription("Maaf, pilihan yang Anda pilih tidak tersedia.")
+                    .setColor(0xFF0000);
+        }
+        
+        await interaction.reply({
+            embeds: [embed],
+            ephemeral: true
+        });
+        return;
+      }
+
+      // 🆕 HANDLER BARU: TOMBOL GUIDEBOOK, SERVER RULES, YT MEMBERSHIP
+      if (interaction.isButton()) {
+        const customId = interaction.customId;
+        
+        if (customId === 'guidebook_btn') {
+            const rulesModule = require('../modules/rules');
+            const rules = await rulesModule.execute(interaction.client);
+            
+            await interaction.reply({
+                embeds: [rules.guidebookEmbed],
+                components: [rules.guideButton],
+                ephemeral: true
+            });
+            return;
+        }
+        
+        if (customId === 'server_rules_btn') {
+            const rulesModule = require('../modules/rules');
+            const rules = await rulesModule.execute(interaction.client);
+            
+            await interaction.reply({
+                embeds: [rules.guidelinesEmbed],
+                ephemeral: true
+            });
+            return;
+        }
+        
+        if (customId === 'yt_membership_btn') {
+            const ytEmbed = new EmbedBuilder()
+                .setTitle("🔴 **YouTube Membership Premium**")
+                .setDescription("Tingkatkan pengalaman Anda dengan menjadi YouTube Member eksklusif!")
+                .setColor(0xFF0000)
+                .addFields(
+                    {
+                        name: '🎁 **Keuntungan Eksklusif**',
+                        value: '• Role khusus di server Discord\n• Akses channel member-only\n• Early access konten premium\n• Badge eksklusif di YouTube\n• Konten behind-the-scenes',
+                        inline: false
+                    },
+                    {
+                        name: '💎 **Level Membership**',
+                        value: '• **Bronze** - Akses dasar\n• **Silver** - Fitur tambahan\n• **Gold** - Prioritas support\n• **Platinum** - Semua fitur premium',
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Upgrade pengalaman komunitas Anda hari ini!', iconURL: 'https://i.imgur.com/example.png' });
+
+            await interaction.reply({
+                embeds: [ytEmbed],
+                ephemeral: true
+            });
+            return;
+        }
+        
+        if (customId === 'start_guide') {
+            const guideEmbed = new EmbedBuilder()
+                .setTitle("🚀 **Panduan Memulai Premium**")
+                .setDescription("Selamat! Anda telah memulai perjalanan menarik di komunitas kami. Ikuti langkah-langkah berikut:")
+                .setColor(0x00FF00)
+                .addFields(
+                    {
+                        name: '📖 **Langkah 1 - Baca Pedoman**',
+                        value: 'Pahami aturan dan budaya komunitas kami yang profesional',
+                        inline: false
+                    },
+                    {
+                        name: '👋 **Langkah 2 - Perkenalan**',
+                        value: 'Kenalkan diri Anda di channel #perkenalan',
+                        inline: false
+                    },
+                    {
+                        name: '💬 **Langkah 3 - Mulai Berinteraksi**',
+                        value: 'Bergabunglah dalam percakapan di berbagai channel',
+                        inline: false
+                    },
+                    {
+                        name: '🎮 **Langkah 4 - Ikuti Aktivitas**',
+                        value: 'Jelajahi game counting dan event komunitas',
+                        inline: false
+                    },
+                    {
+                        name: '🏆 **Langkah 5 - Naik Level**',
+                        value: 'Dapatkan role eksklusif dengan aktif berpartisipasi',
+                        inline: false
+                    }
+                )
+                .setFooter({ text: 'Selamat menikmati pengalaman premium di komunitas kami!', iconURL: 'https://i.imgur.com/example.png' });
+
+            await interaction.reply({
+                embeds: [guideEmbed],
+                ephemeral: true
+            });
+            return;
+        }
+      }
 
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
@@ -40,7 +169,6 @@ module.exports = {
       if (interaction.isButton() && interaction.customId) {
         const customId = interaction.customId;
         
-        // HANYA HANDLE TOMBOL GAMEPLAY SAJA (HAPUS GACHA & REVEAL)
         if (customId.startsWith('item_') || 
             customId.startsWith('shoot_self_') || 
             customId.startsWith('shoot_opponent_') ||
@@ -50,7 +178,7 @@ module.exports = {
             
             let gameId, action, itemIndex;
             
-            // Parsing customId untuk gameplay actions
+            // FIX: Parsing yang benar untuk customId
             if (customId.startsWith('item_')) {
                 const parts = customId.split('_');
                 gameId = parts[1];
