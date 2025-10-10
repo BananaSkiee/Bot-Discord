@@ -15,7 +15,7 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-      // 🆕 HANDLER BARU: SELECT MENU "FIND MORE INFO HERE"
+      // 🆕 HANDLER: SELECT MENU "FIND MORE INFO HERE"
       if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
         const selected = interaction.values[0];
         
@@ -34,6 +34,9 @@ module.exports = {
             case 'counting':
                 embed = rules.countingEmbed;
                 break;
+            case 'beginner_guide':
+                embed = rules.beginnerGuideEmbed;
+                break;
             default:
                 embed = new EmbedBuilder()
                     .setTitle("❌ Informasi Tidak Ditemukan")
@@ -48,10 +51,11 @@ module.exports = {
         return;
       }
 
-      // 🆕 HANDLER BARU: TOMBOL GUIDEBOOK, SERVER RULES, YT MEMBERSHIP
+      // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES, YT MEMBERSHIP
       if (interaction.isButton()) {
         const customId = interaction.customId;
         
+        // Tombol Buku Panduan
         if (customId === 'guidebook_btn') {
             const rulesModule = require('../modules/rules');
             const rules = await rulesModule.execute(interaction.client);
@@ -64,6 +68,7 @@ module.exports = {
             return;
         }
         
+        // Tombol Peraturan Server
         if (customId === 'server_rules_btn') {
             const rulesModule = require('../modules/rules');
             const rules = await rulesModule.execute(interaction.client);
@@ -75,194 +80,32 @@ module.exports = {
             return;
         }
         
+        // 🆕 UBAH: Tombol YouTube Membership sekarang hanya kirim link
         if (customId === 'yt_membership_btn') {
-            const ytEmbed = new EmbedBuilder()
-                .setTitle("🔴 **YouTube Membership Premium**")
-                .setDescription("Tingkatkan pengalaman Anda dengan menjadi YouTube Member eksklusif!")
-                .setColor(0xFF0000)
-                .addFields(
-                    {
-                        name: '🎁 **Keuntungan Eksklusif**',
-                        value: '• Role khusus di server Discord\n• Akses channel member-only\n• Early access konten premium\n• Badge eksklusif di YouTube\n• Konten behind-the-scenes',
-                        inline: false
-                    },
-                    {
-                        name: '💎 **Level Membership**',
-                        value: '• **Bronze** - Akses dasar\n• **Silver** - Fitur tambahan\n• **Gold** - Prioritas support\n• **Platinum** - Semua fitur premium',
-                        inline: false
-                    }
-                )
-                .setFooter({ text: 'Upgrade pengalaman komunitas Anda hari ini!', iconURL: 'https://i.imgur.com/example.png' });
-
             await interaction.reply({
-                embeds: [ytEmbed],
+                content: "🔗 **YouTube Membership Premium**\n\n🎁 Tingkatkan pengalaman Anda dengan menjadi member eksklusif:\nhttps://www.youtube.com/channel/your-channel/membership\n\n**Keuntungan Membership:**\n• Role khusus di Discord\n• Akses konten eksklusif\n• Badge spesial di YouTube\n• Early access video\n• Komunitas private",
                 ephemeral: true
             });
             return;
         }
         
+        // 🆕 Tombol Mulai Panduan Interaktif
         if (customId === 'start_guide') {
             const guideEmbed = new EmbedBuilder()
-                .setTitle("🚀 **Panduan Memulai Premium**")
-                .setDescription("Selamat! Anda telah memulai perjalanan menarik di komunitas kami. Ikuti langkah-langkah berikut:")
+                .setTitle("🚀 **PANDUAN INTERAKTIF DIMULAI!**")
+                .setDescription(`## Selamat! Anda telah memulai panduan interaktif.\n\nIkuti langkah-langkah berikut untuk pengalaman terbaik:\n\n### 📝 **Langkah 1 - Baca & Pahami**\nPelajari semua peraturan dan pedoman komunitas kami\n\n### 👋 **Langkah 2 - Perkenalan**\nKenalkan diri Anda di channel **#perkenalan**\n\n### 💬 **Langkah 3 - Interaksi**\nMulai berinteraksi dengan member lain\n\n### 🎮 **Langkah 4 - Eksplorasi**\nCoba berbagai fitur dan game yang tersedia\n\n### 🏆 **Langkah 5 - Berkembang**\nNaik level dan dapatkan reward eksklusif\n\n---\n\n**🎯 Tips Sukses:**\n• Jangan ragu bertanya\n• Ikuti event komunitas\n• Hormati semua member\n• Nikmati prosesnya!`)
                 .setColor(0x00FF00)
-                .addFields(
-                    {
-                        name: '📖 **Langkah 1 - Baca Pedoman**',
-                        value: 'Pahami aturan dan budaya komunitas kami yang profesional',
-                        inline: false
-                    },
-                    {
-                        name: '👋 **Langkah 2 - Perkenalan**',
-                        value: 'Kenalkan diri Anda di channel #perkenalan',
-                        inline: false
-                    },
-                    {
-                        name: '💬 **Langkah 3 - Mulai Berinteraksi**',
-                        value: 'Bergabunglah dalam percakapan di berbagai channel',
-                        inline: false
-                    },
-                    {
-                        name: '🎮 **Langkah 4 - Ikuti Aktivitas**',
-                        value: 'Jelajahi game counting dan event komunitas',
-                        inline: false
-                    },
-                    {
-                        name: '🏆 **Langkah 5 - Naik Level**',
-                        value: 'Dapatkan role eksklusif dengan aktif berpartisipasi',
-                        inline: false
-                    }
-                )
-                .setFooter({ text: 'Selamat menikmati pengalaman premium di komunitas kami!', iconURL: 'https://i.imgur.com/example.png' });
+                .setThumbnail('https://i.imgur.com/1M8Yh6u.png')
+                .setFooter({ 
+                    text: 'Panduan interaktif • Selamat bergabung!', 
+                    iconURL: 'https://i.imgur.com/1M8Yh6u.png' 
+                })
+                .setTimestamp();
 
             await interaction.reply({
                 embeds: [guideEmbed],
                 ephemeral: true
             });
-            return;
-        }
-      }
-
-      // ========== DUEL ACCEPT/REJECT HANDLER ==========
-      if (interaction.isButton() && interaction.customId && (
-          interaction.customId.startsWith('accept_duel_') || 
-          interaction.customId.startsWith('reject_duel_')
-      )) {
-          console.log(`🎯 Processing duel button: ${interaction.customId}`);
-          
-          const parts = interaction.customId.split('_');
-          const action = parts[0]; // accept or reject
-          const duelId = parts.slice(2).join('_');
-          
-          const shotgunCommand = require('../commands/shotgunCommand');
-          
-          if (action === 'accept') {
-              await shotgunCommand.acceptDuel(duelId, interaction);
-          } else if (action === 'reject') {
-              await shotgunCommand.rejectDuel(duelId, interaction);
-          }
-          
-          return;
-      }
-
-      // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED ==========
-      if (interaction.isButton() && interaction.customId) {
-        const customId = interaction.customId;
-        
-        if (customId.startsWith('item_') || 
-            customId.startsWith('shoot_self_') || 
-            customId.startsWith('shoot_opponent_') ||
-            customId.startsWith('surrender_')) {
-            
-            console.log(`🎯 Processing shotgun button: ${customId}`);
-            
-            let gameId, action, itemIndex;
-            
-            // FIX: Parsing yang benar untuk customId
-            if (customId.startsWith('item_')) {
-                const parts = customId.split('_');
-                gameId = parts[1];
-                itemIndex = parseInt(parts[2]);
-                action = 'use_item';
-            } else if (customId.startsWith('shoot_self_')) {
-                gameId = customId.replace('shoot_self_', '');
-                action = 'shoot_self';
-            } else if (customId.startsWith('shoot_opponent_')) {
-                gameId = customId.replace('shoot_opponent_', '');
-                action = 'shoot_opponent';
-            } else if (customId.startsWith('surrender_')) {
-                gameId = customId.replace('surrender_', '');
-                action = 'surrender';
-            } else {
-                await interaction.reply({ 
-                    content: '❌ Invalid button!', 
-                    ephemeral: true 
-                });
-                return;
-            }
-            
-            const { gameManager } = require('../commands/shotgunCommand');
-            const game = gameManager.getGame(gameId);
-            
-            if (!game) {
-                await interaction.reply({ 
-                    content: '❌ Game tidak ditemukan atau sudah selesai!', 
-                    ephemeral: true 
-                });
-                return;
-            }
-
-            // Check if it's user's turn
-            const currentPlayer = game.players[game.currentPlayer];
-            if (!currentPlayer || currentPlayer.id !== interaction.user.id) {
-                await interaction.reply({ 
-                    content: '❌ Bukan giliran kamu!', 
-                    ephemeral: true 
-                });
-                return;
-            }
-
-            // Defer update untuk button interactions
-            await interaction.deferUpdate();
-
-            try {
-                switch (action) {
-                    case 'use_item':
-                        if (isNaN(itemIndex)) {
-                            await interaction.followUp({ 
-                                content: '❌ Item tidak valid!', 
-                                ephemeral: true 
-                            });
-                            return;
-                        }
-                        await gameManager.useItem(gameId, interaction.user.id, itemIndex, interaction);
-                        break;
-                        
-                    case 'shoot_self':
-                        await gameManager.shoot(gameId, interaction.user.id, 'self', interaction);
-                        break;
-                        
-                    case 'shoot_opponent':
-                        await gameManager.shoot(gameId, interaction.user.id, 'opponent', interaction);
-                        break;
-                        
-                    case 'surrender':
-                        await gameManager.surrender(gameId, interaction.user.id, interaction);
-                        break;
-                        
-                    default:
-                        await interaction.followUp({ 
-                            content: '❌ Aksi tidak dikenali!', 
-                            ephemeral: true 
-                        });
-                }
-            } catch (error) {
-                console.error('❌ Error handling shotgun interaction:', error);
-                await interaction.followUp({ 
-                    content: '❌ Terjadi error saat memproses aksi!', 
-                    ephemeral: true 
-                });
-            }
             return;
         }
       }
