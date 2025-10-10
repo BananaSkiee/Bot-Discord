@@ -1,3 +1,4 @@
+const { ChannelType } = require('discord.js');
 const updateOnline = require("../online");
 const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
@@ -16,66 +17,44 @@ module.exports = {
   name: "ready",
   once: true,
   async execute(client) {
-    console.log(`🤖 Bot siap sebagai ${client.user.tag}`);
+    console.log(`🤖 ${client.user.tag} siap melayani!`);
 
-    // Pindahkan init ke dalam execute
-    if (minecraft.init) {
-      minecraft.init(client);
-    }
-    
     // 🆕 FITUR AUTO SEND RULES
     try {
-        const RULES_CHANNEL_ID = '1352326247186694164'; // ID RULES YANG KAMU KASIH
+        const RULES_CHANNEL_ID = '1352326247186694164';
         const rulesChannel = await client.channels.fetch(RULES_CHANNEL_ID);
         
-        if (rulesChannel) {
-            // Hapus pesan lama satu per satu
+        if (rulesChannel && rulesChannel.type === ChannelType.GuildText) {
+            // Hapus pesan lama
             const messages = await rulesChannel.messages.fetch({ limit: 50 });
-            if (messages.size > 0) {
-                for (const message of messages.values()) {
-                    try {
-                        await message.delete();
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    } catch (error) {
-                        console.log('⚠️ Tidak bisa hapus pesan lama:', error.message);
-                    }
+            for (const message of messages.values()) {
+                try {
+                    await message.delete();
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (error) {
+                    console.log('⚠️ Tidak bisa hapus pesan lama:', error.message);
                 }
-                console.log('🗑️ Pesan lama dihapus');
             }
+
+            console.log('🗑️ Pesan lama dihapus, mengirim rules baru...');
 
             const rules = await rulesModule.execute(client);
 
-            // Kirim semua embed berurutan dengan delay
-            await rulesChannel.send({ embeds: [rules.welcomeHeaderEmbed] });
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
+            // Kirim embed utama dengan tombol dan select menu
             await rulesChannel.send({ 
-                embeds: [rules.welcomeMainEmbed],
-                components: [rules.welcomeButtons]
-            });
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            await rulesChannel.send({ 
-                embeds: [rules.guidebookEmbed],
-                components: [rules.guideButton]
-            });
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            await rulesChannel.send({ embeds: [rules.guidelinesEmbed] });
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            await rulesChannel.send({ 
-                content: '**🔍 Jelajahi informasi lebih lanjut:**',
-                components: [rules.infoSelectMenu] 
+                embeds: [rules.welcomeEmbed],
+                components: [rules.welcomeButtons, rules.infoSelectMenu]
             });
             
             console.log('✅ Rules premium berhasil dikirim ke channel');
+        } else {
+            console.error('❌ Channel rules tidak ditemukan atau bukan text channel');
         }
     } catch (error) {
-        console.error('❌ Gagal mengirim rules:', error.message);
+        console.error('❌ Gagal mengirim rules:', error);
     }
 
-    // ... KODE LAINNYA TETAP SAMA ...
+    // ... KODE LAINNYA UNTUK FITUR EXISTING TETAP SAMA ...
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((guild) => {
       console.log(`- ${guild.name} (ID: ${guild.id})`);
@@ -84,6 +63,7 @@ module.exports = {
     const guild = client.guilds.cache.first();
     if (!guild) return;
 
+    // Fitur existing lainnya
     if (guild) {
       try {
         await updateOnline(guild);
@@ -109,7 +89,7 @@ module.exports = {
       try { rainbowRole(client, 60_000); } catch (err) { console.error("❌ Rainbow role error:", err); }
     }
     
-    // Update crypto message dengan channel ID yang valid
+    // Update crypto message
     setInterval(async () => {
       try {
         const newContent = "📈 BTC: $65,000 (+0.4%)";
@@ -164,5 +144,10 @@ module.exports = {
     }
     
     try { await joinvoice(client); } catch (err) { console.error("❌ Gagal join voice channel:", err); }
+
+    // Minecraft module init
+    if (minecraft.init) {
+      minecraft.init(client);
+    }
   },
 };
