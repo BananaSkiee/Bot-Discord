@@ -110,9 +110,133 @@ module.exports = {
         }
       }
 
+        // ========== DUEL ACCEPT/REJECT HANDLER ==========
+      if (interaction.isButton() && interaction.customId && (
+          interaction.customId.startsWith('accept_duel_') || 
+          interaction.customId.startsWith('reject_duel_')
+      )) {
+          console.log(`🎯 Processing duel button: ${interaction.customId}`);
+          
+          const parts = interaction.customId.split('_');
+          const action = parts[0]; // accept or reject
+          const duelId = parts.slice(2).join('_');
+          
+          const shotgunCommand = require('../commands/shotgunCommand');
+          
+          if (action === 'accept') {
+              await shotgunCommand.acceptDuel(duelId, interaction);
+          } else if (action === 'reject') {
+              await shotgunCommand.rejectDuel(duelId, interaction);
+          }
+          
+          return;
+      }
+
+      // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED ==========
+      if (interaction.isButton() && interaction.customId) {
+        const customId = interaction.customId;
+        
+        if (customId.startsWith('item_') || 
+            customId.startsWith('shoot_self_') || 
+            customId.startsWith('shoot_opponent_') ||
+            customId.startsWith('surrender_')) {
+            
+            console.log(`🎯 Processing shotgun button: ${customId}`);
+            
+            let gameId, action, itemIndex;
+            
+            // FIX: Parsing yang benar untuk customId
+            if (customId.startsWith('item_')) {
+                const parts = customId.split('_');
+                gameId = parts[1];
+                itemIndex = parseInt(parts[2]);
+                action = 'use_item';
+            } else if (customId.startsWith('shoot_self_')) {
+                gameId = customId.replace('shoot_self_', '');
+                action = 'shoot_self';
+            } else if (customId.startsWith('shoot_opponent_')) {
+                gameId = customId.replace('shoot_opponent_', '');
+                action = 'shoot_opponent';
+            } else if (customId.startsWith('surrender_')) {
+                gameId = customId.replace('surrender_', '');
+                action = 'surrender';
+            } else {
+                await interaction.reply({ 
+                    content: '❌ Invalid button!', 
+                    ephemeral: true 
+                });
+                return;
+            }
+            
+            const { gameManager } = require('../commands/shotgunCommand');
+            const game = gameManager.getGame(gameId);
+            
+            if (!game) {
+                await interaction.reply({ 
+                    content: '❌ Game tidak ditemukan atau sudah selesai!', 
+                    ephemeral: true 
+                });
+                return;
+            }
+
+            // Check if it's user's turn
+            const currentPlayer = game.players[game.currentPlayer];
+            if (!currentPlayer || currentPlayer.id !== interaction.user.id) {
+                await interaction.reply({ 
+                    content: '❌ Bukan giliran kamu!', 
+                    ephemeral: true 
+                });
+                return;
+            }
+
+            // Defer update untuk button interactions
+            await interaction.deferUpdate();
+
+            try {
+                switch (action) {
+                    case 'use_item':
+                        if (isNaN(itemIndex)) {
+                            await interaction.followUp({ 
+                                content: '❌ Item tidak valid!', 
+                                ephemeral: true 
+                            });
+                            return;
+                        }
+                        await gameManager.useItem(gameId, interaction.user.id, itemIndex, interaction);
+                        break;
+                        
+                    case 'shoot_self':
+                        await gameManager.shoot(gameId, interaction.user.id, 'self', interaction);
+                        break;
+                        
+                    case 'shoot_opponent':
+                        await gameManager.shoot(gameId, interaction.user.id, 'opponent', interaction);
+                        break;
+                        
+                    case 'surrender':
+                        await gameManager.surrender(gameId, interaction.user.id, interaction);
+                        break;
+                        
+                    default:
+                        await interaction.followUp({ 
+                            content: '❌ Aksi tidak dikenali!', 
+                            ephemeral: true 
+                        });
+                }
+            } catch (error) {
+                console.error('❌ Error handling shotgun interaction:', error);
+                await interaction.followUp({ 
+                    content: '❌ Terjadi error saat memproses aksi!', 
+                    ephemeral: true 
+                });
+            }
+            return;
+        }
+      }
+
+      // ========== EXISTING CODE - TIDAK DIUBAH ==========
       if (!interaction.isButton()) return;
       
-            // ========== EXISTING CODE - JANGAN DIUBAH ==========
       const username = interaction.user.globalName ?? interaction.user.username;
       const guild = interaction.client.guilds.cache.get(guildId);
       if (!guild) return;
@@ -164,10 +288,7 @@ module.exports = {
       }
 
       // ========== TOMBOL TEST ✅ / ❌ ==========
-      if (
-        customId.startsWith("test_use_tag_") ||
-        customId.startsWith("test_remove_tag_")
-      ) {
+      if (customId && (customId.startsWith("test_use_tag_") || customId.startsWith("test_remove_tag_"))) {
         const parts = customId.split("_");
         const action = parts[1];
         const roleId = parts[3];
