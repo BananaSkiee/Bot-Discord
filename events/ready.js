@@ -25,7 +25,7 @@ module.exports = {
     
     // 🆕 FITUR AUTO SEND RULES
     try {
-        const RULES_CHANNEL_ID = '1401061819195592785'; // ID RULES YANG KAMU KASIH
+        const RULES_CHANNEL_ID = '1352326247186694164'; // ID RULES YANG KAMU KASIH
         const rulesChannel = await client.channels.fetch(RULES_CHANNEL_ID);
         
         if (rulesChannel) {
