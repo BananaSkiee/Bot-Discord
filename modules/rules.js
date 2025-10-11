@@ -18,7 +18,7 @@ module.exports = {
             })
             .setTimestamp();
 
-        // Tombol untuk Welcome Embed (BAHASA INGGRIS)
+        // PERBAIKAN: Tombol YouTube Membership hanya menggunakan URL
         const welcomeButtons = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -32,11 +32,10 @@ module.exports = {
                     .setStyle(ButtonStyle.Danger)
                     .setEmoji('⚡'),
                 new ButtonBuilder()
-                    .setCustomId('yt_membership_btn')
+                    .setURL('https://discord.gg/5asgbezyR6')
                     .setLabel('YouTube Membership')
                     .setStyle(ButtonStyle.Link)
                     .setEmoji('🔴')
-                    .setURL('https://discord.gg/5asgbezyR6')
             );
 
         // Select Menu untuk informasi tambahan
@@ -98,7 +97,7 @@ module.exports = {
         // Page 3/5 - Important Channels
         const guidebookPage3 = new EmbedBuilder()
             .setTitle("📁 **CHANNEL PENTING DI SERVER**")
-            .setDescription(`## 🗂️ Panduan Channel BananaSkiee Community\n\n### <#1352326247186694164> **#announcements**\nSemua pengumuman terbaru dan update mengenai server akan dibagikan di sini.\n\n### <#1352326247186694165> **#tickets**\nBuat tiket di channel ini untuk berbicara dengan staff dan mendapatkan bantuan untuk masalah server.\n\n### <#1352326247186694166> **#discussion**\nTempat untuk mengobrol tentang apapun yang tidak melanggar rules.\n\n### <#1352326247186694167> **#our-services**\nAnda akan menemukan semua layanan yang kami tawarkan di sini.\n\n### <#1352326247186694168> **#introductions**\nPerkenalkan diri Anda kepada komunitas di channel ini.\n\n### <#1352326247186694169> **#discord-help**\nButuh bantuan? Tanyakan di sini!`)
+            .setDescription(`## 🗂️ Panduan Channel BananaSkiee Community\n\n### #📢-announcements\nSemua pengumuman terbaru dan update mengenai server akan dibagikan di sini.\n\n### #🎫-tickets\nBuat tiket di channel ini untuk berbicara dengan staff dan mendapatkan bantuan untuk masalah server.\n\n### #💬-discussion\nTempat untuk mengobrol tentang apapun yang tidak melanggar rules.\n\n### #🛠️-our-services\nAnda akan menemukan semua layanan yang kami tawarkan di sini.\n\n### #👋-introductions\nPerkenalkan diri Anda kepada komunitas di channel ini.\n\n### #❓-discord-help\nButuh bantuan? Tanyakan di sini!`)
             .setColor(0x3498DB)
             .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
@@ -122,7 +121,7 @@ module.exports = {
         // Page 5/5 - Completion
         const guidebookPage5 = new EmbedBuilder()
             .setTitle("🎉 **SELAMAT! ANDA BERHASIL**")
-            .setDescription(`## ✅ Panduan Server Selesai\n\nSemoga **Panduan Server** kami membantu Anda memahami sebagian besar **BananaSkiee Community**.\n\n### 📖 **Informasi Tambahan:**\n• Jangan ragu untuk melihat pertanyaan yang sering diajukan di sini — <#1352326247186694170>\n• Nikmati masa tinggal Anda di **BananaSkiee Community!**\n\n### 🎯 **Langkah Selanjutnya:**\n1. **Baca rules** dengan seksama\n2. **Perkenalkan diri** di channel introductions\n3. **Jelajahi channel** yang tersedia\n4. **Ikuti aktivitas** komunitas\n5. **Naik level** dan dapatkan reward\n\n**Terima kasih telah bergabung dengan kami!** 🍌`)
+            .setDescription(`## ✅ Panduan Server Selesai\n\nSemoga **Panduan Server** kami membantu Anda memahami sebagian besar **BananaSkiee Community**.\n\n### 📖 **Informasi Tambahan:**\n• Jangan ragu untuk melihat pertanyaan yang sering diajukan di sini — #❓-discord-help\n• Nikmati masa tinggal Anda di **BananaSkiee Community!**\n\n### 🎯 **Langkah Selanjutnya:**\n1. **Baca rules** dengan seksama\n2. **Perkenalkan diri** di channel introductions\n3. **Jelajahi channel** yang tersedia\n4. **Ikuti aktivitas** komunitas\n5. **Naik level** dan dapatkan reward\n\n**Terima kasih telah bergabung dengan kami!** 🍌`)
             .setColor(0x2ECC71)
             .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setImage('https://i.ibb.co/WvSvsVfH/standard-34.gif')
@@ -166,14 +165,14 @@ module.exports = {
         const rulesAllowedEmbed = new EmbedBuilder()
             .setTitle('✅ **YANG BOLEH DILAKUKAN**')
             .setDescription(
-                '<a:ceklis:1402332072533823640> | **Ngobrol santai** - Asal sopan dan friendly\n' +
-                '<a:ceklis:1402332072533823640> | **Nge-share meme** - Yang receh tapi lucu\n' +
-                '<a:ceklis:1402332072533823640> | **Nanya-nanya** - Tentang game/anime/life\n' +
-                '<a:ceklis:1402332072533823640> | **Main bot** - Musik, game, dll (jangan spam)\n' +
-                '<a:ceklis:1402332072533823640> | **Bikin event** - Tanya admin dulu\n' +
-                '<a:ceklis:1402332072533823640> | **Kasih saran** - Buat server lebih baik\n' +
-                '<a:ceklis:1402332072533823640> | **Berkolaborasi** - Untuk project bersama\n' +
-                '<a:ceklis:1402332072533823640> | **Belajar bersama** - Sharing knowledge'
+                '🎯 | **Ngobrol santai** - Asal sopan dan friendly\n' +
+                '🎯 | **Nge-share meme** - Yang receh tapi lucu\n' +
+                '🎯 | **Nanya-nanya** - Tentang game/anime/life\n' +
+                '🎯 | **Main bot** - Musik, game, dll (jangan spam)\n' +
+                '🎯 | **Bikin event** - Tanya admin dulu\n' +
+                '🎯 | **Kasih saran** - Buat server lebih baik\n' +
+                '🎯 | **Berkolaborasi** - Untuk project bersama\n' +
+                '🎯 | **Belajar bersama** - Sharing knowledge'
             )
             .setColor(0x00FF00)
             .setFooter({ 
@@ -184,14 +183,14 @@ module.exports = {
         const rulesNotAllowedEmbed = new EmbedBuilder()
             .setTitle('❌ **YANG TIDAK BOLEH DILAKUKAN**')
             .setDescription(
-                '<a:silang:1402332141047513150> | **Bahasa kasar** - Toxic = mute/ban\n' +
-                '<a:silang:1402332141047513150> | **Spam mention** - @everyone/@admin tanpa penting\n' +
-                '<a:silang:1402332141047513150> | **Ngebully** - Auto ban permanen\n' +
-                '<a:silang:1402332141047513150> | **NSFW** - Foto/video/chat 18+\n' +
-                '<a:silang:1402332141047513150> | **Promo random** - Kecuali di channel promo\n' +
-                '<a:silang:1402332141047513150> | **Rasis/SARA** - Zero tolerance policy\n' +
-                '<a:silang:1402332141047513150> | **Scam/Phishing** - Langsung ban permanent\n' +
-                '<a:silang:1402332141047513150> | **Impersonasi** - Menyamarkan identitas'
+                '🚫 | **Bahasa kasar** - Toxic = mute/ban\n' +
+                '🚫 | **Spam mention** - @everyone/@admin tanpa penting\n' +
+                '🚫 | **Ngebully** - Auto ban permanen\n' +
+                '🚫 | **NSFW** - Foto/video/chat 18+\n' +
+                '🚫 | **Promo random** - Kecuali di channel promo\n' +
+                '🚫 | **Rasis/SARA** - Zero tolerance policy\n' +
+                '🚫 | **Scam/Phishing** - Langsung ban permanent\n' +
+                '🚫 | **Impersonasi** - Menyamarkan identitas'
             )
             .setColor(0xFF0000)
             .setFooter({ 
@@ -203,17 +202,17 @@ module.exports = {
             .setTitle('📜 **PERATURAN & SISTEM MODERASI BANANASKIE COMMUNITY**')
             .setDescription(
                 '### ⚠️ **SISTEM WARNING KUMULATIF**\n' +
-                '<a:seru:1402337929556263002> | **Warn 1** = Peringatan verbal\n' +
-                '<a:seru:1402337929556263002> | **Warn 2** = Mute 5 menit\n' +
-                '<a:seru:1402337929556263002> | **Warn 3** = Mute 10 menit\n' +
-                '<a:seru:1402337929556263002> | **Warn 4** = Mute 1 jam\n' +
-                '<a:seru:1402337929556263002> | **Warn 5** = Mute 1 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 6** = Mute 3 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 7** = Softban + Mute 1 minggu\n' +
-                '<a:seru:1402337929556263002> | **Warn 8** = Ban 1 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 9** = Ban 3 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 10** = Ban 1 minggu\n' +
-                '<a:seru:1402337929556263002> | **Warn 11** = **BAN PERMANEN**\n\n' +
+                '🔸 | **Warn 1** = Peringatan verbal\n' +
+                '🔸 | **Warn 2** = Mute 5 menit\n' +
+                '🔸 | **Warn 3** = Mute 10 menit\n' +
+                '🔸 | **Warn 4** = Mute 1 jam\n' +
+                '🔸 | **Warn 5** = Mute 1 hari\n' +
+                '🔸 | **Warn 6** = Mute 3 hari\n' +
+                '🔸 | **Warn 7** = Softban + Mute 1 minggu\n' +
+                '🔸 | **Warn 8** = Ban 1 hari\n' +
+                '🔸 | **Warn 9** = Ban 3 hari\n' +
+                '🔸 | **Warn 10** = Ban 1 minggu\n' +
+                '🔸 | **Warn 11** = **BAN PERMANEN**\n\n' +
                 '### 🔇 **PELANGGARAN AUTO-MUTE**\n' +
                 '- **Spam/Flood** = Mute 20 menit\n' +
                 '- **Bahasa NSFW** = Mute 1 hari\n' +
@@ -246,7 +245,7 @@ module.exports = {
         // ==================== LEVELING SECTION ====================
         const levelingEmbed = new EmbedBuilder()
             .setTitle("🏆 **SISTEM LEVELING BANANASKIE COMMUNITY**")
-            .setDescription(`## 📈 Level Dari Bot <@437808476106784770>\n\nBerikut adalah role-level yang bisa Anda dapatkan berdasarkan aktivitas di server:\n\n### 👑 **LEVEL TERTINGGI**\n<@&1354196993680867370> = **Level Tertinggi 100**\n\n### 💎 **LEVEL ADVANCED**\n<@&1354197284476420106> = **Level 80**\n<@&1354197417754628176> = **Level 70**\n<@&1354197527582212106> = **Level 60**\n<@&1354197530010976521> = **Level 55**\n<@&1354197540937142503> = **Level 50**\n\n### 🥈 **LEVEL INTERMEDIATE**\n<@&1354197488264941809> = **Level 45**\n<@&1354197596536701018> = **Level 40**\n<@&1354196727753740409> = **Level 35**\n<@&1354196722716377281> = **Level 30**\n<@&1354196697340837888> = **Level 25**\n\n### 🥉 **LEVEL PEMULA**\n<@&1354196683420078324> = **Level 20**\n<@&1354196302237405285> = **Level 15**\n<@&1354196283975270624> = **Level 10**\n<@&1354196267722346578> = **Level 5**\n<@&1354196247715516617> = **Level Pertama/Level 1**`)
+            .setDescription(`## 📈 Level Dari Bot\n\nBerikut adalah role-level yang bisa Anda dapatkan berdasarkan aktivitas di server:\n\n### 👑 **LEVEL TERTINGGI**\n<@&1354196993680867370> = **Level Tertinggi 100**\n\n### 💎 **LEVEL ADVANCED**\n<@&1354197284476420106> = **Level 80**\n<@&1354197417754628176> = **Level 70**\n<@&1354197527582212106> = **Level 60**\n<@&1354197530010976521> = **Level 55**\n<@&1354197540937142503> = **Level 50**\n\n### 🥈 **LEVEL INTERMEDIATE**\n<@&1354197488264941809> = **Level 45**\n<@&1354197596536701018> = **Level 40**\n<@&1354196727753740409> = **Level 35**\n<@&1354196722716377281> = **Level 30**\n<@&1354196697340837888> = **Level 25**\n\n### 🥉 **LEVEL PEMULA**\n<@&1354196683420078324> = **Level 20**\n<@&1354196302237405285> = **Level 15**\n<@&1354196283975270624> = **Level 10**\n<@&1354196267722346578> = **Level 5**\n<@&1354196247715516617> = **Level Pertama/Level 1**`)
             .setColor(0xFFD700)
             .setFooter({ 
                 text: 'BananaSkiee Community • Leveling System', 
