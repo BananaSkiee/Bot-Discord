@@ -61,7 +61,7 @@ module.exports = {
             const rules = await rulesModule.execute(interaction.client);
             
             await interaction.reply({
-                embeds: [rules.guidebookPage1],
+                embeds: [rules.guidebookIntro],
                 components: [rules.startGuideButton],
                 ephemeral: true
             });
@@ -74,7 +74,7 @@ module.exports = {
             const rules = await rulesModule.execute(interaction.client);
             
             await interaction.reply({
-                embeds: [rules.rulesAllowedEmbed, rules.rulesNotAllowedEmbed, rules.moderationPolicyEmbed],
+                embeds: [rules.rulesAllowedEmbed, rules.rulesNotAllowedEmbed],
                 ephemeral: true
             });
             return;
@@ -91,7 +91,7 @@ module.exports = {
                 message: null
             });
             
-            await interaction.reply({
+            await interaction.update({
                 embeds: [rules.guidebookPage1],
                 components: [rules.guidebookNavigation],
                 ephemeral: true
@@ -116,13 +116,13 @@ module.exports = {
             let newPage = session.currentPage;
             
             if (customId === 'guide_prev') {
-                newPage = Math.max(1, session.currentPage - 1);
+                newPage = Math.max(0, session.currentPage - 1); // 0 = back ke intro
             } else if (customId === 'guide_next') {
                 newPage = Math.min(5, session.currentPage + 1);
             } else if (customId === 'guide_close') {
                 guidebookSessions.delete(interaction.user.id);
                 await interaction.update({
-                    content: "**Only you can see this - Dismiss message**",
+                    content: " ",
                     embeds: [],
                     components: []
                 });
@@ -135,31 +135,37 @@ module.exports = {
                 currentPage: newPage
             });
             
-            // Get the correct page embed
+            // Get the correct page embed dan components
             let currentEmbed;
             let components;
             
-            switch(newPage) {
-                case 1:
-                    currentEmbed = rules.guidebookPage1;
-                    components = rules.guidebookNavigation;
-                    break;
-                case 2:
-                    currentEmbed = rules.guidebookPage2;
-                    components = rules.guidebookNavigation;
-                    break;
-                case 3:
-                    currentEmbed = rules.guidebookPage3;
-                    components = rules.guidebookNavigation;
-                    break;
-                case 4:
-                    currentEmbed = rules.guidebookPage4;
-                    components = rules.guidebookNavigation;
-                    break;
-                case 5:
-                    currentEmbed = rules.guidebookPage5;
-                    components = rules.guidebookClose;
-                    break;
+            if (newPage === 0) {
+                // Kembali ke intro dengan tombol Start Guide
+                currentEmbed = rules.guidebookIntro;
+                components = rules.startGuideButton;
+            } else {
+                switch(newPage) {
+                    case 1:
+                        currentEmbed = rules.guidebookPage1;
+                        components = rules.guidebookNavigation;
+                        break;
+                    case 2:
+                        currentEmbed = rules.guidebookPage2;
+                        components = rules.guidebookNavigation;
+                        break;
+                    case 3:
+                        currentEmbed = rules.guidebookPage3;
+                        components = rules.guidebookNavigation;
+                        break;
+                    case 4:
+                        currentEmbed = rules.guidebookPage4;
+                        components = rules.guidebookNavigation;
+                        break;
+                    case 5:
+                        currentEmbed = rules.guidebookPage5;
+                        components = rules.guidebookClose;
+                        break;
+                }
             }
             
             await interaction.update({
