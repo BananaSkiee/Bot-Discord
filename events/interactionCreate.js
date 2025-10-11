@@ -60,6 +60,12 @@ module.exports = {
             const rulesModule = require('../modules/rules');
             const rules = await rulesModule.execute(interaction.client);
             
+            // Simpan session untuk intro
+            guidebookSessions.set(interaction.user.id, {
+                currentPage: 0, // 0 = intro page
+                message: null
+            });
+            
             await interaction.reply({
                 embeds: [rules.guidebookIntro],
                 components: [rules.startGuideButton],
@@ -82,19 +88,27 @@ module.exports = {
         
         // Tombol Start Guide
         if (customId === 'start_guide') {
+            const session = guidebookSessions.get(interaction.user.id);
+            if (!session) {
+                await interaction.reply({
+                    content: "❌ Session tidak ditemukan. Silakan buka Guidebook terlebih dahulu.",
+                    ephemeral: true
+                });
+                return;
+            }
+            
             const rulesModule = require('../modules/rules');
             const rules = await rulesModule.execute(interaction.client);
             
-            // Simpan session
+            // Update session ke page 1
             guidebookSessions.set(interaction.user.id, {
-                currentPage: 1,
-                message: null
+                ...session,
+                currentPage: 1
             });
             
             await interaction.update({
                 embeds: [rules.guidebookPage1],
-                components: [rules.guidebookNavigation],
-                ephemeral: true
+                components: [rules.guidebookNavigation]
             });
             return;
         }
@@ -104,7 +118,7 @@ module.exports = {
             const session = guidebookSessions.get(interaction.user.id);
             if (!session) {
                 await interaction.reply({
-                    content: "❌ Session guidebook tidak ditemukan. Silakan mulai ulang dengan tombol 'Guidebook'.",
+                    content: "❌ Session tidak valid. Silakan buka Guidebook kembali.",
                     ephemeral: true
                 });
                 return;
