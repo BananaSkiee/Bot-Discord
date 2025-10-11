@@ -5,6 +5,9 @@ const { EmbedBuilder } = require("discord.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
+// Store untuk guidebook sessions
+const guidebookSessions = new Map();
+
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
@@ -29,18 +32,23 @@ module.exports = {
                 embed = rules.levelingEmbed;
                 break;
             case 'moderation':
-                embed = rules.modPolicyEmbed;
+                embed = rules.moderationPolicyEmbed;
                 break;
             case 'counting':
                 embed = rules.countingEmbed;
                 break;
             case 'beginner_guide':
-                embed = rules.beginnerGuideEmbed;
-                break;
+                // Kirim guidebook page 1
+                await interaction.reply({
+                    embeds: [rules.guidebookPage1],
+                    components: [rules.startGuideButton],
+                    ephemeral: true
+                });
+                return;
             default:
                 embed = new EmbedBuilder()
-                    .setTitle("❌ Informasi Tidak Ditemukan")
-                    .setDescription("Maaf, pilihan yang Anda pilih tidak tersedia.")
+                    .setTitle("❌ Information Not Found")
+                    .setDescription("Sorry, the selected option is not available.")
                     .setColor(0xFF0000);
         }
         
@@ -55,62 +63,115 @@ module.exports = {
       if (interaction.isButton()) {
         const customId = interaction.customId;
         
-        // Tombol Buku Panduan
+        // Tombol Guidebook
         if (customId === 'guidebook_btn') {
             const rulesModule = require('../modules/rules');
             const rules = await rulesModule.execute(interaction.client);
             
             await interaction.reply({
-                embeds: [rules.guidebookEmbed],
-                components: [rules.guideButton],
+                embeds: [rules.guidebookPage1],
+                components: [rules.startGuideButton],
                 ephemeral: true
             });
             return;
         }
         
-        // Tombol Peraturan Server
+        // Tombol Server Rules
         if (customId === 'server_rules_btn') {
             const rulesModule = require('../modules/rules');
             const rules = await rulesModule.execute(interaction.client);
             
             await interaction.reply({
-                embeds: [rules.guidelinesEmbed],
+                embeds: [rules.rulesAllowedEmbed, rules.rulesNotAllowedEmbed, rules.moderationPolicyEmbed],
                 ephemeral: true
             });
             return;
         }
         
-        // 🆕 UBAH: Tombol YouTube Membership sekarang hanya kirim link
-        if (customId === 'yt_membership_btn') {
-            await interaction.reply({
-                content: "🔗 **YouTube Membership Premium**\n\n🎁 Tingkatkan pengalaman Anda dengan menjadi member eksklusif:\nhttps://www.youtube.com/channel/your-channel/membership\n\n**Keuntungan Membership:**\n• Role khusus di Discord\n• Akses konten eksklusif\n• Badge spesial di YouTube\n• Early access video\n• Komunitas private",
-                ephemeral: true
-            });
-            return;
-        }
-        
-        // 🆕 Tombol Mulai Panduan Interaktif
+        // Tombol Start Guide
         if (customId === 'start_guide') {
-            const guideEmbed = new EmbedBuilder()
-                .setTitle("🚀 **PANDUAN INTERAKTIF DIMULAI!**")
-                .setDescription(`## Selamat! Anda telah memulai panduan interaktif.\n\nIkuti langkah-langkah berikut untuk pengalaman terbaik:\n\n### 📝 **Langkah 1 - Baca & Pahami**\nPelajari semua peraturan dan pedoman komunitas kami\n\n### 👋 **Langkah 2 - Perkenalan**\nKenalkan diri Anda di channel **#perkenalan**\n\n### 💬 **Langkah 3 - Interaksi**\nMulai berinteraksi dengan member lain\n\n### 🎮 **Langkah 4 - Eksplorasi**\nCoba berbagai fitur dan game yang tersedia\n\n### 🏆 **Langkah 5 - Berkembang**\nNaik level dan dapatkan reward eksklusif\n\n---\n\n**🎯 Tips Sukses:**\n• Jangan ragu bertanya\n• Ikuti event komunitas\n• Hormati semua member\n• Nikmati prosesnya!`)
-                .setColor(0x00FF00)
-                .setThumbnail('https://i.imgur.com/1M8Yh6u.png')
-                .setFooter({ 
-                    text: 'Panduan interaktif • Selamat bergabung!', 
-                    iconURL: 'https://i.imgur.com/1M8Yh6u.png' 
-                })
-                .setTimestamp();
-
+            const rulesModule = require('../modules/rules');
+            const rules = await rulesModule.execute(interaction.client);
+            
+            // Simpan session
+            guidebookSessions.set(interaction.user.id, {
+                currentPage: 1,
+                message: null
+            });
+            
             await interaction.reply({
-                embeds: [guideEmbed],
+                embeds: [rules.guidebookPage1],
+                components: [rules.guidebookNavigation],
                 ephemeral: true
+            });
+            return;
+        }
+        
+        // 🆕 HANDLER: GUIDEBOOK NAVIGATION
+        if (customId === 'guide_prev' || customId === 'guide_next' || customId === 'guide_close') {
+            const session = guidebookSessions.get(interaction.user.id);
+            if (!session) {
+                await interaction.reply({
+                    content: "❌ Session guidebook tidak ditemukan. Silakan mulai ulang dengan tombol 'Guidebook'.",
+                    ephemeral: true
+                });
+                return;
+            }
+            
+            const rulesModule = require('../modules/rules');
+            const rules = await rulesModule.execute(interaction.client);
+            
+            let newPage = session.currentPage;
+            
+            if (customId === 'guide_prev') {
+                newPage = Math.max(1, session.currentPage - 1);
+            } else if (customId === 'guide_next') {
+                newPage = Math.min(5, session.currentPage + 1);
+            } else if (customId === 'guide_close') {
+                guidebookSessions.delete(interaction.user.id);
+                await interaction.update({
+                    content: "📚 **Guidebook telah ditutup**\n\nAnda bisa membuka kembali guidebook kapan saja dengan menekan tombol 'Guidebook'.",
+                    embeds: [],
+                    components: []
+                });
+                return;
+            }
+            
+            // Update session
+            guidebookSessions.set(interaction.user.id, {
+                ...session,
+                currentPage: newPage
+            });
+            
+            // Get the correct page embed
+            let currentEmbed;
+            switch(newPage) {
+                case 1:
+                    currentEmbed = rules.guidebookPage1;
+                    break;
+                case 2:
+                    currentEmbed = rules.guidebookPage2;
+                    break;
+                case 3:
+                    currentEmbed = rules.guidebookPage3;
+                    break;
+                case 4:
+                    currentEmbed = rules.guidebookPage4;
+                    break;
+                case 5:
+                    currentEmbed = rules.guidebookPage5;
+                    break;
+            }
+            
+            await interaction.update({
+                embeds: [currentEmbed],
+                components: [rules.guidebookNavigation]
             });
             return;
         }
       }
 
-        // ========== DUEL ACCEPT/REJECT HANDLER ==========
+    // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
           interaction.customId.startsWith('reject_duel_')
