@@ -12,12 +12,21 @@ const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
 const rulesModule = require("../modules/rules");
+const verifySystem = require('../modules/verify'); // ✅ IMPORT VERIFY SYSTEM
 
 module.exports = {
   name: "ready",
   once: true,
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
+
+    // ✅ VERIFY SYSTEM INITIALIZATION
+    try {
+        await verifySystem.initialize(client);
+        console.log('✅ Verify system initialized');
+    } catch (error) {
+        console.error('❌ Gagal initialize verify system:', error);
+    }
 
     // 🆕 FITUR AUTO SEND RULES
     try {
