@@ -1,19 +1,17 @@
 // modules/verify.js
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
-// Storage sementara (bisa diganti dengan database)
-const userData = new Map();
-const verificationSessions = new Map();
+// Storage untuk session user
+const userSessions = new Map();
 
 class VerifySystem {
     constructor() {
         this.verifyChannelId = '1352823970054803509';
         this.logChannelId = '1426537842875826278';
         this.memberRoleId = '1352286235233620108';
-        this.generalChannelId = '1352404526870560788';
     }
 
-    // Auto kirim tombol verify saat bot ready
+    // ========== INITIALIZE ==========
     async initialize(client) {
         try {
             const channel = await client.channels.fetch(this.verifyChannelId);
@@ -40,7 +38,7 @@ class VerifySystem {
         }
     }
 
-    // Kirim message verify utama
+    // ========== STEP 0: TOMBOL VERIFY UTAMA ==========
     async sendVerifyMessage(channel) {
         const verifyEmbed = new EmbedBuilder()
             .setColor(0x5865F2)
@@ -49,7 +47,7 @@ class VerifySystem {
             .addFields(
                 {
                     name: '🎁 Member Benefits',
-                    value: '• 🏆 Member Exclusive Channels\n• 💼 Professional Networking\n• 📚 Premium Resources\n• 🎪 Private Events\n• 🤝 VIP Community'
+                    value: '- 🏆 Member Exclusive Channels\n- 💼 Professional Networking\n- 📚 Premium Resources\n- 🎪 Private Events\n- 🤝 VIP Community'
                 },
                 {
                     name: '🛡️ Security',
@@ -73,7 +71,7 @@ class VerifySystem {
         });
     }
 
-    // Handle tombol verify diklik
+    // ========== STEP 1: PROGRESS VERIFICATION ==========
     async handleVerify(interaction) {
         // Cek jika sudah verify
         if (interaction.member.roles.cache.has(this.memberRoleId)) {
@@ -92,7 +90,7 @@ class VerifySystem {
             });
         }
 
-        // Kirim progress verification
+        // STEP 1: Progress Verification
         const progressEmbed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('🔒 VERIFICATION IN PROGRESS')
@@ -104,7 +102,7 @@ class VerifySystem {
                 '├─ 🎯 Identity confirmation... ✅\n' +
                 '└─ 🚀 Access provisioning... ✅\n\n' +
                 '**STATUS:** _Identity verified successfully_')
-            .setFooter({ text: `Process completed in 2.3s` });
+            .setFooter({ text: 'Process completed in 2.3s' });
 
         await interaction.reply({ 
             embeds: [progressEmbed], 
@@ -114,7 +112,7 @@ class VerifySystem {
         // Simulasi proses 2 detik
         await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Update ke success message
+        // STEP 2: Verification Success
         const successEmbed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle('🎊 VERIFICATION SUCCESSFUL')
@@ -124,7 +122,11 @@ class VerifySystem {
                 { name: '✅ Access Granted', value: 'Full Community', inline: true },
                 {
                     name: '🎁 MEMBERSHIP BENEFITS ACTIVATED',
-                    value: '• 🎖️ Verified Member Role assigned\n• 🚀 Premium Channels unlocked\n• 📚 Resource Vault access\n• 🤝 Networking privileges'
+                    value: '- 🎖️ **Verified Member** Role assigned\n- 🚀 **Premium Channels** unlocked\n- 📚 **Resource Vault** access\n- 🤝 **Networking** privileges'
+                },
+                {
+                    name: 'PILIH LANJUTAN:',
+                    value: '• [🚀 START COMMUNITY] - Langsung masuk komunitas\n• [🎯 START ONBOARDING] - Lengkapi profil profesional dulu'
                 }
             )
             .setFooter({ text: 'Elite Member • Professional Tier' });
@@ -141,19 +143,19 @@ class VerifySystem {
                     .setStyle(ButtonStyle.Primary)
             );
 
+        // Simpan session
+        userSessions.set(interaction.user.id, {
+            message: interaction.message,
+            step: 'verified'
+        });
+
         await interaction.editReply({ 
             embeds: [successEmbed], 
             components: [actionButtons] 
         });
-
-        // Simpan session
-        verificationSessions.set(interaction.user.id, {
-            message: interaction.message,
-            step: 'verified'
-        });
     }
 
-    // Handle tombol START COMMUNITY
+    // ========== STEP 3A: START COMMUNITY ==========
     async handleStartCommunity(interaction) {
         try {
             // Beri role member
@@ -170,13 +172,14 @@ class VerifySystem {
                 });
             }
 
+            // STEP 3A: Welcome Community
             const welcomeEmbed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('🎉 WELCOME TO BANANASKIE COMMUNITY!')
                 .setDescription(`Selamat ${interaction.user.username}! 🎊`)
                 .addFields(
-                    { name: '✅ Status', value: 'Verified Member dengan akses penuh', inline: true },
-                    { name: '🔒 Channel Verify', value: 'Otomatis tersembunyi', inline: true },
+                    { name: '✅ Status', value: 'Verified Member dengan akses penuh' },
+                    { name: '🔒 Channel Verify', value: 'Otomatis tersembunyi' },
                     { name: '🎯 Pencapaian', value: 'Role member diberikan • Semua channel terbuka' }
                 )
                 .setFooter({ text: 'Selamat menikmati komunitas kami!' });
@@ -189,6 +192,9 @@ class VerifySystem {
             // Kirim log
             await this.sendVerificationLog(interaction, 'quick_access');
 
+            // Hapus session
+            userSessions.delete(interaction.user.id);
+
         } catch (error) {
             console.error('Error handleStartCommunity:', error);
             await interaction.update({ 
@@ -198,8 +204,9 @@ class VerifySystem {
         }
     }
 
-    // Handle tombol START ONBOARDING
+    // ========== STEP 3B: START ONBOARDING ==========
     async handleStartOnboarding(interaction) {
+        // STEP 3B: Onboarding Professional
         const onboardingEmbed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('📝 ONBOARDING PROFESSIONAL')
@@ -207,19 +214,24 @@ class VerifySystem {
             .addFields(
                 {
                     name: '1. PILIH TUJUAN UTAMA ANDA:',
-                    value: 'Pilih dari dropdown di bawah'
+                    value: '[▼ Pilih tujuan utama...]\n↳ Networking\n↳ Belajar Skill\n↳ Kolaborasi\n↳ Hiburan\n↳ Eksplorasi'
                 },
                 {
-                    name: '2. LEVEL EXPERIENCE:',
-                    value: 'Pilih level yang sesuai'
+                    name: '2. PILIH LEVEL EXPERIENCE:',
+                    value: '[▼ Pilih level experience...]\n↳ Pemula\n↳ Menengah\n↳ Advanced\n↳ Professional\n↳ Expert'
                 },
                 {
-                    name: '3. KESIAPAN KONTRIBUSI:',
-                    value: 'Pilih kesiapan berbagi'
+                    name: '3. PILIH KESIAPAN KONTRIBUSI:',
+                    value: '[▼ Pilih kesiapan kontribusi...]\n↳ Ya, aktif berbagi\n↳ Sesekali sharing\n↳ Lihat perkembangan dulu'
+                },
+                {
+                    name: 'ATAU ISI DENGAN PEMIKIRAN SENDIRI:',
+                    value: '[📝 BUKA FORM CUSTOM] - Tulis sesuai pemikiran Anda'
                 }
             )
-            .setFooter({ text: 'Pilih dari dropdown • Opsional' });
+            .setFooter({ text: 'Pilih dropdown atau form custom' });
 
+        // Dropdown untuk tujuan
         const purposeSelect = new StringSelectMenuBuilder()
             .setCustomId('select_purpose')
             .setPlaceholder('🎯 Pilih tujuan utama...')
@@ -231,6 +243,7 @@ class VerifySystem {
                 { label: 'Eksplorasi', value: 'exploration', description: 'Menjelajahi komunitas' }
             ]);
 
+        // Dropdown untuk experience
         const experienceSelect = new StringSelectMenuBuilder()
             .setCustomId('select_experience')
             .setPlaceholder('📈 Pilih level experience...')
@@ -242,15 +255,17 @@ class VerifySystem {
                 { label: 'Expert', value: 'expert', description: 'Ahli dan master' }
             ]);
 
+        // Dropdown untuk kontribusi
         const contributionSelect = new StringSelectMenuBuilder()
             .setCustomId('select_contribution')
             .setPlaceholder('🤝 Pilih kesiapan kontribusi...')
             .addOptions([
-                { label: 'Aktif Berbagi', value: 'active', description: 'Sering berbagi pengetahuan' },
-                { label: 'Sesekali Sharing', value: 'occasional', description: 'Kadang-kadang berbagi' },
-                { label: 'Lihat Perkembangan', value: 'observer', description: 'Mengamati dulu' }
+                { label: 'Ya, aktif berbagi', value: 'active', description: 'Sering berbagi pengetahuan' },
+                { label: 'Sesekali sharing', value: 'occasional', description: 'Kadang-kadang berbagi' },
+                { label: 'Lihat perkembangan dulu', value: 'observer', description: 'Mengamati dulu' }
             ]);
 
+        // Tombol custom form
         const customFormButton = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -259,6 +274,7 @@ class VerifySystem {
                     .setStyle(ButtonStyle.Secondary)
             );
 
+        // Tombol action
         const actionButtons = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -281,130 +297,240 @@ class VerifySystem {
         });
 
         // Simpan session
-        verificationSessions.set(interaction.user.id, {
-            ...verificationSessions.get(interaction.user.id),
+        userSessions.set(interaction.user.id, {
+            ...userSessions.get(interaction.user.id),
             step: 'onboarding',
             onboardingData: {}
         });
     }
 
-    // Handle select menu onboarding
-    async handleSelectMenu(interaction) {
-        const session = verificationSessions.get(interaction.user.id);
-        if (!session) return;
+    // ========== STEP 4A: CUSTOM FORM ==========
+    async handleCustomForm(interaction) {
+        // Buat modal untuk custom form
+        const modal = new ModalBuilder()
+            .setCustomId('custom_profile_modal')
+            .setTitle('📝 Custom Professional Profile');
 
-        const { onboardingData } = session;
-        const selectedValue = interaction.values[0];
+        // Input fields
+        const purposeInput = new TextInputBuilder()
+            .setCustomId('purpose_input')
+            .setLabel('Apa tujuan utama Anda bergabung?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(500)
+            .setPlaceholder('Contoh: Saya ingin belajar digital marketing dan networking...');
 
-        switch (interaction.customId) {
-            case 'select_purpose':
-                onboardingData.purpose = selectedValue;
-                break;
-            case 'select_experience':
-                onboardingData.experience = selectedValue;
-                break;
-            case 'select_contribution':
-                onboardingData.contribution = selectedValue;
-                break;
-        }
+        const experienceInput = new TextInputBuilder()
+            .setCustomId('experience_input')
+            .setLabel('Background dan experience Anda?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(500)
+            .setPlaceholder('Contoh: 2 tahun experience sebagai graphic designer...');
 
-        verificationSessions.set(interaction.user.id, {
-            ...session,
-            onboardingData
-        });
+        const contributionInput = new TextInputBuilder()
+            .setCustomId('contribution_input')
+            .setLabel('Ekspektasi kontribusi di komunitas?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(500)
+            .setPlaceholder('Contoh: Bisa share knowledge design dan belajar...');
 
-        await interaction.reply({ 
-            content: `✅ Pilihan disimpan: ${selectedValue}`,
-            ephemeral: true 
-        });
+        const interestsInput = new TextInputBuilder()
+            .setCustomId('interests_input')
+            .setLabel('Minat dan passion khusus?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(500)
+            .setPlaceholder('Contoh: UI/UX design, social media strategy...');
+
+        // Add inputs to modal
+        const firstActionRow = new ActionRowBuilder().addComponents(purposeInput);
+        const secondActionRow = new ActionRowBuilder().addComponents(experienceInput);
+        const thirdActionRow = new ActionRowBuilder().addComponents(contributionInput);
+        const fourthActionRow = new ActionRowBuilder().addComponents(interestsInput);
+
+        modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
+
+        await interaction.showModal(modal);
     }
 
-    // Handle konfirmasi onboarding
-    async handleConfirmOnboarding(interaction) {
-        const session = verificationSessions.get(interaction.user.id);
-        if (!session || !session.onboardingData) {
-            return await interaction.reply({ 
-                content: '❌ Silakan pilih opsi terlebih dahulu', 
+    // ========== HANDLE MODAL SUBMISSION ==========
+    async handleModalSubmit(interaction) {
+        if (interaction.customId === 'custom_profile_modal') {
+            const purpose = interaction.fields.getTextInputValue('purpose_input');
+            const experience = interaction.fields.getTextInputValue('experience_input');
+            const contribution = interaction.fields.getTextInputValue('contribution_input');
+            const interests = interaction.fields.getTextInputValue('interests_input');
+
+            // Simpan data custom
+            const session = userSessions.get(interaction.user.id);
+            userSessions.set(interaction.user.id, {
+                ...session,
+                onboardingData: {
+                    type: 'custom',
+                    purpose,
+                    experience,
+                    contribution,
+                    interests
+                }
+            });
+
+            // Lanjut ke rating
+            await this.showRatingStep(interaction);
+        }
+    }
+
+    // ========== STEP 4B/5: RATING SYSTEM ==========
+    async showRatingStep(interaction) {
+        const ratingEmbed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle('⭐ FIRST IMPRESSION RATING')
+            .setDescription('**Bagaimana kesan pertama Anda terhadap proses verifikasi & onboarding di BananaSkiee Community? (1-100)**')
+            .addFields(
+                {
+                    name: 'SKALA PENILAIAN:',
+                    value: '- **1-30:** *Pengalaman kurang memuaskan*\n- **31-60:** *Cukup baik, perlu beberapa improvement*\n- **61-80:** *Baik, pengalaman yang positif*\n- **81-95:** *Sangat baik, profesional dan impressive*\n- **96-100:** *Sempurna! Luar biasa dan berkelas*'
+                }
+            )
+            .setFooter({ text: 'Berikan penilaian sejujur mungkin' });
+
+        const ratingButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('input_rating')
+                    .setLabel('🎯 INPUT RATING')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('next_without_rating')
+                    .setLabel('➡️ LANJUT TANPA RATING')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('feedback_detail')
+                    .setLabel('📝 FEEDBACK DETAIL')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+        // Jika dari modal, kita perlu reply baru
+        if (interaction.isModalSubmit()) {
+            await interaction.reply({ 
+                embeds: [ratingEmbed], 
+                components: [ratingButtons],
                 ephemeral: true 
             });
-        }
-
-        // Beri role member
-        const memberRole = interaction.guild.roles.cache.get(this.memberRoleId);
-        if (memberRole) {
-            await interaction.member.roles.add(memberRole);
-        }
-
-        // Sembunyikan channel verify
-        const verifyChannel = interaction.guild.channels.cache.get(this.verifyChannelId);
-        if (verifyChannel) {
-            await verifyChannel.permissionOverwrites.edit(interaction.user.id, {
-                ViewChannel: false
+        } else {
+            await interaction.update({ 
+                embeds: [ratingEmbed], 
+                components: [ratingButtons] 
             });
         }
 
-        const completeEmbed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('🏆 ONBOARDING COMPLETE!')
-            .setDescription(`Selamat ${interaction.user.username}! Profil profesional Anda lengkap! 🌟`)
-            .addFields(
-                { name: '✅ Pencapaian', value: 'Role member diberikan\nChannel verify tersembunyi\nAkses penuh aktif', inline: true },
-                { name: '📊 Data Tersimpan', value: 'Profil profesional tersimpan\nSiap untuk networking', inline: true }
-            )
-            .setFooter({ text: 'Selamat menikmati BananaSkiee Community!' });
-
-        await interaction.update({ 
-            embeds: [completeEmbed], 
-            components: [] 
+        // Update session
+        userSessions.set(interaction.user.id, {
+            ...userSessions.get(interaction.user.id),
+            step: 'rating'
         });
-
-        // Kirim log
-        await this.sendVerificationLog(interaction, 'onboarding_complete', session.onboardingData);
-
-        // Hapus session
-        verificationSessions.delete(interaction.user.id);
     }
 
-    // Handle skip onboarding
-    async handleSkipOnboarding(interaction) {
-        // Tetap beri role member
-        const memberRole = interaction.guild.roles.cache.get(this.memberRoleId);
-        if (memberRole) {
-            await interaction.member.roles.add(memberRole);
-        }
+    // ========== STEP 6: FEEDBACK SYSTEM ==========
+    async showFeedbackStep(interaction) {
+        const feedbackEmbed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('💬 DETAILED FEEDBACK')
+            .setDescription('**Beri masukan detail untuk improvement:**')
+            .addFields(
+                {
+                    name: 'Aspect yang paling disukai:',
+                    value: '_Menunggu input..._'
+                },
+                {
+                    name: 'Area yang bisa ditingkatkan:',
+                    value: '_Menunggu input..._'
+                },
+                {
+                    name: 'Experience dengan UI/UX:',
+                    value: '_Menunggu input..._'
+                },
+                {
+                    name: 'Harapan untuk fitur future:',
+                    value: '_Menunggu input..._'
+                }
+            )
+            .setFooter({ text: 'Feedback detail sangat berharga' });
 
-        // Sembunyikan channel verify
-        const verifyChannel = interaction.guild.channels.cache.get(this.verifyChannelId);
-        if (verifyChannel) {
-            await verifyChannel.permissionOverwrites.edit(interaction.user.id, {
-                ViewChannel: false
+        const feedbackButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('submit_feedback')
+                    .setLabel('✅ KIRIM FEEDBACK')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('skip_feedback')
+                    .setLabel('⏩ LEWATI FEEDBACK')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+        await interaction.update({ 
+            embeds: [feedbackEmbed], 
+            components: [feedbackButtons] 
+        });
+
+        // Update session
+        userSessions.set(interaction.user.id, {
+            ...userSessions.get(interaction.user.id),
+            step: 'feedback'
+        });
+    }
+
+    // ========== STEP 7: COMPLETE ==========
+    async handleComplete(interaction, hasFeedback = false) {
+        try {
+            // Beri role member
+            const memberRole = interaction.guild.roles.cache.get(this.memberRoleId);
+            if (memberRole) {
+                await interaction.member.roles.add(memberRole);
+            }
+
+            // Sembunyikan channel verify
+            const verifyChannel = interaction.guild.channels.cache.get(this.verifyChannelId);
+            if (verifyChannel) {
+                await verifyChannel.permissionOverwrites.edit(interaction.user.id, {
+                    ViewChannel: false
+                });
+            }
+
+            const session = userSessions.get(interaction.user.id);
+            const completeEmbed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('🏆 ONBOARDING COMPLETE!')
+                .setDescription(`Selamat! Profil profesional Anda lengkap! 🌟`)
+                .addFields(
+                    { name: '✅ Pencapaian', value: 'Role member diberikan\nChannel verify tersembunyi\nAkses penuh aktif' },
+                    { name: '📊 Data Tersimpan', value: 'Profil profesional tersimpan\nSiap untuk networking' }
+                )
+                .setFooter({ text: 'Selamat menikmati BananaSkiee Community!' });
+
+            await interaction.update({ 
+                embeds: [completeEmbed], 
+                components: [] 
+            });
+
+            // Kirim log
+            await this.sendVerificationLog(interaction, 'onboarding_complete', session.onboardingData);
+
+            // Hapus session
+            userSessions.delete(interaction.user.id);
+
+        } catch (error) {
+            console.error('Error handleComplete:', error);
+            await interaction.update({ 
+                content: '❌ Gagal memproses. Silakan coba lagi.', 
+                components: [] 
             });
         }
-
-        const skipEmbed = new EmbedBuilder()
-            .setColor(0x3498DB)
-            .setTitle('🎯 ONBOARDING DISKIP')
-            .setDescription(`Tidak masalah! Anda tetap mendapatkan akses penuh.`)
-            .addFields(
-                { name: '✅ Status', value: 'Verified Member aktif', inline: true },
-                { name: '🔒 Channel Verify', value: 'Otomatis tersembunyi', inline: true },
-                { name: '🚀 Akses', value: 'Semua channel terbuka', inline: true }
-            )
-            .setFooter({ text: 'Selamat bergabung di BananaSkiee Community!' });
-
-        await interaction.update({ 
-            embeds: [skipEmbed], 
-            components: [] 
-        });
-
-        // Kirim log
-        await this.sendVerificationLog(interaction, 'onboarding_skipped');
-
-        // Hapus session
-        verificationSessions.delete(interaction.user.id);
     }
 
-    // Kirim log verification
+    // ========== LOG SYSTEM ==========
     async sendVerificationLog(interaction, type, onboardingData = null) {
         try {
             const logChannel = interaction.guild.channels.cache.get(this.logChannelId);
@@ -417,21 +543,30 @@ class VerifySystem {
                 .setTitle('📋 VERIFICATION LOG • BananaSkiee Community')
                 .setDescription(`**✅ NEW MEMBER VERIFIED** • ${this.getStatusText(type)}`)
                 .addFields(
-                    { name: '👤 User', value: `${interaction.user.tag} (\`${interaction.user.id}\`)`, inline: true },
-                    { name: '📛 Display Name', value: interaction.user.displayName, inline: true },
-                    { name: '🆔 Account Age', value: `${accountAge} hari`, inline: true },
-                    { name: '🌍 Join Method', value: this.getJoinMethod(type), inline: true }
-                )
-                .setTimestamp()
-                .setFooter({ text: 'Double Counter System • Auto-Log' });
-
-            if (onboardingData) {
-                logEmbed.addFields(
-                    { name: '🎯 Tujuan', value: this.getPurposeText(onboardingData.purpose), inline: true },
-                    { name: '📈 Level Experience', value: this.getExperienceText(onboardingData.experience), inline: true },
-                    { name: '🤝 Kesiapan Kontribusi', value: this.getContributionText(onboardingData.contribution), inline: true }
+                    { name: '👤 User', value: `${interaction.user.username} (${interaction.user.id})` },
+                    { name: '📛 Display Name', value: interaction.user.displayName },
+                    { name: '🆔 Account Age', value: `${accountAge} hari` },
+                    { name: '🌍 Join Method', value: this.getJoinMethod(type) }
                 );
+
+            // Tambahkan data onboarding jika ada
+            if (onboardingData && type === 'onboarding_complete') {
+                if (onboardingData.type === 'custom') {
+                    logEmbed.addFields(
+                        { name: '🎯 Tujuan', value: onboardingData.purpose.substring(0, 100) + '...' },
+                        { name: '📈 Experience', value: onboardingData.experience.substring(0, 100) + '...' },
+                        { name: '🤝 Kontribusi', value: onboardingData.contribution.substring(0, 100) + '...' }
+                    );
+                } else {
+                    logEmbed.addFields(
+                        { name: '🎯 Tujuan', value: this.getPurposeText(onboardingData.purpose) },
+                        { name: '📈 Level Experience', value: this.getExperienceText(onboardingData.experience) },
+                        { name: '🤝 Kesiapan Kontribusi', value: this.getContributionText(onboardingData.contribution) }
+                    );
+                }
             }
+
+            logEmbed.setFooter({ text: 'Double Counter System • Auto-Log' });
 
             await logChannel.send({ embeds: [logEmbed] });
         } catch (error) {
@@ -439,7 +574,7 @@ class VerifySystem {
         }
     }
 
-    // Helper functions
+    // ========== HELPER FUNCTIONS ==========
     getStatusText(type) {
         const statusMap = {
             'quick_access': 'Quick Access',
