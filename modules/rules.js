@@ -215,7 +215,7 @@ module.exports = {
         // ==================== COUNTING SECTION ====================
         const countingEmbed = new EmbedBuilder()
             .setTitle("🔢 **ACHIEVEMENT GAMIFICATION**")
-            .setDescription(`## Progressive Challenge System\n\n### 🎯 Milestone Recognition\n• **50+** = Initiate Status\n• **100+** = Contributor Level  \n• **250+** = Specialist Rank\n• **500+** = Expert Tier\n• **1000+** = Master Class\n\n### 🎮 Engagement Protocol\n1. Navigate to **#counting** channel\n2. Begin sequence with number **1**\n3. Maintain numerical continuity\n4. Advance through achievement tiers\n5. Claim exclusive role rewards\n\n### 💎 Value Proposition\n• **Exclusive Role Access**\n• **Community Recognition**  \n• **Premium Reward Unlocks**\n• **Achievement Legacy Building**\n\n---\n\n**Track progress with `/user` command**\n*Your dedication, visibly rewarded*`)
+            .setDescription(`## Progressive Challenge System\n\n### 🎯 Milestone Recognition\n• **50+** = Initiate Status\n• **100+** = Contributor Level  \n• **250+** = Specialist Rank\n• **500+** = Expert Tier\n• **1000+** = Master Class\n\n### 🎮 Engagement Protocol\n1. Navigate to **#counting** channel\n2. Begin sequence with number **1**\n3. Maintain numerical continuity\n4. Advance through achievement tiers\n5. Claim exclusive role rewards\n\n### 💎 Value Proposition\n• **Exclusive Role Access**\n• **Community Recognition**  \n• **Premium Reward Unlocks**\n• **Achievement Legacy Building**\n\n---\n\n**Track progress with \`/user\` command**\n*Your dedication, visibly rewarded*`)
             .setColor(0x9B59B6)
             .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
