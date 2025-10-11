@@ -346,4 +346,217 @@ class VerifyTemplates {
         return new EmbedBuilder()
             .setColor(0x3498DB)
             .setTitle('🎯 ONBOARDING DISKIP')
-            .setDescription(`Tidak masalah, ${interaction.user.username}
+            .setDescription(`Tidak masalah, ${interaction.user.username}! Anda tetap mendapatkan akses penuh ke komunitas.`)
+            .addFields(
+                { name: '✅ Status', value: 'Verified Member aktif', inline: true },
+                { name: '🔐 Akses', value: 'Full Platform', inline: true },
+                { name: '🚀 Fitur', value: 'Semua channel terbuka', inline: true },
+                {
+                    name: '💡 Tips:',
+                    value: 'Anda bisa melengkapi profil nanti melalui command `/profile` kapan saja.',
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Selamat bergabung di BananaSkiee Community!' });
+    }
+
+    // ========== RATING & FEEDBACK TEMPLATES ==========
+    getRatingEmbed() {
+        const embed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle('⭐ FIRST IMPRESSION RATING')
+            .setDescription('**Bagaimana kesan pertama Anda terhadap proses verifikasi & onboarding di BananaSkiee Community? (1-100)**')
+            .addFields(
+                {
+                    name: 'SKALA PENILAIAN:',
+                    value: '- **1-30:** *Pengalaman kurang memuaskan*\n- **31-60:** *Cukup baik, perlu beberapa improvement*\n- **61-80:** *Baik, pengalaman yang positif*\n- **81-95:** *Sangat baik, profesional dan impressive*\n- **96-100:** *Sempurna! Luar biasa dan berkelas*',
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Berikan penilaian sejujur mungkin' });
+
+        const components = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('input_rating')
+                    .setLabel('🎯 INPUT RATING')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('next_without_rating')
+                    .setLabel('➡️ LANJUT TANPA RATING')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('feedback_detail')
+                    .setLabel('📝 FEEDBACK DETAIL')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+        return { embed, components };
+    }
+
+    getFeedbackEmbed() {
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('💬 DETAILED FEEDBACK')
+            .setDescription('**Beri masukan detail untuk improvement:**\n\nFeedback Anda sangat berharga untuk membantu kami meningkatkan pengalaman komunitas.')
+            .addFields(
+                {
+                    name: 'Aspect yang paling disukai:',
+                    value: '_Menunggu input Anda..._',
+                    inline: false
+                },
+                {
+                    name: 'Area yang bisa ditingkatkan:',
+                    value: '_Menunggu input Anda..._', 
+                    inline: false
+                },
+                {
+                    name: 'Experience dengan UI/UX:',
+                    value: '_Menunggu input Anda..._',
+                    inline: false
+                },
+                {
+                    name: 'Harapan untuk fitur future:',
+                    value: '_Menunggu input Anda..._',
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Feedback detail sangat berharga bagi perkembangan komunitas' });
+
+        const components = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('submit_feedback')
+                    .setLabel('✅ KIRIM FEEDBACK')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('skip_feedback')
+                    .setLabel('⏩ LEWATI FEEDBACK')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+        return { embed, components };
+    }
+
+    // ========== COMPLETION TEMPLATE ==========
+    getCompletionEmbed(interaction, data, hasFeedback) {
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🏆 ONBOARDING COMPLETE!')
+            .setDescription(`**Selamat! Profil profesional Anda lengkap, ${interaction.user.username}!** 🌟\n\nTerima kasih telah meluangkan waktu untuk onboarding. Dedikasi Anda sangat dihargai dan akan berkontribusi pada pengalaman komunitas yang lebih baik.`)
+            .addFields(
+                {
+                    name: '✅ PENCAPAIAN:',
+                    value: '• Role member telah diberikan\n• Akses penuh ke semua fitur premium\n• Profil profesional tersimpan\n• Personalized experience activated',
+                    inline: false
+                },
+                {
+                    name: '📊 DATA YANG TELAH DIKUMPULKAN:',
+                    value: `📊 **Profile Type:** ${data.profileType || 'Standard'}\n⭐ **Rating Given:** ${data.rating ? data.rating + '/100' : 'Not rated'}\n💬 **Feedback:** ${hasFeedback ? 'Provided' : 'Skipped'}`,
+                    inline: false
+                },
+                {
+                    name: '🚀 SELANJUTNYA:',
+                    value: '1. **Jelajahi channel** yang sesuai minat Anda\n2. **Ikuti event** pertama dari calendar\n3. **Connect** dengan member lain\n4. **Kontribusi** pada diskusi komunitas\n5. **Nikmati** pengalaman personalized',
+                    inline: false
+                }
+            )
+            .setFooter({ text: 'Selamat menikmati BananaSkiee Community! 🎉' });
+
+        return embed;
+    }
+
+    // ========== LOGGING TEMPLATES ==========
+    getLogEmbed(interaction, type, data = {}) {
+        const accountAge = Math.floor((Date.now() - interaction.user.createdTimestamp) / (1000 * 60 * 60 * 24));
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('📋 VERIFICATION LOG • BananaSkiee Community')
+            .setDescription(`**✅ NEW MEMBER VERIFIED** • ${this.getLogStatus(type)}`)
+            .addFields(
+                { name: '👤 User', value: `${interaction.user.username} (${interaction.user.id})` },
+                { name: '📛 Display Name', value: interaction.user.displayName },
+                { name: '🆔 Account Age', value: `${accountAge} hari` },
+                { name: '🌍 Join Method', value: this.getJoinMethod(type) }
+            );
+
+        // Add onboarding data if available
+        if (data && type === 'ONBOARDING_COMPLETE') {
+            if (data.profileType === 'CUSTOM') {
+                embed.addFields(
+                    { name: '🎯 Profile Type', value: 'Custom Form', inline: true },
+                    { name: '📝 Data Provided', value: 'Detailed narrative', inline: true }
+                );
+            } else {
+                embed.addFields(
+                    { name: '🎯 Tujuan', value: this.getPurposeText(data.purpose), inline: true },
+                    { name: '📈 Level Experience', value: this.getExperienceText(data.experience), inline: true },
+                    { name: '🤝 Kesiapan Kontribusi', value: this.getContributionText(data.contribution), inline: true }
+                );
+            }
+
+            if (data.rating) {
+                embed.addFields({ name: '⭐ Rating', value: `${data.rating}/100`, inline: true });
+            }
+        }
+
+        embed.setFooter({ text: 'Double Counter System • Auto-Log' });
+
+        return embed;
+    }
+
+    getLogStatus(type) {
+        const statusMap = {
+            'QUICK_ACCESS': 'Quick Access',
+            'ONBOARDING_COMPLETE': 'Onboarding Complete', 
+            'ONBOARDING_SKIPPED': 'Onboarding Skipped'
+        };
+        return statusMap[type] || 'Verified';
+    }
+
+    getJoinMethod(type) {
+        const methodMap = {
+            'QUICK_ACCESS': 'Direct Access',
+            'ONBOARDING_COMPLETE': 'Full Onboarding',
+            'ONBOARDING_SKIPPED': 'Quick Onboarding'
+        };
+        return methodMap[type] || 'Standard';
+    }
+
+    getPurposeText(purpose) {
+        const purposeMap = {
+            'networking': 'Networking',
+            'learning': 'Skill Development',
+            'collaboration': 'Project Collaboration',
+            'knowledge': 'Knowledge Sharing',
+            'career': 'Career Advancement',
+            'community': 'Community Building'
+        };
+        return purposeMap[purpose] || 'General';
+    }
+
+    getExperienceText(experience) {
+        const experienceMap = {
+            'student': 'Student/Enthusiast',
+            'junior': 'Junior Professional', 
+            'mid': 'Mid-Level Professional',
+            'senior': 'Senior Professional',
+            'expert': 'Industry Expert',
+            'founder': 'Entrepreneur/Founder'
+        };
+        return experienceMap[experience] || 'Not Specified';
+    }
+
+    getContributionText(contribution) {
+        const contributionMap = {
+            'active': 'Active Contributor',
+            'selective': 'Selective Engagement',
+            'observer': 'Observer/Learner',
+            'mentor': 'Mentor/Advisor'
+        };
+        return contributionMap[contribution] || 'Not Specified';
+    }
+}
+
+module.exports = VerifyTemplates;
