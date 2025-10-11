@@ -37,14 +37,6 @@ module.exports = {
             case 'counting':
                 embed = rules.countingEmbed;
                 break;
-            case 'beginner_guide':
-                // Kirim guidebook page 1
-                await interaction.reply({
-                    embeds: [rules.guidebookPage1],
-                    components: [rules.startGuideButton],
-                    ephemeral: true
-                });
-                return;
             default:
                 embed = new EmbedBuilder()
                     .setTitle("❌ Information Not Found")
@@ -59,7 +51,7 @@ module.exports = {
         return;
       }
 
-      // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES, YT MEMBERSHIP
+      // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES
       if (interaction.isButton()) {
         const customId = interaction.customId;
         
@@ -130,7 +122,7 @@ module.exports = {
             } else if (customId === 'guide_close') {
                 guidebookSessions.delete(interaction.user.id);
                 await interaction.update({
-                    content: "📚 **Guidebook telah ditutup**\n\nAnda bisa membuka kembali guidebook kapan saja dengan menekan tombol 'Guidebook'.",
+                    content: "**Only you can see this - Dismiss message**",
                     embeds: [],
                     components: []
                 });
@@ -145,27 +137,34 @@ module.exports = {
             
             // Get the correct page embed
             let currentEmbed;
+            let components;
+            
             switch(newPage) {
                 case 1:
                     currentEmbed = rules.guidebookPage1;
+                    components = rules.guidebookNavigation;
                     break;
                 case 2:
                     currentEmbed = rules.guidebookPage2;
+                    components = rules.guidebookNavigation;
                     break;
                 case 3:
                     currentEmbed = rules.guidebookPage3;
+                    components = rules.guidebookNavigation;
                     break;
                 case 4:
                     currentEmbed = rules.guidebookPage4;
+                    components = rules.guidebookNavigation;
                     break;
                 case 5:
                     currentEmbed = rules.guidebookPage5;
+                    components = rules.guidebookClose;
                     break;
             }
             
             await interaction.update({
                 embeds: [currentEmbed],
-                components: [rules.guidebookNavigation]
+                components: [components]
             });
             return;
         }
