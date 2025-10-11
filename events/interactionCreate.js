@@ -171,7 +171,7 @@ module.exports = {
         }
       }
 
-    // ========== DUEL ACCEPT/REJECT HANDLER ==========
+  // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
           interaction.customId.startsWith('reject_duel_')
