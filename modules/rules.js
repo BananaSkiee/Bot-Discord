@@ -65,10 +65,20 @@ module.exports = {
 
         // ==================== GUIDEBOOK PAGES ====================
         
-        // Page 1/5 - The Basics
+        // GUIDEBOOK INTRODUCTION (Seperti gambar 1000165222.jpg)
+        const guidebookIntro = new EmbedBuilder()
+            .setTitle("📖 **GUIDEBOOK**")
+            .setDescription(`Sebagai member baru server, Anda mungkin merasa sulit memahami cara server ini beroperasi.\n\nSebagai solusinya, kami mendesain modul memulai ini untuk memandu Anda melalui semua yang perlu diketahui, dari awal hingga akhir.\n\n- Klik tombol di bawah **Start Guide**\n\n---\n\n**GUIDEBOOK**\n\n---\n\n**Start Guide**\n\n*Hanya Anda yang bisa melihat ini • Dismiss message*`)
+            .setColor(0x00AAFF)
+            .setFooter({ 
+                text: 'BananaSkiee Community • Guidebook', 
+                iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
+            });
+
+        // Page 1/5 - The Basics (Seperti gambar 1000165245.png)
         const guidebookPage1 = new EmbedBuilder()
-            .setTitle("📖 **PANDUAN DASAR**")
-            .setDescription(`## Dasar-Dasar Server\n\nPelajari tentang aturan server di sini.\n\nSesuaikan role notifikasi Anda agar sesuai dengan preferensi Anda dari **Channels & Roles**`)
+            .setTitle("📖 **THE BASICS**")
+            .setDescription(`- Pelajari tentang aturan server di sini.\n\nSesuaikan role notifikasi Anda agar sesuai dengan preferensi Anda dari **Channels & Roles**\n\n---\n\n**Page 1/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
             .setColor(0x00AAFF)
             .setFooter({ 
                 text: 'BananaSkiee Community • Page 1/5 • The Basics', 
@@ -78,7 +88,7 @@ module.exports = {
         // Page 2/5 - Important Roles
         const guidebookPage2 = new EmbedBuilder()
             .setTitle("👑 **PERAN PENTING DI SERVER**")
-            .setDescription(`## 🏛️ Struktur Kepemimpinan Server\n\nBerikut adalah peran-peran penting yang mengelola **BananaSkiee Community**:\n\n### <@&1352279577174605884> **Headmaster**\nPendiri & Pemilik server\n\n### <@&1352282368043389069> **Principal**  \nIndividu yang bertugas sebagai administrator server, memastikan operasi berjalan lancar tanpa gangguan\n\n### <@&1352282892935368787> **Core Team**\nIndividu yang bekerja langsung dan menawarkan layanan terkait Discord\n\n### <@&1352283202840039475> **Counselors**\nIndividu yang bertugas sebagai helper, bertanggung jawab memoderasi server dan menangani masalah melalui tickets\n\n### <@&1352283798435270709> **Hall of Fame**\nIndividu yang dikenal di seluruh komunitas Discord building\n\n### <@&1352284168234467379> **Server Bots**\nBot-bot yang melayani server ini\n\n### <@&1352284524721209436> **Students**\nRole default untuk semua member server`)
+            .setDescription(`## 🏛️ Struktur Kepemimpinan Server\n\nBerikut adalah peran-peran penting yang mengelola **BananaSkiee Community**:\n\n### <@&1352279577174605884> **Headmaster**\nPendiri & Pemilik server\n\n### <@&1352282368043389069> **Principal**  \nIndividu yang bertugas sebagai administrator server, memastikan operasi berjalan lancar tanpa gangguan\n\n### <@&1352282892935368787> **Core Team**\nIndividu yang bekerja langsung dan menawarkan layanan terkait Discord\n\n### <@&1352283202840039475> **Counselors**\nIndividu yang bertugas sebagai helper, bertanggung jawab memoderasi server dan menangani masalah melalui tickets\n\n### <@&1352283798435270709> **Hall of Fame**\nIndividu yang dikenal di seluruh komunitas Discord building\n\n### <@&1352284168234467379> **Server Bots**\nBot-bot yang melayani server ini\n\n### <@&1352284524721209436> **Students**\nRole default untuk semua member server\n\n---\n\n**Page 2/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
             .setColor(0x9B59B6)
             .setFooter({ 
                 text: 'BananaSkiee Community • Page 2/5 • Important Roles', 
@@ -88,7 +98,7 @@ module.exports = {
         // Page 3/5 - Important Channels
         const guidebookPage3 = new EmbedBuilder()
             .setTitle("📁 **CHANNEL PENTING DI SERVER**")
-            .setDescription(`## 🗂️ Panduan Channel BananaSkiee Community\n\n### #📢-announcements\nSemua pengumuman terbaru dan update mengenai server akan dibagikan di sini.\n\n### #🎫-tickets\nBuat tiket di channel ini untuk berbicara dengan staff dan mendapatkan bantuan untuk masalah server.\n\n### #💬-discussion\nTempat untuk mengobrol tentang apapun yang tidak melanggar rules.\n\n### #🛠️-our-services\nAnda akan menemukan semua layanan yang kami tawarkan di sini.\n\n### #👋-introductions\nPerkenalkan diri Anda kepada komunitas di channel ini.\n\n### #❓-discord-help\nButuh bantuan? Tanyakan di sini!`)
+            .setDescription(`## 🗂️ Panduan Channel BananaSkiee Community\n\n### #📢-announcements\nSemua pengumuman terbaru dan update mengenai server akan dibagikan di sini.\n\n### #🎫-tickets\nBuat tiket di channel ini untuk berbicara dengan staff dan mendapatkan bantuan untuk masalah server.\n\n### #💬-discussion\nTempat untuk mengobrol tentang apapun yang tidak melanggar rules.\n\n### #🛠️-our-services\nAnda akan menemukan semua layanan yang kami tawarkan di sini.\n\n### #👋-introductions\nPerkenalkan diri Anda kepada komunitas di channel ini.\n\n### #❓-discord-help\nButuh bantuan? Tanyakan di sini!\n\n---\n\n**Page 3/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
             .setColor(0x3498DB)
             .setFooter({ 
                 text: 'BananaSkiee Community • Page 3/5 • Important Channels', 
@@ -98,7 +108,7 @@ module.exports = {
         // Page 4/5 - Show All Channels Guide
         const guidebookPage4 = new EmbedBuilder()
             .setTitle("🔍 **CARA MELIHAT SEMUA CHANNEL**")
-            .setDescription(`## 👀 Panduan Menampilkan Semua Channel\n\nUntuk melihat semua channel di server, ikuti langkah-langkah berikut:\n\n### 📝 **Langkah-langkah:**\n1. **Klik pada nama server** (BananaSkiee Community) di bagian atas\n2. **Toggle opsi "Show All Channels"** untuk menampilkan semua channel\n3. **Nikmati akses penuh** ke semua channel yang tersedia\n\n### 🏠 **Struktur Channel Server:**\n• **#🔰-welcome** - Selamat datang!\n• **#ℹ️-info** - Informasi penting\n• **#🎉-boosts** - Info server boost\n• **#📤-uploads** - Upload konten\n• **#📢-announcements** - Pengumuman\n• **#🎫-tickets** - Bantuan staff\n• **#💬-discussion** - Diskusi umum\n• **#👋-introductions** - Perkenalan\n• **#❓-discord-help** - Bantuan Discord`)
+            .setDescription(`## 👀 Panduan Menampilkan Semua Channel\n\nUntuk melihat semua channel di server, ikuti langkah-langkah berikut:\n\n### 📝 **Langkah-langkah:**\n1. **Klik pada nama server** (BananaSkiee Community) di bagian atas\n2. **Toggle opsi "Show All Channels"** untuk menampilkan semua channel\n3. **Nikmati akses penuh** ke semua channel yang tersedia\n\n### 🏠 **Struktur Channel Server:**\n• **#🔰-welcome** - Selamat datang!\n• **#ℹ️-info** - Informasi penting\n• **#🎉-boosts** - Info server boost\n• **#📤-uploads** - Upload konten\n• **#📢-announcements** - Pengumuman\n• **#🎫-tickets** - Bantuan staff\n• **#💬-discussion** - Diskusi umum\n• **#👋-introductions** - Perkenalan\n• **#❓-discord-help** - Bantuan Discord\n\n---\n\n**Page 4/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
             .setColor(0xF39C12)
             .setFooter({ 
                 text: 'BananaSkiee Community • Page 4/5 • Channel Guide', 
@@ -108,14 +118,24 @@ module.exports = {
         // Page 5/5 - Completion
         const guidebookPage5 = new EmbedBuilder()
             .setTitle("🎉 **SELAMAT! ANDA BERHASIL**")
-            .setDescription(`## Yay! You did it!\n\nSemoga **Panduan Server** kami membantu Anda memahami sebagian besar **BananaSkiee Community**.\n\n- Jangan ragu untuk melihat pertanyaan yang sering diajukan di sini - #🔄-fags\n- Nikmati masa tinggal Anda di **BananaSkiee Community!**`)
+            .setDescription(`## Yay! You did it!\n\nSemoga **Panduan Server** kami membantu Anda memahami sebagian besar **BananaSkiee Community**.\n\n- Jangan ragu untuk melihat pertanyaan yang sering diajukan di sini - #🔄-fags\n- Nikmati masa tinggal Anda di **BananaSkiee Community!**\n\n---\n\n**Page 5/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
             .setColor(0x2ECC71)
             .setFooter({ 
                 text: 'BananaSkiee Community • Page 5/5 • Completion', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
-        // Tombol navigasi guidebook untuk page 1-4
+        // Tombol Start Guide untuk intro
+        const startGuideButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('start_guide')
+                    .setLabel('Start Guide')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('🚀')
+            );
+
+        // Tombol navigasi guidebook untuk page 1-4 (Back/Next)
         const guidebookNavigation = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -138,16 +158,6 @@ module.exports = {
                     .setLabel('Close this message')
                     .setStyle(ButtonStyle.Danger)
                     .setEmoji('❌')
-            );
-
-        // Tombol start guide
-        const startGuideButton = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('start_guide')
-                    .setLabel('Start Guide')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('🚀')
             );
 
         // ==================== RULES SECTION ====================
@@ -184,6 +194,7 @@ module.exports = {
             })
             .setImage('https://i.ibb.co/4wcgBZQS/6f59b29a5247.gif');
 
+        // ==================== MODERATION POLICY SECTION ====================
         const moderationPolicyEmbed = new EmbedBuilder()
             .setTitle('📜 **PERATURAN & HUKUMAN SERVER BANANASKIE COMMUNITY**')
             .setDescription(
@@ -252,18 +263,21 @@ module.exports = {
             infoSelectMenu,
             
             // Guidebook pages
+            guidebookIntro,
             guidebookPage1,
             guidebookPage2,
             guidebookPage3,
             guidebookPage4,
             guidebookPage5,
+            startGuideButton,
             guidebookNavigation,
             guidebookClose,
-            startGuideButton,
             
-            // Rules embeds
+            // Rules embeds (TANPA SISTEM WARNING)
             rulesAllowedEmbed,
             rulesNotAllowedEmbed,
+            
+            // Moderation Policy embed (DENGAN SISTEM WARNING)
             moderationPolicyEmbed,
             
             // Additional info embeds
