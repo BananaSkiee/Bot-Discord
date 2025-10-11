@@ -22,6 +22,14 @@ module.exports = {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
       // ========== VERIFY SYSTEM HANDLERS ==========
+      
+      // Handle Modal Submit untuk custom form
+      if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'custom_profile_modal') {
+          return await verifySystem.handleModalSubmit(interaction);
+        }
+      }
+
       if (interaction.isButton()) {
         // VERIFY BUTTON
         if (interaction.customId === 'verify_account') {
@@ -50,11 +58,20 @@ module.exports = {
         
         // CUSTOM FORM BUTTON
         if (interaction.customId === 'custom_form') {
-          await interaction.reply({ 
-            content: '🚧 Fitur custom form dalam pengembangan', 
-            ephemeral: true 
-          });
-          return;
+          return await verifySystem.handleCustomForm(interaction);
+        }
+        
+        // RATING & FEEDBACK BUTTONS
+        if (interaction.customId === 'input_rating' || interaction.customId === 'next_without_rating') {
+          return await verifySystem.showRatingStep(interaction);
+        }
+        
+        if (interaction.customId === 'feedback_detail') {
+          return await verifySystem.showFeedbackStep(interaction);
+        }
+        
+        if (interaction.customId === 'submit_feedback' || interaction.customId === 'skip_feedback') {
+          return await verifySystem.handleComplete(interaction);
         }
       }
 
