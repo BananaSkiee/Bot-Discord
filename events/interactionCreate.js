@@ -1,3 +1,4 @@
+events/interactionCreate.js
 const fs = require("fs");
 const path = require("path");
 const { ROLES, guildId } = require("../config");
@@ -8,8 +9,9 @@ const filePath = path.join(__dirname, "../data/taggedUsers.json");
 // Store untuk guidebook sessions
 const guidebookSessions = new Map();
 
-// Import verify system
-const verifySystem = require('../modules/verify');
+// ========== IMPORT VERIFY SYSTEM ==========
+const VerifySystem = require('../modules/verify');
+const verifySystem = new VerifySystem();
 
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
@@ -21,15 +23,17 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-      // ========== VERIFY SYSTEM HANDLERS ==========
-      
-      // Handle Modal Submit untuk custom form
+      // ========== VERIFY SYSTEM MODAL HANDLERS ==========
       if (interaction.isModalSubmit()) {
         if (interaction.customId === 'custom_profile_modal') {
-          return await verifySystem.handleModalSubmit(interaction);
+          return await verifySystem.handlers.handleModalSubmit(interaction);
+        }
+        if (interaction.customId === 'rating_modal') {
+          return await verifySystem.handlers.handleRatingSubmit(interaction);
         }
       }
 
+      // ========== VERIFY SYSTEM BUTTON HANDLERS ==========
       if (interaction.isButton()) {
         // VERIFY BUTTON
         if (interaction.customId === 'verify_account') {
@@ -62,27 +66,30 @@ module.exports = {
         }
         
         // RATING & FEEDBACK BUTTONS
-        if (interaction.customId === 'input_rating' || interaction.customId === 'next_without_rating') {
-          return await verifySystem.showRatingStep(interaction);
+        if (interaction.customId === 'input_rating') {
+          return await verifySystem.handlers.handleRatingInput(interaction);
         }
-        
+        if (interaction.customId === 'next_without_rating') {
+          return await verifySystem.handlers.handleFeedbackSkip(interaction);
+        }
         if (interaction.customId === 'feedback_detail') {
-          return await verifySystem.showFeedbackStep(interaction);
+          // Skip rating langsung ke feedback
+          const session = verifySystem.getUserSession(interaction.user.id);
+          if (session) {
+            session.data.rating = null;
+            verifySystem.updateUserSession(interaction.user.id, session);
+          }
+          return await verifySystem.handlers.handleFeedbackSubmit(interaction);
         }
-        
-        if (interaction.customId === 'submit_feedback' || interaction.customId === 'skip_feedback') {
+        if (interaction.customId === 'submit_feedback') {
+          return await verifySystem.handlers.handleFeedbackSubmit(interaction);
+        }
+        if (interaction.customId === 'skip_feedback') {
           return await verifySystem.handleComplete(interaction);
         }
       }
-
-      // VERIFY SELECT MENU HANDLERS
-      if (interaction.isStringSelectMenu()) {
-        if (interaction.customId.startsWith('select_')) {
-          return await verifySystem.handleSelectMenu(interaction);
-        }
-      }
-
-      // 🆕 HANDLER: SELECT MENU "FIND MORE INFO HERE"
+      
+            // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
       if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
         const selected = interaction.values[0];
         
@@ -206,7 +213,7 @@ module.exports = {
                 } catch (error) {
                     // 🎯 FALLBACK: Update dengan pesan minimal
                     await interaction.update({
-                        content: "", // Zero-width space
+                        content: "​", // Zero-width space
                         embeds: [],
                         components: []
                     });
