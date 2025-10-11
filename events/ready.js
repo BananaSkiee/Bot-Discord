@@ -17,7 +17,7 @@ module.exports = {
   name: "ready",
   once: true,
   async execute(client) {
-    console.log(`🤖 ${client.user.tag} siap melayani!`);
+    console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
     // 🆕 FITUR AUTO SEND RULES
     try {
@@ -46,7 +46,7 @@ module.exports = {
                 components: [rules.welcomeButtons, rules.infoSelectMenu]
             });
             
-            console.log('✅ Rules premium berhasil dikirim ke channel');
+            console.log('✅ Rules BananaSkiee Community berhasil dikirim ke channel');
         } else {
             console.error('❌ Channel rules tidak ditemukan atau bukan text channel');
         }
@@ -100,19 +100,19 @@ module.exports = {
     }, 60_000);
     
     const statuses = [
-      "🌌 Menembus batas kemungkinan",
-      "📖 Membaca alur takdir",
-      "🎧 Mendengarkan suara hati server",
-      "🧠 Belajar tanpa akhir",
-      "🗝️ Menjaga kedamaian digital",
-      "🕊️ Menyebar aura positif",
-      "⚙️ Melayani tanpa lelah",
-      "🌙 Diam tapi ada",
-      "🔮 Menerawang masa depan",
-      "🌟 Jadi cahaya di kegelapan",
-      "🛡️ Mengamankan dunia maya",
-      "📡 Terhubung dengan dimensi lain",
-      "⏳ Waktu terus berjalan... dan aku tetap di sini",
+      "🌌 Menjaga BananaSkiee Community",
+      "📖 Memandu member baru",
+      "🎧 Mendengarkan komunitas",
+      "🧠 Belajar bersama member",
+      "🗝️ Mengamankan server",
+      "🕊️ Menyebar positivity",
+      "⚙️ Melayani BananaSkiee",
+      "🌙 Standby 24/7",
+      "🔮 Masa depan cerah",
+      "🌟 Cahaya komunitas",
+      "🛡️ Proteksi maksimal",
+      "📡 Terhubung dengan semua",
+      "⏳ Setia menemani",
     ];
 
     let index = 0;
