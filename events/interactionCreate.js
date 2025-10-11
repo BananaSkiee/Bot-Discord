@@ -8,6 +8,9 @@ const filePath = path.join(__dirname, "../data/taggedUsers.json");
 // Store untuk guidebook sessions
 const guidebookSessions = new Map();
 
+// Import verify system
+const verifySystem = require('../modules/verify');
+
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
@@ -17,6 +20,50 @@ module.exports = {
   async execute(interaction) {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
+
+      // ========== VERIFY SYSTEM HANDLERS ==========
+      if (interaction.isButton()) {
+        // VERIFY BUTTON
+        if (interaction.customId === 'verify_account') {
+          return await verifySystem.handleVerify(interaction);
+        }
+        
+        // START COMMUNITY BUTTON
+        if (interaction.customId === 'start_community') {
+          return await verifySystem.handleStartCommunity(interaction);
+        }
+        
+        // START ONBOARDING BUTTON
+        if (interaction.customId === 'start_onboarding') {
+          return await verifySystem.handleStartOnboarding(interaction);
+        }
+        
+        // CONFIRM ONBOARDING BUTTON
+        if (interaction.customId === 'confirm_onboarding') {
+          return await verifySystem.handleConfirmOnboarding(interaction);
+        }
+        
+        // SKIP ONBOARDING BUTTON
+        if (interaction.customId === 'skip_onboarding') {
+          return await verifySystem.handleSkipOnboarding(interaction);
+        }
+        
+        // CUSTOM FORM BUTTON
+        if (interaction.customId === 'custom_form') {
+          await interaction.reply({ 
+            content: '🚧 Fitur custom form dalam pengembangan', 
+            ephemeral: true 
+          });
+          return;
+        }
+      }
+
+      // VERIFY SELECT MENU HANDLERS
+      if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('select_')) {
+          return await verifySystem.handleSelectMenu(interaction);
+        }
+      }
 
       // 🆕 HANDLER: SELECT MENU "FIND MORE INFO HERE"
       if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
@@ -142,7 +189,7 @@ module.exports = {
                 } catch (error) {
                     // 🎯 FALLBACK: Update dengan pesan minimal
                     await interaction.update({
-                        content: "​", // Zero-width space
+                        content: "", // Zero-width space
                         embeds: [],
                         components: []
                     });
