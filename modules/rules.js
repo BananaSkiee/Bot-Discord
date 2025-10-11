@@ -65,63 +65,70 @@ module.exports = {
 
         // ==================== GUIDEBOOK PAGES ====================
         
-        // GUIDEBOOK INTRODUCTION (Seperti gambar 1000165222.jpg)
+        // GUIDEBOOK INTRODUCTION (Professional Design)
         const guidebookIntro = new EmbedBuilder()
             .setTitle("📖 **GUIDEBOOK**")
-            .setDescription(`Sebagai member baru server, Anda mungkin merasa sulit memahami cara server ini beroperasi.\n\nSebagai solusinya, kami mendesain modul memulai ini untuk memandu Anda melalui semua yang perlu diketahui, dari awal hingga akhir.\n\n- Klik tombol di bawah **Start Guide**\n\n---\n\n**GUIDEBOOK**\n\n---\n\n**Start Guide**\n\n*Hanya Anda yang bisa melihat ini • Dismiss message*`)
+            .setDescription(`## Getting Started\n\nSebagai member baru, Anda mungkin merasa bingung dengan cara server ini beroperasi.\n\nKami telah menyiapkan **panduan interaktif** untuk membantu Anda memahami segala hal tentang komunitas kami.\n\n**🎯 Yang akan Anda pelajari:**\n• Struktur dan organisasi server\n• Fitur-fitur penting yang tersedia\n• Cara berinteraksi dengan komunitas\n• Sistem reward dan leveling\n\n**👉 Langkah selanjutnya:**\nKlik tombol **Start Guide** di bawah untuk memulai perjalanan Anda!`)
             .setColor(0x00AAFF)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'BananaSkiee Community • Guidebook', 
+                text: 'BananaSkiee Community • Interactive Guide • Page 1/6', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
-        // Page 1/5 - The Basics (Seperti gambar 1000165245.png)
+        // Page 1/5 - The Basics (Professional Design)
         const guidebookPage1 = new EmbedBuilder()
-            .setTitle("📖 **THE BASICS**")
-            .setDescription(`- Pelajari tentang aturan server di sini.\n\nSesuaikan role notifikasi Anda agar sesuai dengan preferensi Anda dari **Channels & Roles**\n\n---\n\n**Page 1/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
-            .setColor(0x00AAFF)
+            .setTitle("📚 **DASAR-DASAR SERVER**")
+            .setDescription(`## Essential Information\n\n**📖 Pelajari Aturan:**\nBaca dan pahami pedoman komunitas kami untuk pengalaman terbaik.\n\n**⚙️ Sesuaikan Preferensi:**\nAtur role notifikasi sesuai keinginan Anda melalui **Channels & Roles**.\n\n**🎯 Tips untuk Pemula:**\n• Jelajahi semua channel yang tersedia\n• Kenali struktur role dan hierarki\n• Pahami sistem moderasi yang berlaku\n• Manfaatkan fitur-fitur premium`)
+            .setColor(0x3498DB)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'BananaSkiee Community • Page 1/5 • The Basics', 
+                text: 'BananaSkiee Community • Interactive Guide • Page 2/6', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
         // Page 2/5 - Important Roles
         const guidebookPage2 = new EmbedBuilder()
-            .setTitle("👑 **PERAN PENTING DI SERVER**")
-            .setDescription(`## 🏛️ Struktur Kepemimpinan Server\n\nBerikut adalah peran-peran penting yang mengelola **BananaSkiee Community**:\n\n### <@&1352279577174605884> **Headmaster**\nPendiri & Pemilik server\n\n### <@&1352282368043389069> **Principal**  \nIndividu yang bertugas sebagai administrator server, memastikan operasi berjalan lancar tanpa gangguan\n\n### <@&1352282892935368787> **Core Team**\nIndividu yang bekerja langsung dan menawarkan layanan terkait Discord\n\n### <@&1352283202840039475> **Counselors**\nIndividu yang bertugas sebagai helper, bertanggung jawab memoderasi server dan menangani masalah melalui tickets\n\n### <@&1352283798435270709> **Hall of Fame**\nIndividu yang dikenal di seluruh komunitas Discord building\n\n### <@&1352284168234467379> **Server Bots**\nBot-bot yang melayani server ini\n\n### <@&1352284524721209436> **Students**\nRole default untuk semua member server\n\n---\n\n**Page 2/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
+            .setTitle("👑 **STRUKTUR KEPEMIMPINAN**")
+            .setDescription(`## Leadership Hierarchy\n\n**🏛️ Tim Management:**\n<@&1352279577174605884> **Headmaster** - Founder & Owner\n<@&1352282368043389069> **Principal** - Server Administrators\n<@&1352282892935368787> **Core Team** - Discord Specialists\n\n**🛡️ Tim Support:**\n<@&1352283202840039475> **Counselors** - Community Moderators\n<@&1352283798435270709> **Hall of Fame** - Recognized Members\n\n**🤖 Sistem & Default:**\n<@&1352284168234467379> **Server Bots** - Automated Systems\n<@&1352284524721209436> **Students** - Community Members`)
             .setColor(0x9B59B6)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'BananaSkiee Community • Page 2/5 • Important Roles', 
+                text: 'BananaSkiee Community • Interactive Guide • Page 3/6', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
         // Page 3/5 - Important Channels
         const guidebookPage3 = new EmbedBuilder()
-            .setTitle("📁 **CHANNEL PENTING DI SERVER**")
-            .setDescription(`## 🗂️ Panduan Channel BananaSkiee Community\n\n### #📢-announcements\nSemua pengumuman terbaru dan update mengenai server akan dibagikan di sini.\n\n### #🎫-tickets\nBuat tiket di channel ini untuk berbicara dengan staff dan mendapatkan bantuan untuk masalah server.\n\n### #💬-discussion\nTempat untuk mengobrol tentang apapun yang tidak melanggar rules.\n\n### #🛠️-our-services\nAnda akan menemukan semua layanan yang kami tawarkan di sini.\n\n### #👋-introductions\nPerkenalkan diri Anda kepada komunitas di channel ini.\n\n### #❓-discord-help\nButuh bantuan? Tanyakan di sini!\n\n---\n\n**Page 3/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
-            .setColor(0x3498DB)
+            .setTitle("📁 **STRUKTUR CHANNEL**")
+            .setDescription(`## Channel Organization\n\n**📢 Informasi & Update:**\n• **#announcements** - Pengumuman resmi\n• **#info** - Informasi penting server\n\n**💬 Interaksi Komunitas:**\n• **#discussion** - Diskusi umum\n• **#introductions** - Perkenalan member\n• **#help** - Bantuan & support\n\n**🎫 Layanan & Support:**\n• **#tickets** - Bantuan staff\n• **#services** - Layanan yang tersedia\n\n**🔧 Utility & Sistem:**\n• **#bot-commands** - Perintah bot\n• **#counting** - Game komunitas`)
+            .setColor(0xE74C3C)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'BananaSkiee Community • Page 3/5 • Important Channels', 
+                text: 'BananaSkiee Community • Interactive Guide • Page 4/6', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
-        // Page 4/5 - Show All Channels Guide
+        // Page 4/5 - Navigation Guide
         const guidebookPage4 = new EmbedBuilder()
-            .setTitle("🔍 **CARA MELIHAT SEMUA CHANNEL**")
-            .setDescription(`## 👀 Panduan Menampilkan Semua Channel\n\nUntuk melihat semua channel di server, ikuti langkah-langkah berikut:\n\n### 📝 **Langkah-langkah:**\n1. **Klik pada nama server** (BananaSkiee Community) di bagian atas\n2. **Toggle opsi "Show All Channels"** untuk menampilkan semua channel\n3. **Nikmati akses penuh** ke semua channel yang tersedia\n\n### 🏠 **Struktur Channel Server:**\n• **#🔰-welcome** - Selamat datang!\n• **#ℹ️-info** - Informasi penting\n• **#🎉-boosts** - Info server boost\n• **#📤-uploads** - Upload konten\n• **#📢-announcements** - Pengumuman\n• **#🎫-tickets** - Bantuan staff\n• **#💬-discussion** - Diskusi umum\n• **#👋-introductions** - Perkenalan\n• **#❓-discord-help** - Bantuan Discord\n\n---\n\n**Page 4/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
+            .setTitle("🔍 **PANDUAN NAVIGASI**")
+            .setDescription(`## Optimalkan Pengalaman Anda\n\n**👀 Tampilkan Semua Channel:**\n1. Klik nama server di sidebar\n2. Aktifkan opsi **"Show All Channels"**\n3. Akses penuh semua channel tersedia\n\n**🎯 Channel Utama yang Perlu Diketahui:**\n• **Welcome** - Titik awal kedatangan\n• **Announcements** - Update terbaru\n• **Discussion** - Pusat interaksi\n• **Tickets** - Support langsung\n• **Help** - Bantuan komunitas\n\n**💡 Tips Navigasi:**\n• Gunakan search untuk temukan channel\n• Bookmark channel favorit\n• Ikuti category untuk organisasi`)
             .setColor(0xF39C12)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'BananaSkiee Community • Page 4/5 • Channel Guide', 
+                text: 'BananaSkiee Community • Interactive Guide • Page 5/6', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
         // Page 5/5 - Completion
         const guidebookPage5 = new EmbedBuilder()
-            .setTitle("🎉 **SELAMAT! ANDA BERHASIL**")
-            .setDescription(`## Yay! You did it!\n\nSemoga **Panduan Server** kami membantu Anda memahami sebagian besar **BananaSkiee Community**.\n\n- Jangan ragu untuk melihat pertanyaan yang sering diajukan di sini - #🔄-fags\n- Nikmati masa tinggal Anda di **BananaSkiee Community!**\n\n---\n\n**Page 5/5**\n\n*Hanya Anda yang bisa melihat ini - Dismiss message*`)
+            .setTitle("🎉 **PANDUAN SELESAI**")
+            .setDescription(`## Welcome to the Community!\n\n**✅ Anda telah menyelesaikan panduan!**\n\nSekarang Anda telah memahami struktur dasar **BananaSkiee Community** dan siap untuk berpartisipasi penuh dalam komunitas kami.\n\n**📚 Informasi Tambahan:**\n• Kunjungi **#faq** untuk pertanyaan umum\n• Jelajahi channel sesuai minat Anda\n• Jangan ragu bertanya di **#help**\n\n**🌟 Selanjutnya:**\nMulai berinteraksi dengan komunitas dan nikmati semua fitur premium yang tersedia!\n\n*"Great community experiences start with great understanding!"* 🍌`)
             .setColor(0x2ECC71)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
+            .setImage('https://i.ibb.co/WvSvsVfH/standard-34.gif')
             .setFooter({ 
-                text: 'BananaSkiee Community • Page 5/5 • Completion', 
+                text: 'BananaSkiee Community • Interactive Guide • Page 6/6', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
@@ -155,92 +162,51 @@ module.exports = {
             .addComponents(
                 new ButtonBuilder()
                     .setCustomId('guide_close')
-                    .setLabel('Close this message')
-                    .setStyle(ButtonStyle.Danger)
-                    .setEmoji('❌')
+                    .setLabel('Complete Guide')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('✅')
             );
 
         // ==================== RULES SECTION ====================
         const rulesAllowedEmbed = new EmbedBuilder()
-            .setTitle('✅ **YANG BOLEH DILAKUKAN**')
-            .setDescription(
-                '<a:ceklis:1402332072533823640> | **Ngobrol santai** - Asal sopan dan friendly\n' +
-                '<a:ceklis:1402332072533823640> | **Nge-share meme** - Yang receh tapi lucu\n' +
-                '<a:ceklis:1402332072533823640> | **Nanya-nanya** - Tentang game/anime/life\n' +
-                '<a:ceklis:1402332072533823640> | **Main bot** - Musik, Owo, dll (jangan spam)\n' +
-                '<a:ceklis:1402332072533823640> | **Bikin event** - Tanya admin dulu\n' +
-                '<a:ceklis:1402332072533823640> | **Kasih saran** - Buat server lebih baik'
-            )
+            .setTitle('✅ **STANDAR KOMUNITAS**')
+            .setDescription(`## Aktivitas yang Didukung\n\n<a:ceklis:1402332072533823640> **Komunikasi Santai**\nInteraksi sopan dan membangun komunitas\n\n<a:ceklis:1402332072533823640> **Berbagi Konten**\nMeme dan konten menghibur yang appropriate\n\n<a:ceklis:1402332072533823640> **Diskusi Produktif**\nGame, anime, life topics, dan hobi lainnya\n\n<a:ceklis:1402332072533823640> **Utilisasi Bot**\nMusik, game, utility (tanpa spam)\n\n<a:ceklis:1402332072533823640> **Inisiatif Event**\nKolaborasi dengan persetujuan admin\n\n<a:ceklis:1402332072533823640> **Kontribusi Ide**\nSaran untuk pengembangan server`)
             .setColor(0x00FF00)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
                 text: 'BananaSkiee Community • Positive Environment', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
         const rulesNotAllowedEmbed = new EmbedBuilder()
-            .setTitle('❌ **YANG GAK BOLEH**')
-            .setDescription(
-                '<a:silang:1402332141047513150> | **Bahasa kasar** - Toxic = mute/ban\n' +
-                '<a:silang:1402332141047513150> | **Spam mention** - @everyone/@admin tanpa penting\n' +
-                '<a:silang:1402332141047513150> | **Ngebully** - Auto ban permanen\n' +
-                '<a:silang:1402332141047513150> | **NSFW** - Foto/video/chat 18+\n' +
-                '<a:silang:1402332141047513150> | **Promo random** - Kecuali di channel promo\n\n' +
-                '**Catatan:**\n"Kalo ragu boleh nanya admin dulu~" 🔍'
-            )
+            .setTitle('❌ **BATASAN KOMUNITAS**')
+            .setDescription(`## Larangan Utama\n\n<a:silang:1402332141047513150> **Bahasa Tidak Pantas**\nKonsekuensi: Mute hingga ban permanen\n\n<a:silang:1402332141047513150> **Spam Mention**\n@everyone/@admin tanpa urgensi valid\n\n<a:silang:1402332141047513150> **Perilaku Toxic**\nBullying = aksi ban permanen\n\n<a:silang:1402332141047513150> **Konten NSFW**\nZero tolerance untuk konten dewasa\n\n<a:silang:1402332141047513150> **Promosi Ilegal**\nKecuali di channel yang ditentukan\n\n---\n\n**💡 Need Clarification?**\nTim admin selalu siap membantu pertanyaan Anda`)
             .setColor(0xFF0000)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'BananaSkiee Community • Keep It Safe & Fun', 
+                text: 'BananaSkiee Community • Safe Environment', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             })
             .setImage('https://i.ibb.co/4wcgBZQS/6f59b29a5247.gif');
 
         // ==================== MODERATION POLICY SECTION ====================
         const moderationPolicyEmbed = new EmbedBuilder()
-            .setTitle('📜 **PERATURAN & HUKUMAN SERVER BANANASKIE COMMUNITY**')
-            .setDescription(
-                '### ⚠️ SISTEM WARNING KUMULATIF\n' +
-                '<a:seru:1402337929556263002> | **Warn 1** = Peringatan\n' +
-                '<a:seru:1402337929556263002> | **Warn 2** = Mute 5 menit\n' +
-                '<a:seru:1402337929556263002> | **Warn 3** = Mute 10 menit\n' +
-                '<a:seru:1402337929556263002> | **Warn 4** = Mute 1 jam\n' +
-                '<a:seru:1402337929556263002> | **Warn 5** = Mute 1 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 6** = Mute 3 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 7** = Softban + Mute 1 minggu\n' +
-                '<a:seru:1402337929556263002> | **Warn 8** = Ban 1 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 9** = Ban 3 hari\n' +
-                '<a:seru:1402337929556263002> | **Warn 10** = Ban 1 minggu\n' +
-                '<a:seru:1402337929556263002> | **Warn 11** = **BAN PERMANEN**\n\n' +
-                '### 🔇 PELANGGARAN AUTO-MUTE\n' +
-                '- **Spam/Flood** = Mute 20 menit\n' +
-                '- **Bahasa NSFW** = Mute 1 hari\n' +
-                '- **Kirim NSFW/Gore** = Mute 7 hari\n' +
-                '- **Link scam** = Mute 3 hari\n' +
-                '- **Rasis/SARA** = Mute 5 hari\n\n' +
-                '### 🔨 PELANGGARAN AUTO-SOFTBAN\n' +
-                '- **Spam link scam** = Mute 4 hari\n' +
-                '- **Plagiarisme** = Mute 3 hari\n\n' +
-                '### 🚫 PELANGGARAN AUTO-BAN\n' +
-                '- **Akun/PFP NSFW** = Ban 7 hari\n' +
-                '- **Akun spam NSFW** = Ban 10 hari\n\n' +
-                '**📌 CATATAN PENTING:**\n' +
-                '1. Semua warn akan **hangus setelah 1 bulan**\n' +
-                '2. Pelanggaran **NSFW/Rasis/SARA** tidak bisa di-reset\n' +
-                '3. Admin berhak memberikan hukuman tambahan sesuai tingkat pelanggaran\n\n' +
-                '*(Sistem ini berlaku mulai 20 Agustus 2025)*\n\n' +
-                '"Hukuman diberikan bukan untuk menyusahkan, tapi untuk menjaga kenyamanan bersama!" 🍌'
-            )
+            .setTitle('⚖️ **SISTEM MODERASI PREMIUM**')
+            .setDescription(`## Framework Penegakan Aturan\n\n### ⚠️ Progressive Warning System\n<a:seru:1402337929556263002> **Tier 1-3** - Educational Warnings\n<a:seru:1402337929556263002> **Tier 4-7** - Temporary Restrictions  \n<a:seru:1402337929556263002> **Tier 8-11** - Account Limitations\n\n### 📊 Warning Structure\n**1-3** → Verbal → Short Mute\n**4-7** → Extended Mute → Softban\n**8-11** → Temporary Ban → Permanent\n\n### 🛡️ Auto-Moderation Triggers\n• Spam/Flood = 20m restriction\n• NSFW Content = 1-7 day escalation  \n• Security Threats = 3-5 day review\n• Hate Speech = 5 day minimum\n\n### 🔒 Zero-Tolerance Policies\n• Account NSFW = 7 day quarantine\n• Mass NSFW spam = 10 day restriction\n• Platform integrity violations = Permanent\n\n---\n\n**System designed for community excellence**\n*Effective: August 20, 2025*`)
             .setColor(0xFFA500)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: '© Copyright | BananaSkiee Community', 
+                text: 'BananaSkiee Community • Professional Moderation', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             })
             .setImage('https://i.ibb.co/WvSvsVfH/standard-34.gif');
 
         // ==================== LEVELING SECTION ====================
         const levelingEmbed = new EmbedBuilder()
-            .setTitle("🏆 **SISTEM LEVELING BANANASKIE COMMUNITY**")
-            .setDescription(`## 📈 Level Dari Bot <@437808476106784770>\n\nBerikut adalah role-level yang bisa Anda dapatkan berdasarkan aktivitas di server:\n\n### 👑 **LEVEL TERTINGGI**\n<@&1354196993680867370> = **Level Tertinggi 100**\n\n### 💎 **LEVEL ADVANCED**\n<@&1354197284476420106> = **Level 80**\n<@&1354197417754628176> = **Level 70**\n<@&1354197527582212106> = **Level 60**\n<@&1354197530010976521> = **Level 55**\n<@&1354197540937142503> = **Level 50**\n\n### 🥈 **LEVEL INTERMEDIATE**\n<@&1354197488264941809> = **Level 45**\n<@&1354197596536701018> = **Level 40**\n<@&1354196727753740409> = **Level 35**\n<@&1354196722716377281> = **Level 30**\n<@&1354196697340837888> = **Level 25**\n\n### 🥉 **LEVEL PEMULA**\n<@&1354196683420078324> = **Level 20**\n<@&1354196302237405285> = **Level 15**\n<@&1354196283975270624> = **Level 10**\n<@&1354196267722346578> = **Level 5**\n<@&1354196247715516617> = **Level Pertama/Level 1**`)
+            .setTitle("🏆 **ECOSYSTEM PROGRESSION**")
+            .setDescription(`## Achievement Framework\n\n### 🥉 Foundation Tiers (1-25)\n<@&1354196247715516617> - <@&1354196683420078324>\n*Master the basics and establish presence*\n\n### 🥈 Advanced Tiers (30-45)  \n<@&1354196722716377281> - <@&1354197488264941809>\n*Consistent contribution and community impact*\n\n### 🥇 Elite Tiers (50-70)\n<@&1354197540937142503> - <@&1354197417754628176>\n*Leadership demonstration and value creation*\n\n### 👑 Legendary Tiers (80-100)\n<@&1354197284476420106> - <@&1354196993680867370>\n*Community pillar status and legacy building*\n\n---\n\n**Progression powered by <@437808476106784770>**\n*Your journey to excellence starts here*`)
             .setColor(0xFFD700)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
                 text: 'BananaSkiee Community • Leveling System', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
@@ -248,11 +214,12 @@ module.exports = {
 
         // ==================== COUNTING SECTION ====================
         const countingEmbed = new EmbedBuilder()
-            .setTitle("🔢 **GAME COUNTING BANANASKIE COMMUNITY**")
-            .setDescription(`## 🎮 Tantangan Counting Seru!\n\nIkuti game counting kami dan dapatkan role eksklusif berdasarkan jumlah count Anda!\n\n### 🎯 **Sistem Reward Counting:**\n• **50+ Counts**   = Role khusus\n• **100+ Counts**  = Role lebih eksklusif\n• **250+ Counts**  = Role langka\n• **500+ Counts**  = Role sangat eksklusif\n• **1000+ Counts** = Role legendaris\n\n### 📊 **Cara Bermain:**\n1. Pergi ke channel **#counting**\n2. Mulai dengan angka **1**\n3. Lanjutkan dengan angka berikutnya\n4. Jangan break sequence!\n5. Nikmati perjalanan naik level\n\n### 💎 **Keuntungan Counting:**\n• **Role eksklusif** yang keren\n• **Pengakuan** dari komunitas\n• **Special rewards** untuk top counter\n• **Sense of accomplishment** yang memuaskan`)
+            .setTitle("🔢 **ACHIEVEMENT GAMIFICATION**")
+            .setDescription(`## Progressive Challenge System\n\n### 🎯 Milestone Recognition\n• **50+** = Initiate Status\n• **100+** = Contributor Level  \n• **250+** = Specialist Rank\n• **500+** = Expert Tier\n• **1000+** = Master Class\n\n### 🎮 Engagement Protocol\n1. Navigate to **#counting** channel\n2. Begin sequence with number **1**\n3. Maintain numerical continuity\n4. Advance through achievement tiers\n5. Claim exclusive role rewards\n\n### 💎 Value Proposition\n• **Exclusive Role Access**\n• **Community Recognition**  \n• **Premium Reward Unlocks**\n• **Achievement Legacy Building**\n\n---\n\n**Track progress with `/user` command**\n*Your dedication, visibly rewarded*`)
             .setColor(0x9B59B6)
+            .setThumbnail('https://i.imgur.com/RGp8pqJ.jpeg')
             .setFooter({ 
-                text: 'Gunakan command /user di bot-commands untuk melihat statistik counting!', 
+                text: 'BananaSkiee Community • Counting System', 
                 iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg' 
             });
 
