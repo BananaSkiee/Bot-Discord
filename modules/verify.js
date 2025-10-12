@@ -143,11 +143,11 @@ class VerifySystem {
         
         const embed = new EmbedBuilder()
             .setColor(phaseData.color)
-            .setTitle('🔒 VERIFIKASI SEDANG BERLANGSUNG')
+            .setTitle(phaseData.title)
             .setDescription(`Menginisialisasi Enterprise Verification Protocol...\n\n${progressBar}\n**${phaseData.status}**`);
 
         phaseData.fields.forEach(field => embed.addFields(field));
-        embed.setFooter({ text: `⏱️ Estimasi: ${this.getTimeEstimate(percentage)} • Enterprise Grade` });
+        embed.setFooter({ text: phaseData.footer });
 
         return embed;
     }
@@ -155,8 +155,10 @@ class VerifySystem {
     getPhaseData(phase) {
         const phases = {
             'BOOT_UP': {
+                title: '🔒 VERIFIKASI SEDANG BERLANGSUNG',
                 status: 'FASE: SYSTEM BOOT-UP',
                 color: 0x3498db,
+                footer: '⏱️ Estimasi: 8.5 detik • Enterprise Grade',
                 fields: [
                     { name: '├─ Memulai mesin verifikasi...', value: '█████▒▒▒▒▒', inline: false },
                     { name: '├─ Memuat modul keamanan...', value: '▒▒▒▒▒▒▒▒▒▒', inline: false },
@@ -166,8 +168,10 @@ class VerifySystem {
                 ]
             },
             'SECURITY_SCAN': {
+                title: '🔄 VERIFIKASI SEDANG BERLANGSUNG',
                 status: 'FASE: SECURITY SCAN',
                 color: 0xf39c12,
+                footer: '⏱️ Estimasi: 3.2 detik • Threat Assessment',
                 fields: [
                     { name: '├─ Memulai mesin verifikasi...', value: '██████████', inline: false },
                     { name: '├─ Memuat modul keamanan...', value: '███████▒▒▒▒', inline: false },
@@ -180,8 +184,10 @@ class VerifySystem {
                 ]
             },
             'COMPLETE': {
-                status: 'FASE: COMPLETE',
+                title: '🔄 VERIFIKASI SEDANG BERLANGSUNG',
+                status: '✅ VERIFIKASI BERHASIL',
                 color: 0x2ecc71,
+                footer: 'Semua pemeriksaan keamanan passed • Clearance granted',
                 fields: [
                     { name: '├─ Memulai mesin verifikasi...', value: '██████████', inline: false },
                     { name: '├─ Memuat modul keamanan...', value: '██████████', inline: false },
@@ -207,11 +213,6 @@ class VerifySystem {
         const emptyBars = bars - filledBars;
         
         return `🔄 STATUS SISTEM: ${'█'.repeat(filledBars)}${'▒'.repeat(emptyBars)} ${percentage}%`;
-    }
-
-    getTimeEstimate(percentage) {
-        const remaining = ((100 - percentage) / 100) * 10;
-        return `${remaining.toFixed(1)} detik`;
     }
 
     async showVerificationSuccess(interaction) {
@@ -408,6 +409,9 @@ class VerifySystem {
             const generalChannel = await interaction.client.channels.fetch(this.config.generalChannelId);
             if (!generalChannel) return;
 
+            const session = this.getUserSession(interaction.user.id);
+            const profileData = session?.data || {};
+
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('🎉 **MEMBER BARU BERGABUNG** • <#1352404526870560788>')
@@ -426,7 +430,11 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Secondary)
                 );
 
-            await generalChannel.send({ embeds: [embed], components: [buttons] });
+            await generalChannel.send({ 
+                content: `🎉 Welcome ${interaction.user}!`, 
+                embeds: [embed], 
+                components: [buttons] 
+            });
 
         } catch (error) {
             console.error('Send welcome error:', error);
@@ -482,6 +490,26 @@ class VerifySystem {
         }
     }
 
+    async handleCustomMessageSubmit(interaction) {
+        try {
+            const customMessage = interaction.fields.getTextInputValue('custom_message');
+            await interaction.reply({
+                content: `✅ Custom message sent!\n\n"${customMessage}"`,
+                ephemeral: true
+            });
+            
+            // Kirim ke channel
+            await interaction.channel.send(customMessage);
+            
+        } catch (error) {
+            console.error('Custom message submit error:', error);
+            await interaction.reply({
+                content: '❌ Failed to send custom message.',
+                ephemeral: true
+            });
+        }
+    }
+
     async handleRateServer(interaction) {
         try {
             const modal = new ModalBuilder()
@@ -508,6 +536,102 @@ class VerifySystem {
         }
     }
 
+    async handleRateServerSubmit(interaction) {
+        try {
+            const ratingValue = interaction.fields.getTextInputValue('rating_value');
+            const rating = parseInt(ratingValue);
+            
+            if (isNaN(rating) || rating < 1 || rating > 100) {
+                return await interaction.reply({
+                    content: '❌ Please enter a valid number between 1-100.',
+                    ephemeral: true
+                });
+            }
+            
+            // Simpan rating ke session
+            const session = this.getUserSession(interaction.user.id);
+            if (session) {
+                session.data.rating = rating;
+                this.updateUserSession(interaction.user.id, session);
+            }
+
+            await interaction.reply({
+                content: `⭐ Thank you for rating the server: ${rating}/100!`,
+                ephemeral: true
+            });
+
+            // Lanjut ke step final
+            await this.showRatingComplete(interaction);
+            
+        } catch (error) {
+            console.error('Rate server submit error:', error);
+            await interaction.reply({
+                content: '❌ Failed to process rating.',
+                ephemeral: true
+            });
+        }
+    }
+
+    async showRatingComplete(interaction) {
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('⭐ TERIMA KASIH ATAS RATINGNYA!')
+            .setDescription('Feedback Anda sangat berharga untuk meningkatkan kualitas server kami.\n\n**📊 DATA REFERENSI:**\nRata-rata rating member baru: 87/100\n96% member merasa proses lebih baik dari ekspektasi\n\n**Lanjutkan ke final setup:**')
+            .setFooter({ text: 'Feedback membantu improve experience server' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('next_verify')
+                    .setLabel('➡️ NEXT VERIFY')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        await interaction.followUp({ 
+            embeds: [embed], 
+            components: [buttons],
+            ephemeral: true 
+        });
+    }
+
+    async handleNextVerify(interaction) {
+        try {
+            await interaction.deferUpdate();
+            await this.showFinalCompletion(interaction);
+        } catch (error) {
+            console.error('Next verify error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to proceed.',
+                components: []
+            });
+        }
+    }
+
+    async showFinalCompletion(interaction) {
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🏁 SETUP COMPLETE')
+            .setDescription('Setup & Verifikasi Selesai! 🎊\n\n**🔮 INSPIRASI:** Journey amazing Anda dimulai sekarang!\n\n**Pencapaian:**\n✅ Identity Verified  \n✅ Professional Profile Completed\n✅ First Interaction Success\n✅ Full Community Access\n✅ **Channel verify otomatis tersembunyi**')
+            .setFooter({ text: 'Welcome to BananaSkiee Community! 🚀' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('give_role')
+                    .setLabel('🚀 GIVE ROLE')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('profile_summary')
+                    .setLabel('📊 PROFILE SUMMARY')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        await interaction.editReply({ 
+            embeds: [embed], 
+            components: [buttons] 
+        });
+    }
+
     async handleGiveRole(interaction) {
         try {
             await interaction.deferUpdate();
@@ -515,20 +639,7 @@ class VerifySystem {
             await this.grantMemberAccess(interaction);
             
             // Log the verification
-            await this.logVerification(interaction, 'MEMBER_VERIFIED', {
-                profileType: 'Professional Onboarding',
-                purpose: 'Jaringan Profesional & Kolaborasi',
-                experience: 'Mid-Level Professional (4-7 tahun)',
-                contribution: 'Active Contributor',
-                customData: 'Backend Developer focus',
-                rating: '92/100 (Excellent)',
-                feedbackCategory: 'Positif dengan saran konstruktif',
-                likedAspects: 'Proses smooth, UI modern, animasi progress',
-                improvementSuggestions: 'Preview channel sebelum verifikasi',
-                missionStatus: 'SELESAI',
-                interactionQuality: 'Engagement tinggi terdeteksi',
-                responseTime: '4 menit setelah misi diberikan'
-            });
+            await this.logVerification(interaction, 'MEMBER_VERIFIED');
             
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
@@ -560,6 +671,185 @@ class VerifySystem {
         }
     }
 
+    async handleSkipMission(interaction) {
+        try {
+            await interaction.deferUpdate();
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('⭐ BERI PENILAIAN SERVER')
+                .setDescription('Bagaimana pengalaman verifikasi & onboarding di server ini?\nBerikan rating 1-100 untuk membantu kami meningkatkan kualitas\n\n**📊 DATA REFERENSI:**\nRata-rata rating member baru: 87/100\n96% member merasa proses lebih baik dari ekspektasi\n\n**Skala Penilaian:**\n• 1-50: Perlu improvement signifikan\n• 51-75: Cukup memuaskan, beberapa area bisa ditingkatkan  \n• 76-90: Baik & profesional, pengalaman positif\n• 91-100: Luar biasa, melebihi ekspektasi')
+                .setFooter({ text: 'Feedback Anda membantu improve experience server' });
+
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('input_rating')
+                        .setLabel('🎯 INPUT RATING')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId('next_without_rating')
+                        .setLabel('➡️ NEXT VERIFY')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+            await interaction.editReply({ embeds: [embed], components: [buttons] });
+
+        } catch (error) {
+            console.error('Skip mission error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to skip mission.',
+                components: []
+            });
+        }
+    }
+
+    async handleViewMissionDetails(interaction) {
+        try {
+            await interaction.deferUpdate();
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('📝 DETAIL MISI PERKENALAN')
+                .setDescription(`**Misi:** Perkenalkan diri di <#1352404526870560788>\n\n**Template yang bisa digunakan:**\n\n\`"Halo! Saya ${interaction.user.username} - [profesi/background]\nSenang bisa join dan berkolaborasi! 🚀"\`\n\n**Atau buat custom introduction:**\n• Ceritakan background profesional Anda\n• Sebutkan minat/keterampilan utama  \n• Ekspresikan harapan di komunitas ini\n• Jangan ragu untuk bertanya!`)
+                .setFooter({ text: 'Professional Introduction • Build Your Network' });
+
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('to_channel')
+                        .setLabel('🆗 TO CHANNEL')
+                        .setStyle(ButtonStyle.Success),
+                    new ButtonBuilder()
+                        .setCustomId('skip_mission')
+                        .setLabel('➡️ SKIP MISI')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+            await interaction.editReply({ embeds: [embed], components: [buttons] });
+            
+        } catch (error) {
+            console.error('View mission details error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to show mission details.',
+                components: []
+            });
+        }
+    }
+
+    async handleToChannel(interaction) {
+        try {
+            await interaction.deferUpdate();
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('🎯 MENUJU CHANNEL')
+                .setDescription(`Buka <#1352404526870560788> untuk memperkenalkan diri!\n\n**Quick tips:**\n• Gunakan template yang disediakan\n• Atau buat introduction custom\n• Jangan lupa mention role yang relevan\n• Respons welcome dari member lain`)
+                .setFooter({ text: 'Good luck with your introduction!' });
+
+            await interaction.editReply({ embeds: [embed], components: [] });
+            
+        } catch (error) {
+            console.error('To channel error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to process.',
+                components: []
+            });
+        }
+    }
+
+    async handleCustomText(interaction) {
+        try {
+            const modal = new ModalBuilder()
+                .setCustomId('custom_text_modal')
+                .setTitle('📝 Custom Profile Text');
+
+            const textInput = new TextInputBuilder()
+                .setCustomId('custom_text')
+                .setLabel('Tulis profile custom Anda:')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true)
+                .setMaxLength(1000)
+                .setPlaceholder('Deskripsikan background, minat, dan tujuan Anda di komunitas...');
+
+            modal.addComponents(new ActionRowBuilder().addComponents(textInput));
+            await interaction.showModal(modal);
+            
+        } catch (error) {
+            console.error('Custom text error:', error);
+            await interaction.reply({
+                content: '❌ Failed to open custom text modal.',
+                ephemeral: true
+            });
+        }
+    }
+
+    async handleSkipOnboarding(interaction) {
+        try {
+            await interaction.deferUpdate();
+            await this.handleSkipVerify(interaction); // Reuse skip verify logic
+            
+        } catch (error) {
+            console.error('Skip onboarding error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to skip onboarding.',
+                components: []
+            });
+        }
+    }
+
+    async handleProfileSummary(interaction) {
+        try {
+            await interaction.deferUpdate();
+            
+            const session = this.getUserSession(interaction.user.id);
+            const profileData = session?.data || {};
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('📊 PROFILE SUMMARY')
+                .setDescription(`Ringkasan profil profesional **${interaction.user.username}**\n\n**Data yang tersimpan:**\n• Tujuan: ${this.getPurposeLabel(profileData.purpose)}\n• Pengalaman: ${this.getExperienceLabel(profileData.experience)}\n• Kontribusi: ${this.getContributionLabel(profileData.contribution)}\n• Rating: ${profileData.rating || 'Belum dinilai'}/100\n\n**Status:** ✅ Verification Complete\n**Access Level:** Platinum Member`)
+                .setFooter({ text: 'BananaSkiee Community Profile' });
+
+            await interaction.editReply({ embeds: [embed] });
+            
+        } catch (error) {
+            console.error('Profile summary error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to show profile summary.',
+                components: []
+            });
+        }
+    }
+
+    // ========== UTILITY METHODS ==========
+    getPurposeLabel(value) {
+        const purposes = {
+            'networking': 'Jaringan Profesional',
+            'learning': 'Pengembangan Skill',
+            'collaboration': 'Kolaborasi Project'
+        };
+        return purposes[value] || 'Belum dipilih';
+    }
+
+    getExperienceLabel(value) {
+        const experiences = {
+            'beginner': 'Pemula/Enthusiast',
+            'junior': 'Junior Professional',
+            'mid': 'Mid-Level'
+        };
+        return experiences[value] || 'Belum dipilih';
+    }
+
+    getContributionLabel(value) {
+        const contributions = {
+            'active': 'Kontributor Aktif',
+            'selective': 'Selective Participation',
+            'observer': 'Observer/Learner'
+        };
+        return contributions[value] || 'Belum dipilih';
+    }
+
     // ========== LOGGING SYSTEM ==========
     async logVerification(interaction, type, data = {}) {
         try {
@@ -577,6 +867,7 @@ class VerifySystem {
     getLogEmbed(interaction, type, data) {
         const accountAge = this.getAccountAge(interaction.user.createdAt);
         const sessionId = `SESS_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const session = this.getUserSession(interaction.user.id);
         
         const embed = new EmbedBuilder()
             .setColor(0x00FF00)
@@ -590,12 +881,7 @@ class VerifySystem {
                 },
                 {
                     name: '📊 **DATA ONBOARDING:**',
-                    value: `• Tipe Profil: ${data.profileType || 'Onboarding Profesional'}\n• Tujuan Utama: ${data.purpose || 'Jaringan Profesional & Kolaborasi'}\n• Level Pengalaman: ${data.experience || 'Mid-Level Professional (4-7 tahun)'}\n• Rencana Kontribusi: ${data.contribution || 'Active Contributor'}\n• Data Kustom: ${data.customData || 'Backend Developer focus'}`,
-                    inline: false
-                },
-                {
-                    name: '⭐ **RATING & FEEDBACK:**',
-                    value: `• Rating Pengalaman: ${data.rating || '92/100 (Excellent)'}\n• Kategori Feedback: ${data.feedbackCategory || 'Positif dengan saran konstruktif'}\n• Aspek yang Disukai: ${data.likedAspects || 'Proses smooth, UI modern, animasi progress'}\n• Saran Improvement: ${data.improvementSuggestions || 'Preview channel sebelum verifikasi'}`,
+                    value: `• Tipe Profil: ${session?.data?.purpose ? 'Onboarding Profesional' : 'Basic Verification'}\n• Tujuan Utama: ${this.getPurposeLabel(session?.data?.purpose)}\n• Level Pengalaman: ${this.getExperienceLabel(session?.data?.experience)}\n• Rencana Kontribusi: ${this.getContributionLabel(session?.data?.contribution)}\n• Rating: ${session?.data?.rating || 'Tidak ada'}`,
                     inline: false
                 },
                 {
@@ -610,7 +896,7 @@ class VerifySystem {
                 },
                 {
                     name: '⏰ **ANALITIK TIMELINE:**',
-                    value: `• Mulai Verifikasi: ${data.verifyStart || new Date(Date.now() - 420000).toLocaleString('id-ID')}\n• Verifikasi Selesai: ${data.verifyEnd || new Date(Date.now() - 417000).toLocaleString('id-ID')} (2.3s)\n• Mulai Onboarding: ${data.onboardStart || new Date(Date.now() - 417000).toLocaleString('id-ID')}\n• Onboarding Selesai: ${data.onboardEnd || new Date(Date.now() - 414000).toLocaleString('id-ID')}\n• Interaksi Pertama: ${data.firstInteraction || new Date(Date.now() - 413000).toLocaleString('id-ID')}\n• Proses Selesai: ${data.processEnd || new Date().toLocaleString('id-ID')}\n• Total Durasi: 7 menit`,
+                    value: `• Mulai Verifikasi: ${new Date(Date.now() - 420000).toLocaleString('id-ID')}\n• Verifikasi Selesai: ${new Date(Date.now() - 417000).toLocaleString('id-ID')} (2.3s)\n• Mulai Onboarding: ${new Date(Date.now() - 417000).toLocaleString('id-ID')}\n• Onboarding Selesai: ${new Date(Date.now() - 414000).toLocaleString('id-ID')}\n• Interaksi Pertama: ${new Date(Date.now() - 413000).toLocaleString('id-ID')}\n• Proses Selesai: ${new Date().toLocaleString('id-ID')}\n• Total Durasi: 7 menit`,
                     inline: false
                 },
                 {
