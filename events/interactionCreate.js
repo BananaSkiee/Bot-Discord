@@ -30,6 +30,9 @@ module.exports = {
         if (interaction.customId === 'rate_server_modal') {
           return await verifySystem.handleRateServerSubmit(interaction);
         }
+        if (interaction.customId === 'custom_text_modal') {
+          return await verifySystem.handleCustomTextSubmit(interaction);
+        }
       }
 
       // ========== VERIFY SYSTEM BUTTON HANDLERS ==========
@@ -100,6 +103,22 @@ module.exports = {
         // SKIP ONBOARDING BUTTON
         if (customId === 'skip_onboarding') {
           return await verifySystem.handleSkipOnboarding(interaction);
+        }
+        
+        // RATING BUTTONS
+        if (customId === 'input_rating') {
+          return await verifySystem.handleRateServer(interaction);
+        }
+        if (customId === 'next_without_rating') {
+          return await verifySystem.handleNextVerify(interaction);
+        }
+        if (customId === 'next_verify') {
+          return await verifySystem.handleNextVerify(interaction);
+        }
+        
+        // PROFILE SUMMARY BUTTON
+        if (customId === 'profile_summary') {
+          return await verifySystem.handleProfileSummary(interaction);
         }
       }
       
@@ -266,12 +285,10 @@ module.exports = {
                 guidebookSessions.delete(interaction.user.id);
                 
                 try {
-                    // 🎯 SOLUSI: Delete message (jika memungkinkan)
                     await interaction.message.delete();
                 } catch (error) {
-                    // 🎯 FALLBACK: Update dengan pesan minimal
                     await interaction.update({
-                        content: "", // Zero-width space
+                        content: "", 
                         embeds: [],
                         components: []
                     });
@@ -290,7 +307,6 @@ module.exports = {
             let components;
             
             if (newPage === 0) {
-                // Kembali ke intro dengan tombol Start Guide
                 currentEmbed = rules.guidebookIntro;
                 components = rules.startGuideButton;
             } else {
@@ -553,7 +569,7 @@ module.exports = {
 
       // ========== UNKNOWN BUTTON ==========
       await interaction.reply({
-     content: "⚠️ Tombol tidak dikenali.",
+        content: "⚠️ Tombol tidak dikenali.",
         ephemeral: true,
       });
 
