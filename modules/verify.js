@@ -421,7 +421,7 @@ class VerifySystem {
                         .setLabel('👋 AUTO WELCOME')
                         .setStyle(ButtonStyle.Primary),
                     new ButtonBuilder()
-                        .setCusomId('custom_message')
+                        .setCustomId('custom_message')
                         .setLabel('💬 CUSTOM MESSAGE')
                         .setStyle(ButtonStyle.Secondary)
                 );
