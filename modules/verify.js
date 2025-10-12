@@ -784,6 +784,33 @@ class VerifySystem {
         }
     }
 
+    // Di dalam class VerifySystem, tambahkan method ini:
+
+async handleCustomTextSubmit(interaction) {
+    try {
+        const customText = interaction.fields.getTextInputValue('custom_text');
+        
+        // Simpan ke session
+        const session = this.getUserSession(interaction.user.id);
+        if (session) {
+            session.data.customText = customText;
+            this.updateUserSession(interaction.user.id, session);
+        }
+        
+        await interaction.reply({
+            content: `✅ Custom profile text saved!\n\n"${customText}"`,
+            ephemeral: true
+        });
+        
+    } catch (error) {
+        console.error('Custom text submit error:', error);
+        await interaction.reply({
+            content: '❌ Failed to save custom text.',
+            ephemeral: true
+        });
+    }
+}
+
     async handleSkipOnboarding(interaction) {
         try {
             await interaction.deferUpdate();
