@@ -24,101 +24,160 @@ module.exports = {
 
       // ========== VERIFY SYSTEM MODAL HANDLERS ==========
       if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'custom_profile_modal') {
-          return await verifySystem.handlers.handleModalSubmit(interaction);
+        if (interaction.customId === 'custom_message_modal') {
+          return await verifySystem.handleCustomMessageSubmit(interaction);
         }
-        if (interaction.customId === 'rating_modal') {
-          return await verifySystem.handlers.handleRatingSubmit(interaction);
+        if (interaction.customId === 'rate_server_modal') {
+          return await verifySystem.handleRateServerSubmit(interaction);
         }
       }
 
       // ========== VERIFY SYSTEM BUTTON HANDLERS ==========
       if (interaction.isButton()) {
+        const customId = interaction.customId;
+        
         // VERIFY BUTTON
-        if (interaction.customId === 'verify_account') {
+        if (customId === 'verify_account') {
           return await verifySystem.handleVerify(interaction);
         }
         
-        // START COMMUNITY BUTTON
-        if (interaction.customId === 'start_community') {
-          return await verifySystem.handleStartCommunity(interaction);
+        // SKIP VERIFY BUTTON
+        if (customId === 'skip_verify') {
+          return await verifySystem.handleSkipVerify(interaction);
         }
         
-        // START ONBOARDING BUTTON
-        if (interaction.customId === 'start_onboarding') {
-          return await verifySystem.handleStartOnboarding(interaction);
+        // CONTINUE VERIFY BUTTON
+        if (customId === 'continue_verify') {
+          return await verifySystem.handleContinueVerify(interaction);
         }
         
-        // CONFIRM ONBOARDING BUTTON
-        if (interaction.customId === 'confirm_onboarding') {
-          return await verifySystem.handleConfirmOnboarding(interaction);
+        // SAVE PROFILE BUTTON
+        if (customId === 'save_profile') {
+          return await verifySystem.handleSaveProfile(interaction);
+        }
+        
+        // AUTO WELCOME BUTTON
+        if (customId === 'auto_welcome') {
+          return await verifySystem.handleAutoWelcome(interaction);
+        }
+        
+        // CUSTOM MESSAGE BUTTON
+        if (customId === 'custom_message') {
+          return await verifySystem.handleCustomMessage(interaction);
+        }
+        
+        // RATE SERVER BUTTON
+        if (customId === 'rate_server') {
+          return await verifySystem.handleRateServer(interaction);
+        }
+        
+        // GIVE ROLE BUTTON
+        if (customId === 'give_role') {
+          return await verifySystem.handleGiveRole(interaction);
+        }
+        
+        // BACK TO VERIFY BUTTON
+        if (customId === 'back_to_verify') {
+          return await verifySystem.handleBackToVerify(interaction);
+        }
+        
+        // MISSION BUTTONS
+        if (customId === 'skip_mission') {
+          return await verifySystem.handleSkipMission(interaction);
+        }
+        if (customId === 'view_mission_details') {
+          return await verifySystem.handleViewMissionDetails(interaction);
+        }
+        if (customId === 'to_channel') {
+          return await verifySystem.handleToChannel(interaction);
+        }
+        
+        // CUSTOM TEXT BUTTON
+        if (customId === 'custom_text') {
+          return await verifySystem.handleCustomText(interaction);
         }
         
         // SKIP ONBOARDING BUTTON
-        if (interaction.customId === 'skip_onboarding') {
+        if (customId === 'skip_onboarding') {
           return await verifySystem.handleSkipOnboarding(interaction);
-        }
-        
-        // CUSTOM FORM BUTTON
-        if (interaction.customId === 'custom_form') {
-          return await verifySystem.handleCustomForm(interaction);
-        }
-        
-        // RATING & FEEDBACK BUTTONS
-        if (interaction.customId === 'input_rating') {
-          return await verifySystem.handlers.handleRatingInput(interaction);
-        }
-        if (interaction.customId === 'next_without_rating') {
-          return await verifySystem.handlers.handleFeedbackSkip(interaction);
-        }
-        if (interaction.customId === 'feedback_detail') {
-          // Skip rating langsung ke feedback
-          const session = verifySystem.getUserSession(interaction.user.id);
-          if (session) {
-            session.data.rating = null;
-            verifySystem.updateUserSession(interaction.user.id, session);
-          }
-          return await verifySystem.handlers.handleFeedbackSubmit(interaction);
-        }
-        if (interaction.customId === 'submit_feedback') {
-          return await verifySystem.handlers.handleFeedbackSubmit(interaction);
-        }
-        if (interaction.customId === 'skip_feedback') {
-          return await verifySystem.handleComplete(interaction);
         }
       }
       
-            // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
-      if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
-        const selected = interaction.values[0];
+      // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
+      if (interaction.isStringSelectMenu()) {
+        const customId = interaction.customId;
         
-        const rulesModule = require('../modules/rules');
-        const rules = await rulesModule.execute(interaction.client);
-        
-        let embed;
-        
-        switch(selected) {
-            case 'leveling':
-                embed = rules.levelingEmbed;
-                break;
-            case 'moderation':
-                embed = rules.moderationPolicyEmbed;
-                break;
-            case 'counting':
-                embed = rules.countingEmbed;
-                break;
-            default:
-                embed = new EmbedBuilder()
-                    .setTitle("❌ Information Not Found")
-                    .setDescription("Sorry, the selected option is not available.")
-                    .setColor(0xFF0000);
+        if (customId === 'select_purpose') {
+          const session = verifySystem.getUserSession(interaction.user.id);
+          if (session) {
+            session.data.purpose = interaction.values[0];
+            verifySystem.updateUserSession(interaction.user.id, session);
+          }
+          await interaction.reply({ 
+            content: `✅ Tujuan dipilih: ${interaction.values[0]}`,
+            ephemeral: true 
+          });
+          return;
         }
         
-        await interaction.reply({
-            embeds: [embed],
-            ephemeral: true
-        });
-        return;
+        if (customId === 'select_experience') {
+          const session = verifySystem.getUserSession(interaction.user.id);
+          if (session) {
+            session.data.experience = interaction.values[0];
+            verifySystem.updateUserSession(interaction.user.id, session);
+          }
+          await interaction.reply({ 
+            content: `✅ Level pengalaman dipilih: ${interaction.values[0]}`,
+            ephemeral: true 
+          });
+          return;
+        }
+        
+        if (customId === 'select_contribution') {
+          const session = verifySystem.getUserSession(interaction.user.id);
+          if (session) {
+            session.data.contribution = interaction.values[0];
+            verifySystem.updateUserSession(interaction.user.id, session);
+          }
+          await interaction.reply({ 
+            content: `✅ Level kontribusi dipilih: ${interaction.values[0]}`,
+            ephemeral: true 
+          });
+          return;
+        }
+        
+        // EXISTING SELECT MENU HANDLER
+        if (interaction.customId === 'info_select') {
+          const selected = interaction.values[0];
+          
+          const rulesModule = require('../modules/rules');
+          const rules = await rulesModule.execute(interaction.client);
+          
+          let embed;
+          
+          switch(selected) {
+              case 'leveling':
+                  embed = rules.levelingEmbed;
+                  break;
+              case 'moderation':
+                  embed = rules.moderationPolicyEmbed;
+                  break;
+              case 'counting':
+                  embed = rules.countingEmbed;
+                  break;
+              default:
+                  embed = new EmbedBuilder()
+                      .setTitle("❌ Information Not Found")
+                      .setDescription("Sorry, the selected option is not available.")
+                      .setColor(0xFF0000);
+          }
+          
+          await interaction.reply({
+              embeds: [embed],
+              ephemeral: true
+          });
+          return;
+        }
       }
 
       // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES
@@ -212,7 +271,7 @@ module.exports = {
                 } catch (error) {
                     // 🎯 FALLBACK: Update dengan pesan minimal
                     await interaction.update({
-                        content: "​", // Zero-width space
+                        content: "", // Zero-width space
                         embeds: [],
                         components: []
                     });
@@ -494,7 +553,7 @@ module.exports = {
 
       // ========== UNKNOWN BUTTON ==========
       await interaction.reply({
-        content: "⚠️ Tombol tidak dikenali.",
+     content: "⚠️ Tombol tidak dikenali.",
         ephemeral: true,
       });
 
