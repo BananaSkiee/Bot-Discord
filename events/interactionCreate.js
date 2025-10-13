@@ -27,11 +27,11 @@ module.exports = {
         if (interaction.customId === 'custom_message_modal') {
           return await verifySystem.handleCustomMessageSubmit(interaction);
         }
-        if (interaction.customId === 'rate_server_modal') {
-          return await verifySystem.handleRateServerSubmit(interaction);
+        if (interaction.customId === 'input_rating_modal') {
+          return await verifySystem.handleRatingSubmit(interaction);
         }
-        if (interaction.customId === 'custom_text_modal') {
-          return await verifySystem.handleCustomTextSubmit(interaction);
+        if (interaction.customId === 'give_feedback_modal') {
+          return await verifySystem.handleFeedbackSubmit(interaction);
         }
       }
 
@@ -39,89 +39,67 @@ module.exports = {
       if (interaction.isButton()) {
         const customId = interaction.customId;
         
-        // VERIFY BUTTON
+        // VERIFY BUTTONS
         if (customId === 'verify_account') {
           return await verifySystem.handleVerify(interaction);
         }
-        
-        // SKIP VERIFY BUTTON
         if (customId === 'skip_verify') {
           return await verifySystem.handleSkipVerify(interaction);
         }
-        
-        // CONTINUE VERIFY BUTTON
         if (customId === 'continue_verify') {
           return await verifySystem.handleContinueVerify(interaction);
         }
-        
-        // SAVE PROFILE BUTTON
-        if (customId === 'save_profile') {
-          return await verifySystem.handleSaveProfile(interaction);
-        }
-        
-        // AUTO WELCOME BUTTON
-        if (customId === 'auto_welcome') {
-          return await verifySystem.handleAutoWelcome(interaction);
-        }
-        
-        // CUSTOM MESSAGE BUTTON
-        if (customId === 'custom_message') {
-          return await verifySystem.handleCustomMessage(interaction);
-        }
-        
-        // RATE SERVER BUTTON
-        if (customId === 'rate_server') {
-          return await verifySystem.handleRateServer(interaction);
-        }
-        
-        // GIVE ROLE BUTTON
-        if (customId === 'give_role') {
-          return await verifySystem.handleGiveRole(interaction);
-        }
-        
-        // BACK TO VERIFY BUTTON
         if (customId === 'back_to_verify') {
           return await verifySystem.handleBackToVerify(interaction);
         }
         
+        // SERVER EXPLORATION BUTTONS
+        if (customId === 'server_guild' || customId === 'open_rules' || customId === 'self_role') {
+          return await verifySystem.handleServerExplorationComplete(interaction);
+        }
+        
         // MISSION BUTTONS
-        if (customId === 'skip_mission') {
-          return await verifySystem.handleSkipMission(interaction);
+        if (customId === 'see_mission') {
+          return await verifySystem.handleSeeMission(interaction);
         }
-        if (customId === 'view_mission_details') {
-          return await verifySystem.handleViewMissionDetails(interaction);
-        }
-        if (customId === 'to_channel') {
-          return await verifySystem.handleToChannel(interaction);
+        if (customId === 'understand_mission') {
+          return await verifySystem.handleUnderstandMission(interaction);
         }
         
-        // CUSTOM TEXT BUTTON
-        if (customId === 'custom_text') {
-          return await verifySystem.handleCustomText(interaction);
+        // WELCOME BUTTONS
+        if (customId === 'auto_welcome') {
+          return await verifySystem.handleAutoWelcome(interaction);
         }
-        
-        // SKIP ONBOARDING BUTTON
-        if (customId === 'skip_onboarding') {
-          return await verifySystem.handleSkipOnboarding(interaction);
+        if (customId === 'custom_message') {
+          return await verifySystem.handleCustomMessage(interaction);
+        }
+        if (customId.startsWith('welcome_')) {
+          return await verifySystem.handleWelcomeSelection(interaction);
         }
         
         // RATING BUTTONS
         if (customId === 'input_rating') {
-          return await verifySystem.handleRateServer(interaction);
+          return await verifySystem.handleInputRating(interaction);
         }
-        if (customId === 'next_without_rating') {
-          return await verifySystem.handleNextVerify(interaction);
+        if (customId === 'give_feedback') {
+          return await verifySystem.handleGiveFeedback(interaction);
         }
-        if (customId === 'next_verify') {
-          return await verifySystem.handleNextVerify(interaction);
+        if (customId === 'confirm_rating') {
+          return await verifySystem.showRatingStep(interaction);
+        }
+        if (customId === 'next_final') {
+          return await verifySystem.handleNextFinal(interaction);
         }
         
-        // PROFILE SUMMARY BUTTON
-        if (customId === 'profile_summary') {
-          return await verifySystem.handleProfileSummary(interaction);
+        // FINAL BUTTONS
+        if (customId === 'give_role') {
+          return await verifySystem.handleGiveRole(interaction);
+        }
+        if (customId === 'rate_server') {
+          return await verifySystem.showRatingStep(interaction);
         }
       }
-      
+
       // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
       if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
