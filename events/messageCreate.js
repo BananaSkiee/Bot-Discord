@@ -15,7 +15,7 @@ const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
 const verifySystem = require('../modules/verify');
 
-const verifySystemInstance = new VerifySystem(); // Buat instance
+await verifySystemInstance.detectFirstMessage(message);
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
