@@ -86,65 +86,73 @@ class VerifySystem {
     }
 
     // ========== MAIN VERIFICATION FLOW ==========
-    async handleVerify(interaction) {
-        try {
-            if (this.verificationQueue.has(interaction.user.id)) {
-                return await interaction.reply({
-                    content: '⏳ Verification already in progress. Please wait...',
-                    ephemeral: true
-                });
-            }
+async handleVerify(interaction) {
+    try {
+        if (this.verificationQueue.has(interaction.user.id)) {
+            return await interaction.reply({
+                content: '⏳ Verification already in progress. Please wait...',
+                ephemeral: true
+            });
+        }
 
-            this.verificationQueue.set(interaction.user.id, true);
+        this.verificationQueue.set(interaction.user.id, true);
 
-            if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
-                this.verificationQueue.delete(interaction.user.id);
-                return await interaction.reply({
-                    content: '✅ Anda sudah terverifikasi!',
-                    ephemeral: true
-                });
-            }
-
-            await this.executeVerificationProgress(interaction);
-
-        } catch (error) {
-            console.error('Verify handling error:', error);
+        if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
             this.verificationQueue.delete(interaction.user.id);
-            
+            return await interaction.reply({
+                content: '✅ Anda sudah terverifikasi!',
+                ephemeral: true
+            });
+        }
+
+        // ✅ PERBAIKAN: Defer reply untuk proses yang lama
+        await interaction.deferReply({ ephemeral: true });
+        
+        await this.executeVerificationProgress(interaction);
+
+    } catch (error) {
+        console.error('Verify handling error:', error);
+        this.verificationQueue.delete(interaction.user.id);
+        
+        // ✅ PERBAIKAN: Handle error dengan defer
+        if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({
                 content: '❌ System error. Please try again later.',
                 ephemeral: true
             });
+        } else {
+            await interaction.editReply({
+                content: '❌ System error. Please try again later.'
+            });
         }
     }
+}
 
     async executeVerificationProgress(interaction) {
-        // Random steps selection
-        const selectedSteps = this.getRandomSteps(4);
-        const totalDuration = 10000; // 10 seconds
-        const stepDuration = totalDuration / selectedSteps.length;
+    // Random steps selection
+    const selectedSteps = this.getRandomSteps(4);
+    const totalDuration = 8000; // ✅ KURANGI DURASI jadi 8 detik
+    const stepDuration = totalDuration / selectedSteps.length;
 
-        let currentReply = await interaction.reply({ 
-            embeds: [this.getProgressEmbed(selectedSteps[0], 0, selectedSteps.length)], 
-            ephemeral: true,
-            fetchReply: true
-        });
+    // ✅ PERBAIKAN: Tidak perlu fetchReply karena sudah defer
+    let currentEmbed = this.getProgressEmbed(selectedSteps[0], 0, selectedSteps.length);
+    await interaction.editReply({ embeds: [currentEmbed] });
 
-        for (let i = 0; i < selectedSteps.length; i++) {
-            const step = selectedSteps[i];
-            const progress = ((i + 1) / selectedSteps.length) * 100;
-            
-            await this.delay(stepDuration);
-            const embed = this.getProgressEmbed(step, i + 1, selectedSteps.length);
-            await interaction.editReply({ embeds: [embed] });
-        }
-
-        await this.delay(1000);
-        await this.showVerificationSuccess(interaction);
+    for (let i = 0; i < selectedSteps.length; i++) {
+        const step = selectedSteps[i];
+        const progress = ((i + 1) / selectedSteps.length) * 100;
         
-        this.verificationQueue.delete(interaction.user.id);
+        await this.delay(stepDuration);
+        const embed = this.getProgressEmbed(step, i + 1, selectedSteps.length);
+        await interaction.editReply({ embeds: [embed] });
     }
 
+    await this.delay(1000);
+    await this.showVerificationSuccess(interaction);
+    
+    this.verificationQueue.delete(interaction.user.id);
+    }
+    
     getRandomSteps(count) {
         const shuffled = [...this.verificationSteps].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, count);
@@ -244,53 +252,59 @@ class VerifySystem {
         }
     }
 
-    async handleContinueVerify(interaction) {
-        try {
-            await interaction.deferUpdate();
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🏠 KUNJUNGI AREA SERVER')
-                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags')
-                .setFooter({ text: 'Kunjungi ketiga channel untuk melanjutkan' });
+async handleContinueVerify(interaction) {
+    try {
+        await interaction.deferUpdate(); // ✅ Defer dulu sebelum proses lama
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🏠 KUNJUNGI AREA SERVER')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags')
+            .setFooter({ text: 'Kunjungi ketiga channel untuk melanjutkan' });
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('server_guild')
-                        .setLabel('🏠 SERVER GUILD')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL('https://discord.com/channels/1347233781391560837/@home'),
-                    new ButtonBuilder()
-                        .setCustomId('open_rules')
-                        .setLabel('📋 OPEN RULES')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL('https://discord.com/channels/1347233781391560837/1352326247186694164'),
-                    new ButtonBuilder()
-                        .setCustomId('self_role')
-                        .setLabel('🎨 SELF ROLE')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL('https://discord.com/channels/1347233781391560837/customize-community')
-                );
+        // ✅ PERBAIKAN: Tombol link tidak perlu custom id
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🏠 SERVER GUILD')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL('https://discord.com/channels/1347233781391560837/@home'),
+                new ButtonBuilder()
+                    .setLabel('📋 OPEN RULES')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL('https://discord.com/channels/1347233781391560837/1352326247186694164'),
+                new ButtonBuilder()
+                    .setLabel('🎨 SELF ROLE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL('https://discord.com/channels/1347233781391560837/customize-community')
+            );
 
-            await interaction.editReply({ 
-                embeds: [embed], 
-                components: [buttons] 
+        await interaction.editReply({ 
+            embeds: [embed], 
+            components: [buttons] 
+        });
+
+        this.updateUserSession(interaction.user.id, { 
+            step: 'server_exploration',
+            visitedChannels: []
+        });
+
+    } catch (error) {
+        console.error('Continue verify error:', error);
+        // ✅ PERBAIKAN: Handle error dengan deferUpdate
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({
+                content: '❌ Failed to start server exploration.',
+                ephemeral: true
             });
-
-            this.updateUserSession(interaction.user.id, { 
-                step: 'server_exploration',
-                visitedChannels: []
-            });
-
-        } catch (error) {
-            console.error('Continue verify error:', error);
+        } else {
             await interaction.editReply({
                 content: '❌ Failed to start server exploration.',
                 components: []
             });
         }
     }
+}
 
     async handleServerExplorationComplete(interaction) {
         try {
@@ -304,11 +318,11 @@ class VerifySystem {
 
             const buttons = new ActionRowBuilder()
                 .addComponents(
+                    // ✅ BENAR - tombol link tanpa custom id
                     new ButtonBuilder()
-                        .setCustomId('open_general')
                         .setLabel('🔗 OPEN GENERAL')
                         .setStyle(ButtonStyle.Link)
-                        .setURL('https://discord.com/channels/1347233781391560837/1352404526870560788'),
+                        .setURL('https://discord.com/channels/1347233781391560837/1352404526870560788')
                     new ButtonBuilder()
                         .setCustomId('see_mission')
                         .setLabel('📝 SEE MISSION')
