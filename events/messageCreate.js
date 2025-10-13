@@ -13,9 +13,9 @@ const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-ny
 const beritaCmd = require("../modules/beritaCmd.js");
 const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
-const verifySystem = require('../modules/verify');
+const VerifySystem = require('../modules/verify');
 
-await verifySystemInstance.detectFirstMessage(message);
+const verifySystemInstance = new VerifySystem();
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
@@ -67,7 +67,6 @@ module.exports = {
     await autoChat(message);
     await autoEmoji(message);
     autoReactEmoji.execute(message);
-    await verifySystemInstance.detectFirstMessage(message); // ✅ Pakai instance
     
     const prefix = "!";
     const contentRaw = message.content.trim();
