@@ -12,7 +12,9 @@ const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
 const rulesModule = require("../modules/rules");
-const verifySystem = require('../modules/verify'); // ✅ IMPORT VERIFY SYSTEM
+const VerifySystem = require('../modules/verify'); // ✅ Import class
+
+const verifySystem = new VerifySystem(); // ✅ Buat instance
 
 module.exports = {
   name: "ready",
