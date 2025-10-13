@@ -13,6 +13,9 @@ const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-ny
 const beritaCmd = require("../modules/beritaCmd.js");
 const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
+const verifySystem = require('../modules/verify');
+
+const verifySystemInstance = new VerifySystem(); // Buat instance
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
@@ -56,7 +59,7 @@ const ROLE_DISPLAY_MAP = {
 
 module.exports = {
   name: "messageCreate",
-  async execute(message, client) {
+  async execute(message) {
     if (message.author.bot) return;
  // Panggil fungsi-fungsinya saat ada pesan baru
     await countValidator(message);
@@ -64,6 +67,7 @@ module.exports = {
     await autoChat(message);
     await autoEmoji(message);
     autoReactEmoji.execute(message);
+    await verifySystemInstance.detectFirstMessage(message); // ✅ Pakai instance
     
     const prefix = "!";
     const contentRaw = message.content.trim();
@@ -102,8 +106,6 @@ if (command === 'testwelcome') { // Menggunakan 'command' dari struktur kode And
     try {
         const imageBuffer = await generateWelcomeCard(member);
         const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
-
-const { EmbedBuilder } = require('discord.js');
 
 // Fungsi warna acak HEX
 function getRandomColor() {
