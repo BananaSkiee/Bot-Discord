@@ -12,9 +12,10 @@ const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
 const rulesModule = require("../modules/rules");
-const VerifySystem = require('../modules/verify'); // ✅ Import class
+const VerifySystem = require('../modules/verify'); // ✅ IMPORT CLASS
 
-const verifySystem = new VerifySystem(); // ✅ Buat instance
+// ✅ BUAT INSTANCE VERIFY SYSTEM
+const verifySystem = new VerifySystem();
 
 module.exports = {
   name: "ready",
@@ -65,7 +66,7 @@ module.exports = {
         console.error('❌ Gagal mengirim rules:', error);
     }
 
-    // ... KODE LAINNYA UNTUK FITUR EXISTING TETAP SAMA ...
+    // ... KODE LAINNYA TETAP SAMA ...
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((guild) => {
       console.log(`- ${guild.name} (ID: ${guild.id})`);
