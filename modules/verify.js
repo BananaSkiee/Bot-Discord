@@ -47,11 +47,6 @@ class VerifySystem {
                 }
             ]
         };
-
-        // Bind methods
-        this.handleInteraction = this.handleInteraction.bind(this);
-        this.handleModalSubmit = this.handleModalSubmit.bind(this);
-        this.detectFirstMessage = this.detectFirstMessage.bind(this);
     }
 
     // ========== INITIALIZATION ==========
@@ -125,62 +120,55 @@ class VerifySystem {
                 });
             }
 
+            // Quick verification process
             await interaction.reply({ 
                 content: '🔄 Memulai verifikasi...', 
                 flags: 64 
             });
 
-            await this.executeQuickVerification(interaction);
+            const steps = [
+                { name: "Security Check", emoji: "🔐", duration: 800 },
+                { name: "Profile Analysis", emoji: "🤖", duration: 800 },
+                { name: "Final Verification", emoji: "✅", duration: 800 }
+            ];
+
+            let currentMessage = await interaction.fetchReply();
+
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                const progress = ((i + 1) / steps.length) * 100;
+                
+                const embed = new EmbedBuilder()
+                    .setColor(0x3498db)
+                    .setTitle(`${step.emoji} PROSES VERIFIKASI - ${Math.round(progress)}%`)
+                    .setDescription(`${step.name} sedang berjalan...\n\n${this.generateProgressBar(progress)}`)
+                    .setFooter({ text: `Step ${i + 1}/${steps.length}` });
+
+                await interaction.editReply({ embeds: [embed] });
+                await this.delay(step.duration);
+            }
+
+            await this.showVerificationSuccess(interaction);
+            this.verificationQueue.delete(interaction.user.id);
 
         } catch (error) {
             console.error('Verify handling error:', error);
             this.verificationQueue.delete(interaction.user.id);
             
+            if (error.code === 10062) {
+                console.log('⚠️ Interaction expired');
+                return;
+            }
+            
             try {
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({
-                        content: '❌ System error. Please try again later.'
-                    });
-                } else {
-                    await interaction.reply({
-                        content: '❌ System error. Please try again later.',
-                        flags: 64
-                    });
-                }
+                await interaction.reply({
+                    content: '❌ System error. Please try again later.',
+                    flags: 64
+                });
             } catch (e) {
                 console.error('Failed to send error message:', e);
             }
         }
-    }
-
-    async executeQuickVerification(interaction) {
-        const steps = [
-            { name: "Security Check", emoji: "🔐", duration: 800 },
-            { name: "Profile Analysis", emoji: "🤖", duration: 800 },
-            { name: "Final Verification", emoji: "✅", duration: 800 }
-        ];
-
-        let currentMessage = await interaction.fetchReply();
-
-        for (let i = 0; i < steps.length; i++) {
-            const step = steps[i];
-            const progress = ((i + 1) / steps.length) * 100;
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x3498db)
-                .setTitle(`${step.emoji} PROSES VERIFIKASI - ${Math.round(progress)}%`)
-                .setDescription(`${step.name} sedang berjalan...\n\n${this.generateProgressBar(progress)}`)
-                .setFooter({ text: `Step ${i + 1}/${steps.length}` });
-
-            await interaction.editReply({ 
-                embeds: [embed] 
-            });
-
-            await this.delay(step.duration);
-        }
-
-        await this.showVerificationSuccess(interaction);
-        this.verificationQueue.delete(interaction.user.id);
     }
 
     generateProgressBar(percentage) {
@@ -191,30 +179,45 @@ class VerifySystem {
     }
 
     async showVerificationSuccess(interaction) {
-        const embed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('🎊 VERIFIKASI BERHASIL')
-            .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\n**PILIHAN LANJUTAN:**\n[🚀 SKIP VERIFY] - Langsung dapat role\n[🎯 CONTINUE VERIFY] - Lanjut verifikasi lengkap\n\n**⚠️ CATATAN PENTING:**\n• Setelah memilih CONTINUE VERIFY, tidak bisa kembali ke step ini\n• Setelah mendapatkan role member, channel verify akan hilang`)
-            .setFooter({ text: 'Platinum Member • Professional Network' });
+        try {
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('🎊 VERIFIKASI BERHASIL')
+                .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\n**PILIHAN LANJUTAN:**\n[🚀 SKIP VERIFY] - Langsung dapat role\n[🎯 CONTINUE VERIFY] - Lanjut verifikasi lengkap\n\n**⚠️ CATATAN PENTING:**\n• Setelah memilih CONTINUE VERIFY, tidak bisa kembali ke step ini\n• Setelah mendapatkan role member, channel verify akan hilang`)
+                .setFooter({ text: 'Platinum Member • Professional Network' });
 
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('skip_verify')
-                    .setLabel('🚀 SKIP VERIFY')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('continue_verify')
-                    .setLabel('🎯 CONTINUE VERIFY')
-                    .setStyle(ButtonStyle.Primary)
-            );
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('skip_verify')
+                        .setLabel('🚀 SKIP VERIFY')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('continue_verify')
+                        .setLabel('🎯 CONTINUE VERIFY')
+                        .setStyle(ButtonStyle.Primary)
+                );
 
-        await interaction.editReply({ 
-            embeds: [embed], 
-            components: [buttons] 
-        });
+            if (interaction.replied || interaction.deferred) {
+                await interaction.editReply({ 
+                    embeds: [embed], 
+                    components: [buttons] 
+                });
+            } else {
+                await interaction.reply({ 
+                    embeds: [embed], 
+                    components: [buttons],
+                    flags: 64
+                });
+            }
 
-        this.createUserSession(interaction.user.id);
+            this.createUserSession(interaction.user.id);
+
+        } catch (error) {
+            console.error('Show verification success error:', error);
+            if (error.code === 10062) return;
+            throw error;
+        }
     }
 
     // ========== BUTTON HANDLERS ==========
@@ -285,14 +288,14 @@ class VerifySystem {
                         .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
                 );
 
-            await interaction.editReply({ 
+            const reply = await interaction.editReply({ 
                 embeds: [embed], 
                 components: [linkButtons] 
             });
 
             this.updateUserSession(interaction.user.id, { 
                 step: 'server_exploration',
-                visitedChannels: [],
+                explorationMessageId: reply.id,
                 explorationStart: Date.now()
             });
 
@@ -301,7 +304,7 @@ class VerifySystem {
                 try {
                     const currentSession = this.getUserSession(interaction.user.id);
                     if (currentSession && currentSession.step === 'server_exploration') {
-                        await this.handleServerExplorationComplete(interaction);
+                        await this.autoProceedServerExploration(interaction, currentSession);
                     }
                 } catch (error) {
                     console.error('Auto server exploration complete error:', error);
@@ -317,17 +320,17 @@ class VerifySystem {
         }
     }
 
-    async handleServerExplorationComplete(interaction) {
+    async autoProceedServerExploration(originalInteraction, session) {
         try {
-            await interaction.deferUpdate();
+            const channel = await originalInteraction.client.channels.fetch(this.config.verifyChannelId);
+            const message = await channel.messages.fetch(session.explorationMessageId);
             
-            const session = this.getUserSession(interaction.user.id);
             const explorationTime = Date.now() - (session.explorationStart || Date.now());
             
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
+                .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${originalInteraction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
                 .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
 
             const linkButton = new ActionRowBuilder()
@@ -346,23 +349,21 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
 
-            await interaction.editReply({ 
+            await message.edit({ 
                 embeds: [embed], 
                 components: [linkButton, actionButton] 
             });
 
-            this.updateUserSession(interaction.user.id, { 
+            this.updateUserSession(originalInteraction.user.id, { 
                 step: 'introduction_mission',
                 missionStartTime: Date.now(),
                 explorationTime: explorationTime
             });
 
+            console.log(`✅ Auto proceeded user ${originalInteraction.user.username} to mission`);
+
         } catch (error) {
-            console.error('Server exploration error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to proceed.',
-                components: []
-            });
+            console.error('Auto proceed server exploration error:', error);
         }
     }
 
@@ -411,7 +412,6 @@ class VerifySystem {
         try {
             const session = this.getUserSession(user.id);
             
-            // Cek jika welcome sudah dikirim
             if (session && session.welcomeSent) {
                 return null;
             }
@@ -904,26 +904,15 @@ class VerifySystem {
             if (message.channel.id !== this.config.generalChannelId) return;
             if (message.author.bot) return;
 
-            // Cek jika user sudah punya role member - JANGAN KIRIM WELCOME
+            // ✅ CHECK 1: USER UDAH PUNYA ROLE MEMBER? → STOP
             if (message.member.roles.cache.has(this.config.memberRoleId)) {
                 return;
             }
 
             const session = this.getUserSession(message.author.id);
             
-            // Untuk user SKIP VERIFY (tanpa session) - kirim welcome sekali
-            if (!session) {
-                await this.sendWelcomeMessage(message.author, message.client);
-                this.createUserSession(message.author.id);
-                this.updateUserSession(message.author.id, {
-                    step: 'skip_welcome_sent',
-                    welcomeSent: true
-                });
-                return;
-            }
-
-            // Untuk user CONTINUE VERIFY - process normal
-            if (session.step === 'introduction_mission' && !session.data.firstMessage) {
+            // ✅ CHECK 2: USER LAGI MISI PERKENALAN? → PROCESS
+            if (session && session.step === 'introduction_mission') {
                 session.data.firstMessage = message.content;
                 session.data.firstMessageTime = Date.now();
                 session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
@@ -932,14 +921,29 @@ class VerifySystem {
 
                 await this.sendWelcomeMessage(message.author, message.client);
                 
-                // Auto lanjut ke rating setelah 3 detik
+                // Auto lanjut ke rating
                 setTimeout(async () => {
-                    try {
-                        await this.showRatingStepFromMessage(message);
-                    } catch (error) {
-                        console.error('Auto rating transition error:', error);
-                    }
+                    await this.showRatingStepFromMessage(message);
                 }, 3000);
+                return;
+            }
+
+            // ✅ CHECK 3: USER UDAH SELESAI/SKIP? → STOP  
+            if (session && (session.step === 'completed' || session.step === 'skip_welcome_sent')) {
+                return;
+            }
+
+            // ✅ CHECK 4: USER BELUM VERIFY? → KIRIM WELCOME SEKALI
+            if (!session) {
+                await this.sendWelcomeMessage(message.author, message.client);
+                
+                // Buat session biar ga spam
+                this.createUserSession(message.author.id);
+                this.updateUserSession(message.author.id, {
+                    step: 'skip_welcome_sent',
+                    welcomeSent: true
+                });
+                return;
             }
 
         } catch (error) {
@@ -1010,7 +1014,6 @@ class VerifySystem {
             if (customId === 'continue_verify') return await this.handleContinueVerify(interaction);
             
             // Server exploration
-            if (customId === 'server_exploration_complete') return await this.handleServerExplorationComplete(interaction);
             if (customId === 'see_mission') return await this.handleSeeMission(interaction);
             if (customId === 'understand_mission') return await this.handleUnderstandMission(interaction);
             
@@ -1034,6 +1037,12 @@ class VerifySystem {
 
         } catch (error) {
             console.error('Interaction handling error:', error);
+            
+            if (error.code === 10062) {
+                console.log('⚠️ Interaction expired');
+                return;
+            }
+            
             try {
                 if (interaction.deferred || interaction.replied) {
                     await interaction.editReply({ content: '❌ Terjadi kesalahan sistem.', components: [] });
