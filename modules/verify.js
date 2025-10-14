@@ -994,57 +994,80 @@ async fallbackProceedServerExploration(originalInteraction) {
     }
 
     // ========== MESSAGE DETECTION ==========
-    async detectFirstMessage(message) {
-        try {
-            if (message.channel.id !== this.config.generalChannelId) return;
-            if (message.author.bot) return;
+async detectFirstMessage(message) {
+    try {
+        if (message.channel.id !== this.config.generalChannelId) return;
+        if (message.author.bot) return;
 
-            // ✅ CHECK 1: USER UDAH PUNYA ROLE MEMBER? → STOP
-            if (message.member.roles.cache.has(this.config.memberRoleId)) {
-                return;
-            }
+        console.log(`🔍 Detect message from: ${message.author.username}`);
+        console.log(`📝 Message: ${message.content}`);
+        console.log(`📍 Channel: ${message.channel.name} (${message.channel.id})`);
 
-            const session = this.getUserSession(message.author.id);
-            
-            // ✅ CHECK 2: USER LAGI MISI PERKENALAN? → PROCESS
-            if (session && session.step === 'introduction_mission') {
-                session.data.firstMessage = message.content;
-                session.data.firstMessageTime = Date.now();
-                session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
-                session.step = 'ready_for_rating';
-                this.updateUserSession(message.author.id, session);
-
-                await this.sendWelcomeMessage(message.author, message.client);
-                
-                // Auto lanjut ke rating
-                setTimeout(async () => {
-                    await this.showRatingStepFromMessage(message);
-                }, 3000);
-                return;
-            }
-
-            // ✅ CHECK 3: USER UDAH SELESAI/SKIP? → STOP  
-            if (session && (session.step === 'completed' || session.step === 'skip_welcome_sent')) {
-                return;
-            }
-
-            // ✅ CHECK 4: USER BELUM VERIFY? → KIRIM WELCOME SEKALI
-            if (!session) {
-                await this.sendWelcomeMessage(message.author, message.client);
-                
-                // Buat session biar ga spam
-                this.createUserSession(message.author.id);
-                this.updateUserSession(message.author.id, {
-                    step: 'skip_welcome_sent',
-                    welcomeSent: true
-                });
-                return;
-            }
-
-        } catch (error) {
-            console.error('First message detection error:', error);
+        // ✅ CHECK 1: USER UDAH PUNYA ROLE MEMBER? → STOP
+        if (message.member.roles.cache.has(this.config.memberRoleId)) {
+            console.log(`🛑 ${message.author.username} sudah punya role, skip`);
+            return;
         }
+
+        const session = this.getUserSession(message.author.id);
+        console.log(`📊 Session step: ${session?.step}`);
+        console.log(`👤 User ID: ${message.author.id}`);
+        
+        // ✅ CHECK 2: USER LAGI MISI PERKENALAN? → PROCESS
+        if (session && session.step === 'introduction_mission') {
+            console.log(`🎯 ${message.author.username} sedang mission, PROCESS...`);
+            
+            session.data.firstMessage = message.content;
+            session.data.firstMessageTime = Date.now();
+            session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
+            session.step = 'ready_for_rating';
+            this.updateUserSession(message.author.id, session);
+
+            console.log(`✅ Session updated to: ready_for_rating`);
+            
+            await this.sendWelcomeMessage(message.author, message.client);
+            
+            console.log(`⏰ Auto lanjut rating dalam 3 detik...`);
+            
+            // Auto lanjut ke rating
+            setTimeout(async () => {
+                try {
+                    console.log(`🚀 Executing showRatingStepFromMessage for ${message.author.username}`);
+                    await this.showRatingStepFromMessage(message);
+                } catch (error) {
+                    console.error('Auto rating transition error:', error);
+                }
+            }, 3000);
+            return;
+        }
+
+        // ✅ CHECK 3: USER UDAH SELESAI/SKIP? → STOP  
+        if (session && (session.step === 'completed' || session.step === 'skip_welcome_sent')) {
+            console.log(`🛑 ${message.author.username} sudah selesai, skip welcome`);
+            return;
+        }
+
+        // ✅ CHECK 4: USER BELUM VERIFY? → KIRIM WELCOME SEKALI
+        if (!session) {
+            console.log(`👋 ${message.author.username} belum verify, kirim welcome sekali`);
+            await this.sendWelcomeMessage(message.author, message.client);
+            
+            // Buat session biar ga spam
+            this.createUserSession(message.author.id);
+            this.updateUserSession(message.author.id, {
+                step: 'skip_welcome_sent',
+                welcomeSent: true
+            });
+            return;
+        }
+
+        // ✅ CHECK 5: USER DI STEP LAIN? → LOG SAJA
+        console.log(`ℹ️ ${message.author.username} di step: ${session.step}, no action`);
+
+    } catch (error) {
+        console.error('First message detection error:', error);
     }
+}
 
 async showRatingStepFromMessage(message) {
     try {
