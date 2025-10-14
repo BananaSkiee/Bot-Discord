@@ -1051,51 +1051,43 @@ async showRatingStepFromMessage(message) {
         const session = this.getUserSession(message.author.id);
         if (!session || session.step !== 'ready_for_rating') return;
 
+        console.log(`🔍 Mencari message untuk user: ${message.author.username}`);
+
         const verifyChannel = await message.client.channels.fetch(this.config.verifyChannelId);
         
-        // ✅ CARI MESSAGE DENGAN FALLBACK
-        let userMessage;
-        try {
-            const messages = await verifyChannel.messages.fetch({ limit: 50 });
-            userMessage = messages.find(msg => 
-                msg.author.id === message.client.user.id && 
-                msg.embeds.length > 0 &&
-                msg.embeds[0].description?.includes(message.author.username) &&
-                msg.components.length > 0
-            );
-        } catch (error) {
-            console.error('Error fetching messages:', error);
-            return;
-        }
+        // ✅ CARI SEMUA MESSAGE USER DI CHANNEL VERIFY
+        const messages = await verifyChannel.messages.fetch({ limit: 50 });
+        
+        const userMessage = messages.find(msg => 
+            msg.author.id === message.client.user.id && 
+            msg.components.length > 0 // ADA TOMBOL
+        );
 
-        if (!userMessage) {
-            console.log(`❌ Cannot find verify message for user ${message.author.username}`);
-            return;
-        }
+        if (userMessage) {
+            console.log(`✅ Found message for ${message.author.username}`);
+            
+            const embed = new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setTitle('⭐ BERI PENILAIAN')
+                .setDescription('Bagaimana pengalaman verifikasi di server ini?\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa')
+                .setFooter({ text: 'Bantu kami improve experience' });
 
-        const embed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle('⭐ BERI PENILAIAN')
-            .setDescription('Bagaimana pengalaman verifikasi di server ini?\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa\n\n**💡 Info:** \n• INPUT RATING: Beri rating 1-100 (wajib untuk lanjut)\n• GIVE FEEDBACK: Beri masukan tambahan (opsional)  \n• FAQS: Bantuan & pertanyaan umum (opsional)')
-            .setFooter({ text: 'Bantu kami improve experience' });
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('input_rating')
+                        .setLabel('🎯 INPUT RATING')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId('give_feedback')
+                        .setLabel('💬 GIVE FEEDBACK')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('faqs_rating')
+                        .setLabel('❓ FAQS')
+                        .setStyle(ButtonStyle.Secondary)
+                );
 
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('input_rating')
-                    .setLabel('🎯 INPUT RATING')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('give_feedback')
-                    .setLabel('💬 GIVE FEEDBACK')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('faqs_rating')
-                    .setLabel('❓ FAQS')
-                    .setStyle(ButtonStyle.Secondary)
-            );
-
-        try {
             await userMessage.edit({ 
                 embeds: [embed], 
                 components: [buttons] 
@@ -1104,19 +1096,15 @@ async showRatingStepFromMessage(message) {
             session.step = 'rating';
             this.updateUserSession(message.author.id, session);
             
-            console.log(`✅ Rating step shown for user ${message.author.username}`);
-        } catch (error) {
-            if (error.code === 10008) {
-                console.log(`❌ Message not found for user ${message.author.username}`);
-                return;
-            }
-            throw error;
+            console.log(`✅ Rating step shown for ${message.author.username}`);
+        } else {
+            console.log(`❌ No message found for ${message.author.username}`);
         }
 
     } catch (error) {
         console.error('Show rating from message error:', error);
     }
-                }
+                      }
 
     // ========== INTERACTION HANDLER ==========
     async handleInteraction(interaction) {
