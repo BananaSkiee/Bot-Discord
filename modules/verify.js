@@ -277,10 +277,10 @@ async handleContinueVerify(interaction) {
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('🏠 KUNJUNGI AREA SERVER')
-            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel, lalu kembali ke sini.')
             .setFooter({ text: 'Kunjungi ketiga channel untuk melanjutkan' });
 
-        // ✅ TOMBOL LINK - HANYA PAKAI URL, TANPA CUSTOM ID
+        // ✅ TOMBOL LINK SAJA - TIDAK ADA TOMBOL "SELESAI"
         const linkButtons = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
@@ -297,25 +297,29 @@ async handleContinueVerify(interaction) {
                     .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
             );
 
-        // ✅ TOMBOL ACTION - PAKAI CUSTOM ID, TANPA URL
-        const actionButton = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('server_exploration_complete')
-                    .setLabel('✅ SELESAI KUNJUNGI')
-                    .setStyle(ButtonStyle.Success)
-            );
-
         await interaction.editReply({ 
             embeds: [embed], 
-            components: [linkButtons, actionButton] 
+            components: [linkButtons] 
         });
 
+        // ✅ TRACK WINDOW OPEN - AUTO LANJUT SETELAH 30 DETIK
         this.updateUserSession(interaction.user.id, { 
             step: 'server_exploration',
             visitedChannels: [],
             explorationStart: Date.now()
         });
+
+        // ✅ AUTO LANJUT KE STEP BERIKUTNYA SETELAH 30 DETIK
+        setTimeout(async () => {
+            try {
+                const currentSession = this.getUserSession(interaction.user.id);
+                if (currentSession && currentSession.step === 'server_exploration') {
+                    await this.handleServerExplorationComplete(interaction);
+                }
+            } catch (error) {
+                console.error('Auto server exploration complete error:', error);
+            }
+        }, 30000); // 30 detik
 
     } catch (error) {
         console.error('Continue verify error:', error);
@@ -324,7 +328,7 @@ async handleContinueVerify(interaction) {
             components: []
         });
     }
-                }
+        }
     
 async handleServerExplorationComplete(interaction) {
     try {
@@ -418,47 +422,55 @@ async handleServerExplorationComplete(interaction) {
     }
 
     // ========== WELCOME SYSTEM ==========
-    async sendWelcomeMessage(user, client) {
-        try {
-            const generalChannel = await client.channels.fetch(this.config.generalChannelId);
-            if (!generalChannel) return;
-
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('🎉 SELAMAT DATANG!')
-                .setDescription(`Selamat datang **${user.username}** di BananaSkiee Community! 🏆\n\n**Pertanyaan Icebreaker:**\n• Game favorit apa yang sering dimainkan?\n• Mata pelajaran apa yang paling disukai?\n• Punya hobi atau kegiatan seru lainnya?`)
-                .setFooter({ text: '#NewMember #Welcome' });
-
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('auto_welcome')
-                        .setLabel('👋 AUTO WELCOME')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('custom_message')
-                        .setLabel('💬 CUSTOM MESSAGE')
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            const welcomeMessage = await generalChannel.send({ 
-                content: `🎉 Welcome ${user}!`,
-                embeds: [embed], 
-                components: [buttons] 
-            });
-
-            const session = this.getUserSession(user.id);
-            if (session) {
-                session.welcomeMessageId = welcomeMessage.id;
-                this.updateUserSession(user.id, session);
-            }
-
-            return welcomeMessage;
-
-        } catch (error) {
-            console.error('Send welcome error:', error);
+async sendWelcomeMessage(user, client) {
+    try {
+        const session = this.getUserSession(user.id);
+        
+        // ✅ CEK JIKA WELCOME SUDAH PERNAH DIKIRIM
+        if (session && session.welcomeSent) {
+            return null; // Jangan kirim welcome lagi
         }
+
+        const generalChannel = await client.channels.fetch(this.config.generalChannelId);
+        if (!generalChannel) return;
+
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🎉 SELAMAT DATANG!')
+            .setDescription(`Selamat datang **${user.username}** di BananaSkiee Community! 🏆\n\n**Pertanyaan Icebreaker:**\n• Game favorit apa yang sering dimainkan?\n• Mata pelajaran apa yang paling disukai?\n• Punya hobi atau kegiatan seru lainnya?`)
+            .setFooter({ text: '#NewMember #Welcome' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('auto_welcome')
+                    .setLabel('👋 AUTO WELCOME')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('custom_message')
+                    .setLabel('💬 CUSTOM MESSAGE')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+        const welcomeMessage = await generalChannel.send({ 
+            content: `🎉 Welcome ${user}!`,
+            embeds: [embed], 
+            components: [buttons] 
+        });
+
+        // ✅ TANDAI WELCOME SUDAH DIKIRIM
+        if (session) {
+            session.welcomeSent = true;
+            session.welcomeMessageId = welcomeMessage.id;
+            this.updateUserSession(user.id, session);
+        }
+
+        return welcomeMessage;
+
+    } catch (error) {
+        console.error('Send welcome error:', error);
     }
+}
 
     async handleAutoWelcome(interaction) {
         try {
@@ -903,67 +915,109 @@ async handleServerExplorationComplete(interaction) {
     }
 
     // ========== MESSAGE DETECTION ==========
-    async detectFirstMessage(message) {
-        try {
-            if (message.channel.id !== this.config.generalChannelId) return;
-            if (message.author.bot) return;
+async detectFirstMessage(message) {
+    try {
+        if (message.channel.id !== this.config.generalChannelId) return;
+        if (message.author.bot) return;
 
-            const session = this.getUserSession(message.author.id);
-            
-            if (!session) {
-                await this.sendWelcomeMessage(message.author, message.client);
-                return;
-            }
-
-            if (session.step === 'introduction_mission') {
-                session.data.firstMessage = message.content;
-                session.data.firstMessageTime = Date.now();
-                session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
-                session.step = 'ready_for_rating';
-                this.updateUserSession(message.author.id, session);
-
-                await this.sendWelcomeMessage(message.author, message.client);
-                
-                setTimeout(async () => {
-                    try {
-                        await this.showRatingStepFromMessage(message);
-                    } catch (error) {
-                        console.error('Auto rating transition error:', error);
-                    }
-                }, 3000);
-            }
-
-        } catch (error) {
-            console.error('First message detection error:', error);
+        // ✅ CEK JIKA USER SUDAH PUNYA ROLE MEMBER - JANGAN KIRIM WELCOME LAGI
+        if (message.member.roles.cache.has(this.config.memberRoleId)) {
+            return; // User sudah jadi member, skip welcome
         }
-    }
 
-    async showRatingStepFromMessage(message) {
-        try {
-            const session = this.getUserSession(message.author.id);
-            if (!session || session.step !== 'ready_for_rating') return;
-
-            const verifyChannel = await message.client.channels.fetch(this.config.verifyChannelId);
-            const messages = await verifyChannel.messages.fetch({ limit: 50 });
+        const session = this.getUserSession(message.author.id);
+        
+        // ✅ UNTUK USER SKIP VERIFY (tanpa session) - KIRIM WELCOME SEKALI SAJA
+        if (!session) {
+            await this.sendWelcomeMessage(message.author, message.client);
             
-            const userMessage = messages.find(msg => 
-                msg.author.id === message.client.user.id && 
-                msg.embeds.length > 0 &&
-                msg.embeds[0].description?.includes(message.author.username)
-            );
-
-            if (userMessage) {
-                await this.showRatingStep({ 
-                    user: message.author,
-                    editReply: (content) => userMessage.edit(content),
-                    deferUpdate: () => Promise.resolve()
-                });
-            }
-
-        } catch (error) {
-            console.error('Show rating from message error:', error);
+            // Tandai user sudah dikirim welcome (prevent spam)
+            this.createUserSession(message.author.id);
+            this.updateUserSession(message.author.id, {
+                step: 'skip_welcome_sent',
+                welcomeSent: true
+            });
+            return;
         }
+
+        // ✅ UNTUK USER CONTINUE VERIFY - PROCESS NORMAL
+        if (session.step === 'introduction_mission' && !session.data.firstMessage) {
+            session.data.firstMessage = message.content;
+            session.data.firstMessageTime = Date.now();
+            session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
+            session.step = 'ready_for_rating';
+            this.updateUserSession(message.author.id, session);
+
+            // Kirim welcome message
+            await this.sendWelcomeMessage(message.author, message.client);
+            
+            // ✅ AUTO LANJUT KE RATING SETELAH 3 DETIK
+            setTimeout(async () => {
+                try {
+                    await this.showRatingStepFromMessage(message);
+                } catch (error) {
+                    console.error('Auto rating transition error:', error);
+                }
+            }, 3000);
+        }
+
+    } catch (error) {
+        console.error('First message detection error:', error);
     }
+        }
+
+async showRatingStepFromMessage(message) {
+    try {
+        const session = this.getUserSession(message.author.id);
+        if (!session || session.step !== 'ready_for_rating') return;
+
+        // ✅ CARI ORIGINAL VERIFY MESSAGE USER
+        const verifyChannel = await message.client.channels.fetch(this.config.verifyChannelId);
+        const messages = await verifyChannel.messages.fetch({ limit: 100 });
+        
+        const userMessage = messages.find(msg => 
+            msg.author.id === message.client.user.id && 
+            msg.embeds.length > 0 &&
+            msg.embeds[0].description?.includes(message.author.username) &&
+            msg.components.length > 0 // Pastikan ada tombol
+        );
+
+        if (userMessage) {
+            const embed = new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setTitle('⭐ BERI PENILAIAN')
+                .setDescription('Bagaimana pengalaman verifikasi di server ini?\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa\n\n**💡 Info:** \n• INPUT RATING: Beri rating 1-100 (wajib untuk lanjut)\n• GIVE FEEDBACK: Beri masukan tambahan (opsional)  \n• FAQS: Bantuan & pertanyaan umum (opsional)')
+                .setFooter({ text: 'Bantu kami improve experience' });
+
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('input_rating')
+                        .setLabel('🎯 INPUT RATING')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId('give_feedback')
+                        .setLabel('💬 GIVE FEEDBACK')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('faqs_rating')
+                        .setLabel('❓ FAQS')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+            await userMessage.edit({ 
+                embeds: [embed], 
+                components: [buttons] 
+            });
+            
+            session.step = 'rating';
+            this.updateUserSession(message.author.id, session);
+        }
+
+    } catch (error) {
+        console.error('Show rating from message error:', error);
+    }
+}
 
     // ========== INTERACTION HANDLER ==========
     async handleInteraction(interaction) {
@@ -1193,31 +1247,30 @@ async handleServerExplorationComplete(interaction) {
     }
 
     // ========== SESSION MANAGEMENT ==========
-    createUserSession(userId) {
-        const session = {
-            id: userId,
-            createdAt: Date.now(),
-            step: 'verified',
-            data: {},
-            lastActivity: Date.now()
-        };
-        
-        this.userSessions.set(userId, session);
-        return session;
-    }
-
-    getUserSession(userId) {
+createUserSession(userId) {
+    // ✅ CEK JIKA SUDAH ADA SESSION - JANGAN BUAT BARU
+    if (this.userSessions.has(userId)) {
         return this.userSessions.get(userId);
     }
+    
+    const session = {
+        id: userId,
+        createdAt: Date.now(),
+        step: 'verified',
+        data: {},
+        lastActivity: Date.now(),
+        welcomeSent: false // ✅ FLAG UNTUK CEK WELCOME SUDAH DIKIRIM
+    };
+    
+    this.userSessions.set(userId, session);
+    return session;
+}
 
-    updateUserSession(userId, updates) {
-        const session = this.getUserSession(userId);
-        if (session) {
-            Object.assign(session, updates, { lastActivity: Date.now() });
-            this.userSessions.set(userId, session);
-        }
-        return session;
-    }
+// ✅ METHOD UNTUK CEK APAKAH USER SUDAH COMPLETE
+isUserCompleted(userId) {
+    const session = this.getUserSession(userId);
+    return session && (session.step === 'completed' || session.step === 'skip_welcome_sent');
+}
 
     // ========== UTILITY METHODS ==========
     delay(ms) {
