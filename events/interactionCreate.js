@@ -54,8 +54,29 @@ module.exports = {
         }
         
         // SERVER EXPLORATION BUTTONS
-        if (customId === 'server_guild' || customId === 'open_rules' || customId === 'self_role') {
+        if (customId === 'server_exploration_complete') {
           return await verifySystem.handleServerExplorationComplete(interaction);
+        }
+        if (customId === 'server_guild' || customId === 'open_rules' || customId === 'self_role') {
+          // Track channel visits untuk server exploration
+          const session = verifySystem.getUserSession(interaction.user.id);
+          if (session && session.step === 'server_exploration') {
+            const channelType = customId === 'server_guild' ? 'home' : 
+                              customId === 'open_rules' ? 'rules' : 'customize';
+            
+            if (!session.visitedChannels) session.visitedChannels = [];
+            if (!session.visitedChannels.includes(channelType)) {
+              session.visitedChannels.push(channelType);
+              verifySystem.updateUserSession(interaction.user.id, session);
+            }
+            
+            // Kirim feedback bahwa channel berhasil dikunjungi
+            await interaction.reply({
+              content: `✅ Berhasil mengunjungi ${channelType === 'home' ? 'Server Home' : channelType === 'rules' ? 'Rules' : 'Customize Profile'}!`,
+              ephemeral: true
+            });
+          }
+          return;
         }
         
         // MISSION BUTTONS
@@ -64,6 +85,10 @@ module.exports = {
         }
         if (customId === 'understand_mission') {
           return await verifySystem.handleUnderstandMission(interaction);
+        }
+        if (customId === 'open_general') {
+          // Ini tombol link, tidak perlu handler khusus
+          return;
         }
         
         // WELCOME BUTTONS
@@ -90,91 +115,52 @@ module.exports = {
         if (customId === 'next_final') {
           return await verifySystem.handleNextFinal(interaction);
         }
-        
-        // FINAL BUTTONS
-        if (customId === 'give_role') {
-          return await verifySystem.handleGiveRole(interaction);
-        }
         if (customId === 'rate_server') {
           return await verifySystem.showRatingStep(interaction);
         }
-      }
+        
+        // FAQ BUTTONS
+        if (customId === 'faqs_skip' || customId === 'faqs_rating') {
+          return await verifySystem.handleFaqs(interaction);
+        }
+        
+        // FINAL BUTTONS
+        if (customId === 'give_role_skip' || customId === 'give_role_final') {
+          return await verifySystem.handleGiveRole(interaction);
+        }
+            }
 
       // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
-      if (interaction.isStringSelectMenu()) {
-        const customId = interaction.customId;
+      if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
+        const selected = interaction.values[0];
         
-        if (customId === 'select_purpose') {
-          const session = verifySystem.getUserSession(interaction.user.id);
-          if (session) {
-            session.data.purpose = interaction.values[0];
-            verifySystem.updateUserSession(interaction.user.id, session);
-          }
-          await interaction.reply({ 
-            content: `✅ Tujuan dipilih: ${interaction.values[0]}`,
-            ephemeral: true 
-          });
-          return;
+        const rulesModule = require('../modules/rules');
+        const rules = await rulesModule.execute(interaction.client);
+        
+        let embed;
+        
+        switch(selected) {
+            case 'leveling':
+                embed = rules.levelingEmbed;
+                break;
+            case 'moderation':
+                embed = rules.moderationPolicyEmbed;
+                break;
+            case 'counting':
+                embed = rules.countingEmbed;
+                break;
+            default:
+                embed = new EmbedBuilder()
+                    .setTitle("❌ Information Not Found")
+                    .setDescription("Sorry, the selected option is not available.")
+                    .setColor(0xFF0000);
         }
         
-        if (customId === 'select_experience') {
-          const session = verifySystem.getUserSession(interaction.user.id);
-          if (session) {
-            session.data.experience = interaction.values[0];
-            verifySystem.updateUserSession(interaction.user.id, session);
-          }
-          await interaction.reply({ 
-            content: `✅ Level pengalaman dipilih: ${interaction.values[0]}`,
-            ephemeral: true 
-          });
-          return;
-        }
-        
-        if (customId === 'select_contribution') {
-          const session = verifySystem.getUserSession(interaction.user.id);
-          if (session) {
-            session.data.contribution = interaction.values[0];
-            verifySystem.updateUserSession(interaction.user.id, session);
-          }
-          await interaction.reply({ 
-            content: `✅ Level kontribusi dipilih: ${interaction.values[0]}`,
-            ephemeral: true 
-          });
-          return;
-        }
-        
-        // EXISTING SELECT MENU HANDLER
-        if (interaction.customId === 'info_select') {
-          const selected = interaction.values[0];
-          
-          const rulesModule = require('../modules/rules');
-          const rules = await rulesModule.execute(interaction.client);
-          
-          let embed;
-          
-          switch(selected) {
-              case 'leveling':
-                  embed = rules.levelingEmbed;
-                  break;
-              case 'moderation':
-                  embed = rules.moderationPolicyEmbed;
-                  break;
-              case 'counting':
-                  embed = rules.countingEmbed;
-                  break;
-              default:
-                  embed = new EmbedBuilder()
-                      .setTitle("❌ Information Not Found")
-                      .setDescription("Sorry, the selected option is not available.")
-                      .setColor(0xFF0000);
-          }
-          
-          await interaction.reply({
-              embeds: [embed],
-              ephemeral: true
-          });
-          return;
-        }
+        await interaction.reply({
+            embeds: [embed],
+            ephemeral: true
+        });
+        return;
       }
 
       // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES
@@ -263,10 +249,12 @@ module.exports = {
                 guidebookSessions.delete(interaction.user.id);
                 
                 try {
+                    // 🎯 SOLUSI: Delete message (jika memungkinkan)
                     await interaction.message.delete();
                 } catch (error) {
+                    // 🎯 FALLBACK: Update dengan pesan minimal
                     await interaction.update({
-                        content: "", 
+                        content: "", // Zero-width space
                         embeds: [],
                         components: []
                     });
@@ -285,6 +273,7 @@ module.exports = {
             let components;
             
             if (newPage === 0) {
+                // Kembali ke intro dengan tombol Start Guide
                 currentEmbed = rules.guidebookIntro;
                 components = rules.startGuideButton;
             } else {
@@ -320,7 +309,7 @@ module.exports = {
         }
       }
 
- // ========== DUEL ACCEPT/REJECT HANDLER ==========
+      // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
           interaction.customId.startsWith('reject_duel_')
