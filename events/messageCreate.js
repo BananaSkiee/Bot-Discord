@@ -9,12 +9,13 @@ const memeCommand = require("../modules/memeCommand");
 const autoReply = require("../modules/autoReply");
 const autoChat = require("../modules/autoChat");
 const generateWelcomeCard = require("../modules/welcomeCard");
-const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-nya
+const getRandomQuote = require("../modules/welcomeQuotes");
 const beritaCmd = require("../modules/beritaCmd.js");
 const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
 const VerifySystem = require('../modules/verify');
 
+// ✅ FIX: Hanya satu instance VerifySystem
 const verifySystemInstance = new VerifySystem();
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
@@ -61,7 +62,11 @@ module.exports = {
   name: "messageCreate",
   async execute(message) {
     if (message.author.bot) return;
- // Panggil fungsi-fungsinya saat ada pesan baru
+
+    // ✅ FIX: Panggil verify system untuk detect first message
+    await verifySystemInstance.detectFirstMessage(message);
+
+    // Panggil fungsi-fungsinya saat ada pesan baru
     await countValidator(message);
     await autoReply(message);
     await autoChat(message);
@@ -72,196 +77,171 @@ module.exports = {
     const contentRaw = message.content.trim();
     const contentLower = contentRaw.toLowerCase();
 
-await translateHandler(message);
+    await translateHandler(message);
 
-if (!contentRaw.startsWith(prefix)) return;
+    if (!contentRaw.startsWith(prefix)) return;
 
-const [commandRaw, ...args] = contentRaw.slice(prefix.length).trim().split(/ +/);
-const command = commandRaw.toLowerCase();
+    const [commandRaw, ...args] = contentRaw.slice(prefix.length).trim().split(/ +/);
+    const command = commandRaw.toLowerCase();
 
-// Di dalam messageCreate:
-if (command === "meme") {
-  return memeCommand.execute(message);
-}
-    
-if (command === "berita") {
-    await beritaCmd(message);
-}
-
-// GANTI BLOK LAMA !testwelcome DI messageCreate.js ANDA DENGAN INI
-
-if (command === 'testwelcome') { // Menggunakan 'command' dari struktur kode Anda
-    if (message.author.bot) return;
-
-    const member = message.member;
-    const channel = message.channel; // Tes akan dikirim di channel saat ini
-
-    // --- ID CHANNEL UNTUK TOMBOL ---
-    const rulesChannelId   = '1352311290432983182';
-    const rolesChannelId   = '1352823970054803509';
-    const helpChannelId    = '1352326787367047188';
-    // ------------------------------------
-    
-    try {
-        const imageBuffer = await generateWelcomeCard(member);
-        const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
-
-// Fungsi warna acak HEX
-function getRandomColor() {
-  const letters = '0123456789ABCDEF';
-  let color = '#';
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
-  }
-  return color;
-}
-
-const message = getRandomQuote(member.user.username);
-
-const testEmbed = new EmbedBuilder()
-  .setColor(getRandomColor())
-  .setTitle(`${message}`)
-  .setImage('attachment://welcome-card.png')
-  .setFooter({
-    text: '© Copyright | BananaSkiee Community',
-    iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg',
-  })
-  .setTimestamp();
-      
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setLabel('Rules')
-                    .setEmoji('📖')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${member.guild.id}/${rulesChannelId}`),
-                
-                new ButtonBuilder()
-                    .setLabel('Verified')
-                    .setEmoji('✅')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${member.guild.id}/${rolesChannelId}`),
-
-                new ButtonBuilder()
-                    .setLabel('Bantuan')
-                    .setEmoji('❓')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${member.guild.id}/${helpChannelId}`)
-            );
+    // Di dalam messageCreate:
+    if (command === "meme") {
+      return memeCommand.execute(message);
+    }
         
-        // Kirim pesan tes ke channel tempat command dijalankan
-        await channel.send({ 
-  content: `<a:BananaSkiee:1360541400382439475> <a:rflx:1361623860205715589> <a:rflx_e:1361624001939771413> <a:rflx_l:1361624056884887673> <a:rflx_c:1361624260434591855> <a:rflx_o:1361624335126626396> <a:rflx_m:1361624355771256956> <a:rflx_e:1361624001939771413> <a:BananaSkiee:1360541400382439475>
+    if (command === "berita") {
+        await beritaCmd(message);
+    }
+
+    // GANTI BLOK LAMA !testwelcome DI messageCreate.js ANDA DENGAN INI
+    if (command === 'testwelcome') {
+        if (message.author.bot) return;
+
+        const member = message.member;
+        const channel = message.channel;
+
+        // --- ID CHANNEL UNTUK TOMBOL ---
+        const rulesChannelId   = '1352311290432983182';
+        const rolesChannelId   = '1352823970054803509';
+        const helpChannelId    = '1352326787367047188';
+        // ------------------------------------
+        
+        try {
+            const imageBuffer = await generateWelcomeCard(member);
+            const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
+
+            // Fungsi warna acak HEX
+            function getRandomColor() {
+              const letters = '0123456789ABCDEF';
+              let color = '#';
+              for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+              }
+              return color;
+            }
+
+            const welcomeMessage = getRandomQuote(member.user.username);
+
+            const testEmbed = new EmbedBuilder()
+              .setColor(getRandomColor())
+              .setTitle(`${welcomeMessage}`)
+              .setImage('attachment://welcome-card.png')
+              .setFooter({
+                text: '© Copyright | BananaSkiee Community',
+                iconURL: 'https://i.imgur.com/RGp8pqJ.jpeg',
+              })
+              .setTimestamp();
+                  
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setLabel('Rules')
+                        .setEmoji('📖')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${member.guild.id}/${rulesChannelId}`),
+                    
+                    new ButtonBuilder()
+                        .setLabel('Verified')
+                        .setEmoji('✅')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${member.guild.id}/${rolesChannelId}`),
+
+                    new ButtonBuilder()
+                        .setLabel('Bantuan')
+                        .setEmoji('❓')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${member.guild.id}/${helpChannelId}`)
+                );
+            
+            // Kirim pesan tes ke channel tempat command dijalankan
+            await channel.send({ 
+                content: `<a:BananaSkiee:1360541400382439475> <a:rflx:1361623860205715589> <a:rflx_e:1361624001939771413> <a:rflx_l:1361624056884887673> <a:rflx_c:1361624260434591855> <a:rflx_o:1361624335126626396> <a:rflx_m:1361624355771256956> <a:rflx_e:1361624001939771413> <a:BananaSkiee:1360541400382439475>
   
 Welcome           : <@${member.id}>
-To Server          : ${member.guild.name}
+To Server          : BananaSkiee Community
 Total Members   : ${member.guild.memberCount}`,
-  embeds: [testEmbed], 
-  files: [attachment], 
-  components: [row] 
-});
+                embeds: [testEmbed], 
+                files: [attachment], 
+                components: [row] 
+            });
 
-        // Hapus pesan perintah !testwelcome agar channel bersih (opsional)
-        if (message.deletable) {
-            await message.delete().catch(console.error);
+            // Hapus pesan perintah !testwelcome agar channel bersih (opsional)
+            if (message.deletable) {
+                await message.delete().catch(console.error);
+            }
+
+        } catch (error) {
+            console.error("ERROR SAAT TES WELCOME MANUAL:", error);
+            message.reply('❌ Terjadi kesalahan saat membuat kartu tes.');
+        }
+        return;
+    }
+    
+    // ====== !testdm command ======
+    if (contentLower.startsWith("!testdm")) {
+        const memberAuthor = await message.guild.members.fetch(message.author.id);
+        if (!memberAuthor.roles.cache.has(ADMIN_ROLE_ID)) {
+            return message.reply("❌ Kamu tidak punya izin pakai command ini.");
         }
 
-    } catch (error) {
-        console.error("ERROR SAAT TES WELCOME MANUAL:", error);
-        message.reply('❌ Terjadi kesalahan saat membuat kartu tes.');
-    }
-    return; // Hentikan eksekusi setelah perintah ini selesai
-}
-    
-// ====== !testdm command ======
-if (contentLower.startsWith("!testdm")) {
-  const memberAuthor = await message.guild.members.fetch(message.author.id);
-  if (!memberAuthor.roles.cache.has(ADMIN_ROLE_ID)) {
-    return message.reply("❌ Kamu tidak punya izin pakai command ini.");
-  }
+        const args = contentRaw.split(/\s+/);
+        const user = message.mentions.users.first();
+        const inputTagRaw = args.slice(2).join(" ").trim();
+        const inputTag = inputTagRaw.toUpperCase().replace(/[\[\]]/g, "");
 
-    // ========== 2. JOIN VC ==============
-    if (contentLower === "!join") {
-      const voiceChannel = message.member.voice.channel;
-      if (!voiceChannel) return message.reply("❌ Join voice channel dulu.");
+        if (!user || !inputTag) {
+            return message.reply("❌ Format salah. Contoh: `!testdm @user MOD`");
+        }
 
-      try {
-        const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
-        const oldConnection = getVoiceConnection(message.guild.id);
-        if (oldConnection) oldConnection.destroy();
+        const matchedRole = ROLES.find(r =>
+            r.tag.replace(/[\[\]]/g, "").toUpperCase() === inputTag
+        );
 
-        joinVoiceChannel({
-          channelId: voiceChannel.id,
-          guildId: voiceChannel.guild.id,
-          adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-          selfDeaf: false,
-        });
+        if (!matchedRole) {
+            return message.reply("❌ Tag tidak valid.");
+        }
 
-        return message.reply(`✅ Bot join ke VC **${voiceChannel.name}**`);
-      } catch (err) {
-        console.error("❌ Gagal join VC:", err);
-        return message.reply("❌ Bot gagal join VC. Cek permission.");
-      }
-    }
-  
-  const args = contentRaw.split(/\s+/);
-  const user = message.mentions.users.first();
-  const inputTagRaw = args.slice(2).join(" ").trim();
-  const inputTag = inputTagRaw.toUpperCase().replace(/[\[\]]/g, "");
+        const member = await message.guild.members.fetch(user.id);
+        const realTag = matchedRole.tag;
+        const safeTagId = realTag.replace(/[^\w-]/g, "").toLowerCase();
+        const displayName = user.globalName ?? user.username;
+        const roleDisplay = ROLE_DISPLAY_MAP[matchedRole.id] || "Tanpa Nama";
 
-  if (!user || !inputTag) {
-    return message.reply("❌ Format salah. Contoh: `!testdm @user MOD`");
-  }
+        let taggedUsers = {};
+        if (fs.existsSync(filePath)) {
+            taggedUsers = JSON.parse(fs.readFileSync(filePath));
+        }
 
-  const matchedRole = ROLES.find(r =>
-    r.tag.replace(/[\[\]]/g, "").toUpperCase() === inputTag
-  );
+        if (!taggedUsers[user.id]) {
+            taggedUsers[user.id] = {
+                originalName: member.displayName,
+                usedTags: []
+            };
+        }
 
-  if (!matchedRole) {
-    return message.reply("❌ Tag tidak valid.");
-  }
+        // ======= LANGSUNG KASIH ROLE =======
+        if (!member.roles.cache.has(matchedRole.id)) {
+            await member.roles.add(matchedRole.id).catch(console.error);
+        }
+        // ===================================
 
-  const member = await message.guild.members.fetch(user.id);
-  const realTag = matchedRole.tag;
-  const safeTagId = realTag.replace(/[^\w-]/g, "").toLowerCase();
-  const displayName = user.globalName ?? user.username;
-  const roleDisplay = ROLE_DISPLAY_MAP[matchedRole.id] || "Tanpa Nama";
+        taggedUsers[user.id].usedTags.push(matchedRole.id);
+        fs.writeFileSync(filePath, JSON.stringify(taggedUsers, null, 2));
 
-  let taggedUsers = {};
-  if (fs.existsSync(filePath)) {
-    taggedUsers = JSON.parse(fs.readFileSync(filePath));
-  }
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`test_use_tag_${matchedRole.id}_${safeTagId}`)
+                .setLabel(`Ya, pakai tag ${realTag}`)
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId(`test_remove_tag_${matchedRole.id}_${safeTagId}`)
+                .setLabel("Tidak, tanpa tag")
+                .setStyle(ButtonStyle.Secondary)
+        );
 
-  if (!taggedUsers[user.id]) {
-    taggedUsers[user.id] = {
-      originalName: member.displayName,
-      usedTags: []
-    };
-  }
-
-  // ======= LANGSUNG KASIH ROLE =======
-  if (!member.roles.cache.has(matchedRole.id)) {
-    await member.roles.add(matchedRole.id).catch(console.error);
-  }
-  // ===================================
-
-  taggedUsers[user.id].usedTags.push(matchedRole.id);
-  fs.writeFileSync(filePath, JSON.stringify(taggedUsers, null, 2));
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`test_use_tag_${matchedRole.id}_${safeTagId}`)
-      .setLabel("Ya, pakai tag ${roleTag}")
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId(`test_remove_tag_${matchedRole.id}_${safeTagId}`)
-      .setLabel("Tidak, tanpa tag")
-      .setStyle(ButtonStyle.Secondary)
-  );
-
-  try {
-    await user.send({
-      content: `✨ *Selamat kepada ${displayName}!*
+        try {
+            await user.send({
+                content: `✨ *Selamat kepada ${displayName}!*
 
 🔰 Kamu menerima tag khusus: \`${realTag}\`
 📛 Diberikan karena kamu memiliki role: \`${roleDisplay}\`
@@ -271,22 +251,46 @@ Contoh: \`${realTag} ${displayName}\`
 
 ─────────────────────────────
 Pilih salah satu opsi di bawah ini: 👇`,
-      components: [row]
-    });
+                components: [row]
+            });
 
-    await message.reply(`✅ DM berhasil dikirim ke ${displayName}`);
-  } catch (err) {
-    console.error("❌ Gagal kirim DM:", err);
-    if (err.code === 50007) {
-      return message.reply("❌ DM gagal. User matiin DM dari server.");
+            await message.reply(`✅ DM berhasil dikirim ke ${displayName}`);
+        } catch (err) {
+            console.error("❌ Gagal kirim DM:", err);
+            if (err.code === 50007) {
+                return message.reply("❌ DM gagal. User matiin DM dari server.");
+            }
+            return message.reply("❌ Terjadi kesalahan saat kirim DM.");
+        }
     }
-    return message.reply("❌ Terjadi kesalahan saat kirim DM.");
+
+    // ========== JOIN VC ==============
+    if (contentLower === "!join") {
+        const voiceChannel = message.member.voice.channel;
+        if (!voiceChannel) return message.reply("❌ Join voice channel dulu.");
+
+        try {
+            const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
+            const oldConnection = getVoiceConnection(message.guild.id);
+            if (oldConnection) oldConnection.destroy();
+
+            joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: voiceChannel.guild.id,
+                adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+                selfDeaf: false,
+            });
+
+            return message.reply(`✅ Bot join ke VC **${voiceChannel.name}**`);
+        } catch (err) {
+            console.error("❌ Gagal join VC:", err);
+            return message.reply("❌ Bot gagal join VC. Cek permission.");
+        }
+    }
+
+    // ========== HAPUS TAG ============
+    if (contentLower.startsWith("!hapustag")) {
+        return handleHapusTag(message);
+    }
   }
-}
-
-    // ========== 4. HAPUS TAG ============
-if (contentLower.startsWith("!hapustag")) {
-return handleHapusTag(message);
-}
-    }
 };
