@@ -229,149 +229,153 @@ class VerifySystem {
     }
 
     // ========== BUTTON HANDLERS ==========
-    async handleSkipVerify(interaction) {
-        try {
-            await interaction.deferUpdate();
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('🎉 SELAMAT DATANG DI KOMUNITAS')
-                .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\nAnda sekarang Verified Member dengan akses penuh.\n\n**✅ YANG SUDAH AKTIF:**\n• Role Verified Member diberikan\n• Semua channel premium terbuka\n• Channel verify otomatis tersembunyi\n\n**Misi:** Buka <#${this.config.generalChannelId}> dan perkenalkan diri!\n\n\`"Halo! Saya ${interaction.user.username} - senang join komunitas ini!"\``)
-                .setFooter({ text: 'Your Journey Starts Now • Complete Your Mission' });
+async handleSkipVerify(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🎉 SELAMAT DATANG DI KOMUNITAS')
+            .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\nAnda sekarang Verified Member dengan akses penuh.\n\n**✅ YANG SUDAH AKTIF:**\n• Role Verified Member diberikan\n• Semua channel premium terbuka\n• Channel verify otomatis tersembunyi\n\n**Misi:** Buka <#${this.config.generalChannelId}> dan perkenalkan diri!\n\n\`"Halo! Saya ${interaction.user.username} - senang join komunitas ini!"\``)
+            .setFooter({ text: 'Your Journey Starts Now • Complete Your Mission' });
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('rate_server')
-                        .setLabel('⭐ RATE SERVER')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('faqs_skip')
-                        .setLabel('❓ FAQS')
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId('give_role_skip')
-                        .setLabel('🎁 GIVE ROLE')
-                        .setStyle(ButtonStyle.Success),
-                    new ButtonBuilder()
-                        .setCustomId('back_to_verify')
-                        .setLabel('⬅️ BACK')
-                        .setStyle(ButtonStyle.Secondary)
-                );
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('rate_server')
+                    .setLabel('⭐ RATE SERVER')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('faqs_skip')
+                    .setLabel('❓ FAQS')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('give_role_skip')
+                    .setLabel('🎁 GIVE ROLE')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('back_to_verify')
+                    .setLabel('⬅️ BACK')
+                    .setStyle(ButtonStyle.Secondary)
+            );
 
-            await interaction.editReply({ embeds: [embed], components: [buttons] });
+        await interaction.editReply({ embeds: [embed], components: [buttons] });
 
-        } catch (error) {
-            console.error('Skip verify error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to process request.',
-                components: []
-            });
-        }
+    } catch (error) {
+        console.error('Skip verify error:', error);
+        await interaction.editReply({
+            content: '❌ Failed to process request.',
+            components: []
+        });
     }
+}
 
-    async handleContinueVerify(interaction) {
-        try {
-            await interaction.deferUpdate();
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🏠 KUNJUNGI AREA SERVER')
-                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags')
-                .setFooter({ text: 'Kunjungi ketiga channel untuk melanjutkan' });
+async handleContinueVerify(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🏠 KUNJUNGI AREA SERVER')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags')
+            .setFooter({ text: 'Kunjungi ketiga channel untuk melanjutkan' });
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('server_guild')
-                        .setLabel('🏠 SERVER GUILD')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
-                    new ButtonBuilder()
-                        .setCustomId('open_rules')
-                        .setLabel('📋 OPEN RULES')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
-                    new ButtonBuilder()
-                        .setCustomId('self_role')
-                        .setLabel('🎨 SELF ROLE')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
-                );
+        // ✅ TOMBOL LINK - HANYA PAKAI URL, TANPA CUSTOM ID
+        const linkButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🏠 SERVER GUILD')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
+                new ButtonBuilder()
+                    .setLabel('📋 OPEN RULES')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
+                new ButtonBuilder()
+                    .setLabel('🎨 SELF ROLE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
+            );
 
-            const completeButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('server_exploration_complete')
-                        .setLabel('✅ SELESAI KUNJUNGI')
-                        .setStyle(ButtonStyle.Success)
-                );
+        // ✅ TOMBOL ACTION - PAKAI CUSTOM ID, TANPA URL
+        const actionButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('server_exploration_complete')
+                    .setLabel('✅ SELESAI KUNJUNGI')
+                    .setStyle(ButtonStyle.Success)
+            );
 
-            await interaction.editReply({ 
-                embeds: [embed], 
-                components: [buttons, completeButton] 
-            });
+        await interaction.editReply({ 
+            embeds: [embed], 
+            components: [linkButtons, actionButton] 
+        });
 
-            this.updateUserSession(interaction.user.id, { 
-                step: 'server_exploration',
-                visitedChannels: [],
-                explorationStart: Date.now()
-            });
+        this.updateUserSession(interaction.user.id, { 
+            step: 'server_exploration',
+            visitedChannels: [],
+            explorationStart: Date.now()
+        });
 
-        } catch (error) {
-            console.error('Continue verify error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to start server exploration.',
-                components: []
-            });
-        }
+    } catch (error) {
+        console.error('Continue verify error:', error);
+        await interaction.editReply({
+            content: '❌ Failed to start server exploration.',
+            components: []
+        });
     }
+                }
+    
+async handleServerExplorationComplete(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const session = this.getUserSession(interaction.user.id);
+        const explorationTime = Date.now() - (session.explorationStart || Date.now());
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('👋 MISI PERKENALAN')
+            .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
+            .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
 
-    async handleServerExplorationComplete(interaction) {
-        try {
-            await interaction.deferUpdate();
-            
-            const session = this.getUserSession(interaction.user.id);
-            const explorationTime = Date.now() - (session.explorationStart || Date.now());
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
-                .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
+        // ✅ TOMBOL LINK - HANYA URL
+        const linkButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🔗 OPEN GENERAL')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+            );
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('open_general')
-                        .setLabel('🔗 OPEN GENERAL')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
-                    new ButtonBuilder()
-                        .setCustomId('see_mission')
-                        .setLabel('📝 SEE MISSION')
-                        .setStyle(ButtonStyle.Primary)
-                );
+        // ✅ TOMBOL ACTION - HANYA CUSTOM ID
+        const actionButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('see_mission')
+                    .setLabel('📝 SEE MISSION')
+                    .setStyle(ButtonStyle.Primary)
+            );
 
-            await interaction.editReply({ 
-                embeds: [embed], 
-                components: [buttons] 
-            });
+        await interaction.editReply({ 
+            embeds: [embed], 
+            components: [linkButton, actionButton] 
+        });
 
-            this.updateUserSession(interaction.user.id, { 
-                step: 'introduction_mission',
-                missionStartTime: Date.now(),
-                explorationTime: explorationTime
-            });
+        this.updateUserSession(interaction.user.id, { 
+            step: 'introduction_mission',
+            missionStartTime: Date.now(),
+            explorationTime: explorationTime
+        });
 
-        } catch (error) {
-            console.error('Server exploration error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to proceed.',
-                components: []
-            });
-        }
+    } catch (error) {
+        console.error('Server exploration error:', error);
+        await interaction.editReply({
+            content: '❌ Failed to proceed.',
+            components: []
+        });
     }
+            }
 
     async handleSeeMission(interaction) {
         try {
