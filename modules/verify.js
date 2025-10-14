@@ -262,110 +262,205 @@ class VerifySystem {
         }
     }
 
-    async handleContinueVerify(interaction) {
-        try {
-            await interaction.deferUpdate();
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🏠 KUNJUNGI AREA SERVER')
-                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
-                .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
+async handleContinueVerify(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🏠 KUNJUNGI AREA SERVER')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
+            .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
 
-            const linkButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('🏠 SERVER GUILD')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
-                    new ButtonBuilder()
-                        .setLabel('📋 OPEN RULES')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
-                    new ButtonBuilder()
-                        .setLabel('🎨 SELF ROLE')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
-                );
+        const linkButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🏠 SERVER GUILD')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
+                new ButtonBuilder()
+                    .setLabel('📋 OPEN RULES')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
+                new ButtonBuilder()
+                    .setLabel('🎨 SELF ROLE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
+            );
 
-            const reply = await interaction.editReply({ 
-                embeds: [embed], 
-                components: [linkButtons] 
-            });
+        await interaction.editReply({ 
+            embeds: [embed], 
+            components: [linkButtons] 
+        });
 
-            this.updateUserSession(interaction.user.id, { 
-                step: 'server_exploration',
-                explorationMessageId: reply.id,
-                explorationStart: Date.now()
-            });
+        this.updateUserSession(interaction.user.id, { 
+            step: 'server_exploration',
+            explorationStart: Date.now()
+        });
 
-            // Auto lanjut setelah 30 detik
-            setTimeout(async () => {
-                try {
-                    const currentSession = this.getUserSession(interaction.user.id);
-                    if (currentSession && currentSession.step === 'server_exploration') {
-                        await this.autoProceedServerExploration(interaction, currentSession);
-                    }
-                } catch (error) {
-                    console.error('Auto server exploration complete error:', error);
-                }
-            }, 30000);
+        // ✅ SIMPAN INTERACTION REFERENCE UNTUK EDIT NANTI
+        const session = this.getUserSession(interaction.user.id);
+        session.originalInteraction = {
+            channelId: interaction.channelId,
+            messageId: (await interaction.fetchReply()).id,
+            userId: interaction.user.id
+        };
+        this.updateUserSession(interaction.user.id, session);
 
-        } catch (error) {
-            console.error('Continue verify error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to start server exploration.',
-                components: []
-            });
-        }
+        // ✅ AUTO LANJUT SETELAH 30 DETIK - GUNAKAN CARA YANG LEBIH AMAN
+        setTimeout(async () => {
+            try {
+                await this.autoProceedServerExploration(interaction);
+            } catch (error) {
+                console.error('Auto server exploration complete error:', error);
+                // ✅ JIKA GAGAL, COBA CARI MESSAGE LAINNYA DARI USER
+                await this.fallbackProceedServerExploration(interaction);
+            }
+        }, 30000);
+
+    } catch (error) {
+        console.error('Continue verify error:', error);
+        await interaction.editReply({
+            content: '❌ Failed to start server exploration.',
+            components: []
+        });
     }
+}
 
-    async autoProceedServerExploration(originalInteraction, session) {
+// ✅ METHOD UTAMA UNTUK AUTO PROCEED
+async autoProceedServerExploration(originalInteraction) {
+    try {
+        const session = this.getUserSession(originalInteraction.user.id);
+        if (!session || session.step !== 'server_exploration') return;
+
+        const explorationTime = Date.now() - (session.explorationStart || Date.now());
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('👋 MISI PERKENALAN')
+            .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${originalInteraction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
+            .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
+
+        const linkButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🔗 OPEN GENERAL')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+            );
+
+        const actionButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('see_mission')
+                    .setLabel('📝 SEE MISSION')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        // ✅ COBA EDIT MESSAGE ASLI DENGAN INTERACTION
         try {
-            const channel = await originalInteraction.client.channels.fetch(this.config.verifyChannelId);
-            const message = await channel.messages.fetch(session.explorationMessageId);
-            
-            const explorationTime = Date.now() - (session.explorationStart || Date.now());
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${originalInteraction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
-                .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
-
-            const linkButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('🔗 OPEN GENERAL')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
-                );
-
-            const actionButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('see_mission')
-                        .setLabel('📝 SEE MISSION')
-                        .setStyle(ButtonStyle.Primary)
-                );
-
-            await message.edit({ 
+            await originalInteraction.editReply({ 
                 embeds: [embed], 
                 components: [linkButton, actionButton] 
             });
-
-            this.updateUserSession(originalInteraction.user.id, { 
-                step: 'introduction_mission',
-                missionStartTime: Date.now(),
-                explorationTime: explorationTime
-            });
-
-            console.log(`✅ Auto proceeded user ${originalInteraction.user.username} to mission`);
-
         } catch (error) {
-            console.error('Auto proceed server exploration error:', error);
+            // ✅ JIKA INTERACTION UDAH EXPIRED, CARI MESSAGE LAIN
+            if (error.code === 10062 || error.code === 10008) {
+                console.log('⚠️ Interaction expired, trying fallback method...');
+                await this.fallbackProceedServerExploration(originalInteraction);
+                return;
+            }
+            throw error;
+        }
+
+        this.updateUserSession(originalInteraction.user.id, { 
+            step: 'introduction_mission',
+            missionStartTime: Date.now(),
+            explorationTime: explorationTime
+        });
+
+        console.log(`✅ Auto proceeded user ${originalInteraction.user.username} to mission`);
+
+    } catch (error) {
+        console.error('Auto proceed server exploration error:', error);
+        throw error;
+    }
+}
+
+// ✅ FALLBACK METHOD JIKA INTERACTION/MESSAGE TIDAK DITEMUKAN
+async fallbackProceedServerExploration(originalInteraction) {
+    try {
+        const session = this.getUserSession(originalInteraction.user.id);
+        if (!session || session.step !== 'server_exploration') return;
+
+        const channel = await originalInteraction.client.channels.fetch(this.config.verifyChannelId);
+        
+        // ✅ CARI MESSAGE TERBARU DARI USER INI
+        const messages = await channel.messages.fetch({ limit: 20 });
+        const userMessage = messages.find(msg => 
+            msg.author.id === originalInteraction.client.user.id &&
+            msg.embeds.length > 0 &&
+            msg.embeds[0].title?.includes('KUNJUNGI AREA SERVER') &&
+            msg.components.length > 0
+        );
+
+        if (!userMessage) {
+            console.log('❌ Cannot find user message for fallback');
+            return;
+        }
+
+        const explorationTime = Date.now() - (session.explorationStart || Date.now());
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('👋 MISI PERKENALAN')
+            .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${originalInteraction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
+            .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
+
+        const linkButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🔗 OPEN GENERAL')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+            );
+
+        const actionButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('see_mission')
+                    .setLabel('📝 SEE MISSION')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        await userMessage.edit({ 
+            embeds: [embed], 
+            components: [linkButton, actionButton] 
+        });
+
+        this.updateUserSession(originalInteraction.user.id, { 
+            step: 'introduction_mission',
+            missionStartTime: Date.now(),
+            explorationTime: explorationTime
+        });
+
+        console.log(`✅ Fallback succeeded for user ${originalInteraction.user.username}`);
+
+    } catch (error) {
+        console.error('Fallback proceed server exploration error:', error);
+        
+        // ✅ JIKA SEMUA GAGAL, KIRIM MESSAGE BARU
+        try {
+            const channel = await originalInteraction.client.channels.fetch(this.config.verifyChannelId);
+            await channel.send({
+                content: `❌ <@${originalInteraction.user.id}> Sistem mengalami error. Silakan mulai ulang verifikasi dengan klik tombol verify lagi.`,
+                flags: 64
+            });
+        } catch (finalError) {
+            console.error('Final fallback also failed:', finalError);
         }
     }
+            }
 
     async handleSeeMission(interaction) {
         try {
@@ -951,57 +1046,77 @@ class VerifySystem {
         }
     }
 
-    async showRatingStepFromMessage(message) {
-        try {
-            const session = this.getUserSession(message.author.id);
-            if (!session || session.step !== 'ready_for_rating') return;
+async showRatingStepFromMessage(message) {
+    try {
+        const session = this.getUserSession(message.author.id);
+        if (!session || session.step !== 'ready_for_rating') return;
 
-            const verifyChannel = await message.client.channels.fetch(this.config.verifyChannelId);
-            const messages = await verifyChannel.messages.fetch({ limit: 100 });
-            
-            const userMessage = messages.find(msg => 
+        const verifyChannel = await message.client.channels.fetch(this.config.verifyChannelId);
+        
+        // ✅ CARI MESSAGE DENGAN FALLBACK
+        let userMessage;
+        try {
+            const messages = await verifyChannel.messages.fetch({ limit: 50 });
+            userMessage = messages.find(msg => 
                 msg.author.id === message.client.user.id && 
                 msg.embeds.length > 0 &&
                 msg.embeds[0].description?.includes(message.author.username) &&
                 msg.components.length > 0
             );
-
-            if (userMessage) {
-                const embed = new EmbedBuilder()
-                    .setColor(0xFFD700)
-                    .setTitle('⭐ BERI PENILAIAN')
-                    .setDescription('Bagaimana pengalaman verifikasi di server ini?\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa\n\n**💡 Info:** \n• INPUT RATING: Beri rating 1-100 (wajib untuk lanjut)\n• GIVE FEEDBACK: Beri masukan tambahan (opsional)  \n• FAQS: Bantuan & pertanyaan umum (opsional)')
-                    .setFooter({ text: 'Bantu kami improve experience' });
-
-                const buttons = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('input_rating')
-                            .setLabel('🎯 INPUT RATING')
-                            .setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder()
-                            .setCustomId('give_feedback')
-                            .setLabel('💬 GIVE FEEDBACK')
-                            .setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder()
-                            .setCustomId('faqs_rating')
-                            .setLabel('❓ FAQS')
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                await userMessage.edit({ 
-                    embeds: [embed], 
-                    components: [buttons] 
-                });
-                
-                session.step = 'rating';
-                this.updateUserSession(message.author.id, session);
-            }
-
         } catch (error) {
-            console.error('Show rating from message error:', error);
+            console.error('Error fetching messages:', error);
+            return;
         }
+
+        if (!userMessage) {
+            console.log(`❌ Cannot find verify message for user ${message.author.username}`);
+            return;
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle('⭐ BERI PENILAIAN')
+            .setDescription('Bagaimana pengalaman verifikasi di server ini?\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa\n\n**💡 Info:** \n• INPUT RATING: Beri rating 1-100 (wajib untuk lanjut)\n• GIVE FEEDBACK: Beri masukan tambahan (opsional)  \n• FAQS: Bantuan & pertanyaan umum (opsional)')
+            .setFooter({ text: 'Bantu kami improve experience' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('input_rating')
+                    .setLabel('🎯 INPUT RATING')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('give_feedback')
+                    .setLabel('💬 GIVE FEEDBACK')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('faqs_rating')
+                    .setLabel('❓ FAQS')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+        try {
+            await userMessage.edit({ 
+                embeds: [embed], 
+                components: [buttons] 
+            });
+            
+            session.step = 'rating';
+            this.updateUserSession(message.author.id, session);
+            
+            console.log(`✅ Rating step shown for user ${message.author.username}`);
+        } catch (error) {
+            if (error.code === 10008) {
+                console.log(`❌ Message not found for user ${message.author.username}`);
+                return;
+            }
+            throw error;
+        }
+
+    } catch (error) {
+        console.error('Show rating from message error:', error);
     }
+                }
 
     // ========== INTERACTION HANDLER ==========
     async handleInteraction(interaction) {
