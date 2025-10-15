@@ -331,7 +331,10 @@ async handleContinueVerify(interaction) {
 async autoProceedServerExploration(originalInteraction) {
     try {
         const session = this.getUserSession(originalInteraction.user.id);
-        if (!session || session.step !== 'server_exploration') return;
+        if (!session || session.step !== 'server_exploration') {
+            console.log(`❌ Session not found or wrong step for ${originalInteraction.user.username}`);
+            return;
+        }
 
         const explorationTime = Date.now() - (session.explorationStart || Date.now());
         
@@ -357,36 +360,41 @@ async autoProceedServerExploration(originalInteraction) {
                     .setStyle(ButtonStyle.Primary)
             );
 
-        // ✅ COBA EDIT MESSAGE ASLI DENGAN INTERACTION
+        // ✅ EDIT MESSAGE ASLI
         try {
             await originalInteraction.editReply({ 
                 embeds: [embed], 
                 components: [linkButton, actionButton] 
             });
         } catch (error) {
-            // ✅ JIKA INTERACTION UDAH EXPIRED, CARI MESSAGE LAIN
             if (error.code === 10062 || error.code === 10008) {
-                console.log('⚠️ Interaction expired, trying fallback method...');
+                console.log('⚠️ Interaction expired, trying fallback...');
                 await this.fallbackProceedServerExploration(originalInteraction);
                 return;
             }
             throw error;
         }
 
-        this.updateUserSession(originalInteraction.user.id, { 
+        // ✅ PASTIKAN SESSION DIUPDATE DENGAN BENAR
+        const updatedSession = {
             step: 'introduction_mission',
             missionStartTime: Date.now(),
-            explorationTime: explorationTime
-        });
+            explorationTime: explorationTime,
+            welcomeSent: false,
+            data: session.data || {}
+        };
+        
+        this.updateUserSession(originalInteraction.user.id, updatedSession);
 
         console.log(`✅ Auto proceeded user ${originalInteraction.user.username} to mission`);
+        console.log(`📊 New session step: ${this.getUserSession(originalInteraction.user.id)?.step}`);
 
     } catch (error) {
         console.error('Auto proceed server exploration error:', error);
         throw error;
     }
-}
-
+                }
+    
 // ✅ FALLBACK METHOD JIKA INTERACTION/MESSAGE TIDAK DITEMUKAN
 async fallbackProceedServerExploration(originalInteraction) {
     try {
