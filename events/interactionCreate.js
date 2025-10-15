@@ -53,6 +53,11 @@ module.exports = {
           return await verifySystem.handleBackToVerify(interaction);
         }
         
+        // ✅ TAMBAH HANDLER UNTUK NEXT VERIFY
+        if (customId === 'next_verify') {
+          return await verifySystem.handleNextVerify(interaction);
+        }
+        
         // SERVER EXPLORATION BUTTONS
         if (customId === 'server_exploration_complete') {
           return await verifySystem.handleServerExplorationComplete(interaction);
@@ -128,7 +133,12 @@ module.exports = {
         if (customId === 'give_role_skip' || customId === 'give_role_final') {
           return await verifySystem.handleGiveRole(interaction);
         }
-            }
+      }
+    } catch (error) {
+      console.error('Interaction handling error:', error);
+    }
+  }
+};
 
       // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
       if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
