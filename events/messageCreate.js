@@ -63,8 +63,8 @@ module.exports = {
     if (message.author.bot) return;
 
     // ✅ FIX: Panggil verify system untuk detect first message
-    await verifySystemInstance.detectFirstMessage(message);
-
+await verifySystem.detectFirstMessage(message);
+    
     // Panggil fungsi-fungsinya saat ada pesan baru
     await countValidator(message);
     await autoReply(message);
