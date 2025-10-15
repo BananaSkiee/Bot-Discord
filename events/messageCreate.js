@@ -14,7 +14,6 @@ const beritaCmd = require("../modules/beritaCmd.js");
 const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
 const VerifySystem = require('../modules/verify');
-const verifySystem = require('../modules/verifyInstance');
 
 const verifySystem = new VerifySystem();
 
