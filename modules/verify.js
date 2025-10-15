@@ -2,6 +2,14 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder
 
 class VerifySystem {
     constructor() {
+        // ✅ SINGLETON PATTERN - PASTIKAN HANYA 1 INSTANCE
+if (VerifySystem.instance) {
+    console.log('🔄 Returning existing VerifySystem instance');
+    return VerifySystem.instance;
+}
+VerifySystem.instance = this;
+console.log('✅ Creating new VerifySystem instance');
+        
         this.config = {
             verifyChannelId: '1352823970054803509',
             logChannelId: '1426537842875826278',
