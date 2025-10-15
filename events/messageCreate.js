@@ -15,8 +15,7 @@ const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
 const VerifySystem = require('../modules/verify');
 
-// ✅ FIX: Hanya satu instance VerifySystem
-const verifySystemInstance = new VerifySystem();
+const verifySystem = new VerifySystem();
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
