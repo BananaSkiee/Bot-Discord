@@ -9,8 +9,8 @@ const filePath = path.join(__dirname, "../data/taggedUsers.json");
 const guidebookSessions = new Map();
 
 // ========== IMPORT VERIFY SYSTEM ==========
-const verifySystem = require('../modules/verifyInstance');
 const VerifySystem = require('../modules/verify');
+const verifySystem = new VerifySystem();
 
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
