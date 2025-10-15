@@ -13,6 +13,7 @@ const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
 const rulesModule = require("../modules/rules");
 const VerifySystem = require('../modules/verify');
+const verifySystem = require('../modules/verifyInstance');
 
 const verifySystem = new VerifySystem();
 
