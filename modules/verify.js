@@ -503,108 +503,107 @@ class VerifySystem {
     }
 
     // ========== NEXT VERIFY HANDLER ==========
-    async handleNextVerify(interaction) {
-        try {
-            const session = this.getUserSession(interaction.user.id);
-            
-            // ✅ CHECK: USER UDAH SELESAI MISI CHAT?
-            if (!session || session.step !== 'ready_for_rating') {
-                return await interaction.reply({
-                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan perkenalkan diri di channel general terlebih dahulu.',
-                    flags: 64
-                });
-            }
-
-            await interaction.deferUpdate();
-            
-            // ✅ KIRIM EMBED SHORTCUT KE GENERAL CHANNEL
-            const shortcutEmbed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🎯 LANJUTKAN VERIFIKASI')
-                .setDescription(`Hai ${interaction.user.username}! Klik tombol dibawah untuk langsung ke channel verify dan lanjutkan proses verifikasi:`)
-                .setFooter({ text: 'Shortcut ke Verify Channel' });
-
-            const shortcutButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('↗️ TO VERIFY')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.verifyChannelId}`)
-                );
-
-            await interaction.channel.send({
-                content: `${interaction.user}`,
-                embeds: [shortcutEmbed],
-                components: [shortcutButton]
-            });
-
-            // ✅ KIRIM EMBED RATING KE VERIFY CHANNEL
-            const verifyChannel = await interaction.client.channels.fetch(this.config.verifyChannelId);
-            
-            const ratingEmbed = new EmbedBuilder()
-                .setColor(0xFFD700)
-                .setTitle('⭐ BERI PENILAIAN')
-                .setDescription(`Hai ${interaction.user.username}! Silakan beri rating pengalaman verifikasi:\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa`)
-                .setFooter({ text: 'Bantu kami improve experience' });
-
-            const ratingButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('input_rating')
-                        .setLabel('🎯 INPUT RATING')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('give_feedback')
-                        .setLabel('💬 GIVE FEEDBACK')
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId('faqs_rating')
-                        .setLabel('❓ FAQS')
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await verifyChannel.send({
-                content: `${interaction.user}`,
-                embeds: [ratingEmbed],
-                components: [ratingButtons]
-            });
-
-            // ✅ UPDATE SESSION & DISABLE TOMBOL
-            session.step = 'rating';
-            this.updateUserSession(interaction.user.id, session);
-            
-            // ✅ EDIT WELCOME MESSAGE UNTUK DISABLE TOMBOL NEXT VERIFY
-            const disabledButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('auto_welcome')
-                        .setLabel('👋 AUTO WELCOME')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('custom_message')
-                        .setLabel('💬 CUSTOM MESSAGE')
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId('next_verify')
-                        .setLabel('✅ NEXT VERIFY')
-                        .setStyle(ButtonStyle.Success)
-                        .setDisabled(true) // ✅ DISABLE TOMBOL
-                );
-
-            await interaction.message.edit({
-                components: [disabledButtons]
-            });
-
-            console.log(`✅ User ${interaction.user.username} pindah ke rating via next verify`);
-
-        } catch (error) {
-            console.error('Next verify error:', error);
-            await interaction.editReply({
-                content: '❌ Gagal memproses next verify.',
-                components: []
+async handleNextVerify(interaction) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        
+        if (!session || session.step !== 'ready_for_rating') {
+            return await interaction.reply({
+                content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan perkenalkan diri di channel general terlebih dahulu.',
+                flags: 64
             });
         }
+
+        await interaction.deferUpdate();
+        
+        // ✅ 1. EMBED SHORTCUT (DISMISS MESSAGE)
+        const shortcutEmbed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🎯 LANJUTKAN VERIFIKASI')
+            .setDescription(`Hai ${interaction.user.username}! Klik tombol dibawah untuk langsung ke channel verify dan lanjutkan proses verifikasi:`)
+            .setFooter({ text: 'Shortcut ke Verify Channel' });
+
+        const shortcutButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('↗️ TO VERIFY')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.verifyChannelId}`)
+            );
+
+        await interaction.followUp({
+            content: `${interaction.user}`,
+            embeds: [shortcutEmbed],
+            components: [shortcutButton],
+            flags: 64 // ✅ DISMISS MESSAGE
+        });
+
+        // ✅ 2. EMBED RATING (DISMISS MESSAGE JUGA)
+        const ratingEmbed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle('⭐ BERI PENILAIAN')
+            .setDescription(`Hai ${interaction.user.username}! Silakan beri rating pengalaman verifikasi:\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa`)
+            .setFooter({ text: 'Bantu kami improve experience' });
+
+        const ratingButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('input_rating')
+                    .setLabel('🎯 INPUT RATING')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('give_feedback')
+                    .setLabel('💬 GIVE FEEDBACK')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('faqs_rating')
+                    .setLabel('❓ FAQS')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+        // ✅ KIRIM RATING SEBAGAI DISMISS MESSAGE JUGA
+        await interaction.followUp({
+            content: `${interaction.user}`,
+            embeds: [ratingEmbed],
+            components: [ratingButtons],
+            flags: 64 // ✅ DISMISS MESSAGE
+        });
+
+        // ✅ UPDATE SESSION & DISABLE TOMBOL
+        session.step = 'rating';
+        this.updateUserSession(interaction.user.id, session);
+        
+        const disabledButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('auto_welcome')
+                    .setLabel('👋 AUTO WELCOME')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('custom_message')
+                    .setLabel('💬 CUSTOM MESSAGE')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('next_verify')
+                    .setLabel('✅ NEXT VERIFY')
+                    .setStyle(ButtonStyle.Success)
+                    .setDisabled(true)
+            );
+
+        await interaction.message.edit({
+            components: [disabledButtons]
+        });
+
+        console.log(`✅ User ${interaction.user.username} pindah ke rating via next verify`);
+
+    } catch (error) {
+        console.error('Next verify error:', error);
+        await interaction.editReply({
+            content: '❌ Gagal memproses next verify.',
+            components: []
+        });
     }
+}
 
     async handleSeeMission(interaction) {
         try {
