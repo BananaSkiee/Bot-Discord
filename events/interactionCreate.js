@@ -176,7 +176,7 @@ module.exports = {
         if (customId === 'give_role_skip' || customId === 'give_role_final') {
           return await verifySystem.handleGiveRole(interaction);
         }
-        
+
         // ========== GUIDEBOOK & RULES BUTTON HANDLERS ==========
         
         // Tombol Guidebook
