@@ -1,4 +1,3 @@
-modules/verify.js
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
 class VerifySystem {
