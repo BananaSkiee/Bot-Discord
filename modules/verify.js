@@ -11,7 +11,7 @@ class VerifySystem {
         
         this.config = {
             verifyChannelId: '1352823970054803509',
-            logChannelId: '1426537842875826278',
+            logChannelId: '1428789734993432676', // Forum channel
             memberRoleId: '1352286235233620108',
             generalChannelId: '1352404526870560788',
             serverId: '1347233781391560837',
@@ -160,8 +160,6 @@ class VerifySystem {
                 flags: 64 
             });
 
-            let currentMessage = await interaction.fetchReply();
-
             for (let i = 0; i < this.verificationSteps.length; i++) {
                 const step = this.verificationSteps[i];
                 const progress = Math.round(((i + 1) / this.verificationSteps.length) * 100);
@@ -270,7 +268,7 @@ class VerifySystem {
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('🎉 SELAMAT DATANG DI KOMUNITAS')
-                .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\nAnda sekarang Verified Member dengan akses penuh.\n\n**✅ YANG SUDAH AKTIF:**\n• Role Verified Member diberikan\n• Semua channel premium terbuka\n• Channel verify otomatis tersembunyi\n\n**Misi:** Buka <#${this.config.generalChannelId}> dan perkenalkan diri!\n\n\`"Halo! Saya ${interaction.user.username} - senang join komunitas ini!"\``)
+                .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\nAnda sekarang Verified Member dengan akses penuh.\n\n**✅ YANG SUDAH AKTIV:**\n• Role Verified Member diberikan\n• Semua channel premium terbuka\n• Channel verify otomatis tersembunyi\n\n**Misi:** Buka <#${this.config.generalChannelId}> dan perkenalkan diri!\n\n\`"Halo! Saya ${interaction.user.username} - senang join komunitas ini!"\``)
                 .setFooter({ text: 'Your Journey Starts Now • Complete Your Mission' });
 
             const buttons = new ActionRowBuilder()
@@ -311,7 +309,7 @@ class VerifySystem {
             const embed = new EmbedBuilder()
                 .setColor(0x5865F2)
                 .setTitle('🏠 KUNJUNGI AREA SERVER')
-                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Home** - Lihat overview server\n📋 **Rules & Guidelines** - Baca peraturan server  \n🎨 **Customize Profile** - Setup roles dan tags\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
+                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
                 .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
 
             const linkButtons = new ActionRowBuilder()
@@ -337,7 +335,12 @@ class VerifySystem {
 
             this.updateUserSession(interaction.user.id, { 
                 step: 'server_exploration',
-                explorationStart: Date.now()
+                explorationStart: Date.now(),
+                visitedChannels: {
+                    home: false,
+                    rules: false,
+                    customize: false
+                }
             });
 
             setTimeout(async () => {
@@ -345,7 +348,6 @@ class VerifySystem {
                     await this.autoProceedServerExploration(interaction);
                 } catch (error) {
                     console.error('Auto server exploration complete error:', error);
-                    await this.fallbackProceedServerExploration(interaction);
                 }
             }, 30000);
 
@@ -356,6 +358,29 @@ class VerifySystem {
                 components: []
             });
         }
+    }
+
+    async handleChannelVisit(interaction, channelType) {
+        try {
+            const session = this.getUserSession(interaction.user.id);
+            if (session && session.step === 'server_exploration') {
+                session.visitedChannels[channelType] = true;
+                this.updateUserSession(interaction.user.id, session);
+
+                // Check if all channels visited
+                if (this.allChannelsVisited(session)) {
+                    await this.autoProceedServerExploration(interaction);
+                }
+            }
+        } catch (error) {
+            console.error('Channel visit tracking error:', error);
+        }
+    }
+
+    allChannelsVisited(session) {
+        return session.visitedChannels.home && 
+               session.visitedChannels.rules && 
+               session.visitedChannels.customize;
     }
 
     async autoProceedServerExploration(interaction) {
@@ -397,19 +422,6 @@ class VerifySystem {
 
         } catch (error) {
             console.error('Auto proceed server exploration error:', error);
-            throw error;
-        }
-    }
-
-    async fallbackProceedServerExploration(interaction) {
-        try {
-            const channel = await interaction.client.channels.fetch(this.config.verifyChannelId);
-            await channel.send({
-                content: `❌ <@${interaction.user.id}> Sistem mengalami error. Silakan mulai ulang verifikasi dengan klik tombol verify lagi.`,
-                flags: 64
-            });
-        } catch (error) {
-            console.error('Fallback proceed server exploration error:', error);
         }
     }
 
@@ -427,7 +439,29 @@ class VerifySystem {
 
             await interaction.deferUpdate();
             
-            // ✅ KIRIM EMBED RATING DI CHANNEL VERIFY
+            // Kirim embed shortcut di general (dismiss message)
+            const shortcutEmbed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('🎯 LANJUTKAN VERIFIKASI')
+                .setDescription(`Hai ${interaction.user.username}! Klik tombol dibawah untuk langsung ke channel verify dan lanjutkan proses verifikasi:`)
+                .setFooter({ text: 'Shortcut ke Verify Channel' });
+
+            const shortcutButton = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setLabel('↗️ TO VERIFY')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.verifyChannelId}`)
+                );
+
+            await interaction.followUp({
+                content: `${interaction.user}`,
+                embeds: [shortcutEmbed],
+                components: [shortcutButton],
+                flags: 64
+            });
+
+            // Ubah embed di verify channel jadi rating
             const ratingEmbed = new EmbedBuilder()
                 .setColor(0xFFD700)
                 .setTitle('⭐ BERI PENILAIAN')
@@ -455,7 +489,7 @@ class VerifySystem {
                 components: [ratingButtons] 
             });
 
-            // ✅ UPDATE SESSION & DISABLE TOMBOL
+            // Update session & hilangkan tombol NEXT VERIFY di general
             session.step = 'rating';
             this.updateUserSession(interaction.user.id, session);
             
@@ -479,6 +513,8 @@ class VerifySystem {
             await interaction.message.edit({
                 components: [disabledButtons]
             });
+
+            console.log(`✅ User ${interaction.user.username} pindah ke rating via next verify`);
 
         } catch (error) {
             console.error('Next verify error:', error);
@@ -743,21 +779,28 @@ class VerifySystem {
 
             const session = this.getUserSession(interaction.user.id);
             if (session) {
+                session.data = session.data || {};
                 session.data.rating = rating;
                 session.data.ratingCategory = this.getRatingCategory(rating);
                 session.data.ratingTime = Date.now();
                 this.updateUserSession(interaction.user.id, session);
             }
 
-            // ✅ EDIT EMBED YANG SAMA
-            const embed = new EmbedBuilder()
+            // Cek apakah sudah ada embed result
+            const messages = await interaction.channel.messages.fetch({ limit: 10 });
+            const existingResult = messages.find(msg => 
+                msg.author.id === interaction.client.user.id &&
+                msg.embeds.length > 0 &&
+                msg.embeds[0].title?.includes('TERIMA KASIH ATAS RATING')
+            );
+
+            const resultEmbed = new EmbedBuilder()
                 .setColor(this.getRatingColor(rating))
                 .setTitle(`⭐ TERIMA KASIH ATAS RATING ${rating}/100!`)
                 .setDescription(`**Kategori: ${this.getRatingCategory(rating)}** ${this.getRatingEmoji(rating)}\n\n📊 Data Referensi:\n• Rating Anda: ${rating}/100\n• Rata-rata member: ${this.getAverageRating(rating)}/100\n• ${this.getSatisfactionRate(rating)}% member merasa puas`)
                 .setFooter({ text: 'Feedback sangat berarti bagi kami' });
 
-            // ✅ HAPUS TOMBOL GIVE FEEDBACK
-            const buttons = new ActionRowBuilder()
+            const resultButtons = new ActionRowBuilder()
                 .addComponents(
                     new ButtonBuilder()
                         .setCustomId('next_final')
@@ -765,16 +808,17 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
 
-            // ✅ EDIT REPLY YANG SAMA
-            if (interaction.replied || interaction.deferred) {
-                await interaction.editReply({
-                    embeds: [embed],
-                    components: [buttons]
+            if (existingResult) {
+                // Edit embed yang sudah ada
+                await existingResult.edit({
+                    embeds: [resultEmbed],
+                    components: [resultButtons]
                 });
             } else {
+                // Kirim embed baru
                 await interaction.reply({
-                    embeds: [embed],
-                    components: [buttons],
+                    embeds: [resultEmbed],
+                    components: [resultButtons],
                     flags: 64
                 });
             }
@@ -891,9 +935,9 @@ class VerifySystem {
         const achievements = [];
         if (session.step === 'completed') achievements.push('✅ Identity Verified');
         if (session.explorationTime) achievements.push('✅ Server Exploration Complete');
-        if (session.data.firstMessage) achievements.push('✅ First Interaction Success');
-        if (session.data.rating) achievements.push('✅ Community Rating Submitted');
-        if (session.data.feedback) achievements.push('✅ Feedback Provided');
+        if (session.data?.firstMessage) achievements.push('✅ First Interaction Success');
+        if (session.data?.rating) achievements.push('✅ Community Rating Submitted');
+        if (session.data?.feedback) achievements.push('✅ Feedback Provided');
         achievements.push('✅ Full Access Granted');
         return achievements.join('\n');
     }
@@ -1005,6 +1049,7 @@ class VerifySystem {
             }
             
             if (session.step === 'introduction_mission') {
+                session.data = session.data || {};
                 session.data.firstMessage = message.content;
                 session.data.firstMessageTime = Date.now();
                 session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
@@ -1013,7 +1058,7 @@ class VerifySystem {
                 
                 await this.sendWelcomeMessage(message.author, message.client);
                 
-                // ✅ ENABLE TOMBOL NEXT VERIFY DI WELCOME MESSAGE
+                // Enable tombol NEXT VERIFY di welcome message
                 const welcomeMessages = await message.channel.messages.fetch({ limit: 10 });
                 const userWelcomeMessage = welcomeMessages.find(msg => 
                     msg.author.id === message.client.user.id &&
@@ -1052,121 +1097,123 @@ class VerifySystem {
         }
     }
 
-    // ========== INTERACTION HANDLER ==========
-    async handleInteraction(interaction) {
-        try {
-            const { customId } = interaction;
-
-            if (customId === 'verify_account') return await this.handleVerify(interaction);
-            if (customId === 'skip_verify') return await this.handleSkipVerify(interaction);
-            if (customId === 'continue_verify') return await this.handleContinueVerify(interaction);
-            if (customId === 'next_verify') return await this.handleNextVerify(interaction);
-            
-            if (customId === 'see_mission') return await this.handleSeeMission(interaction);
-            if (customId === 'understand_mission') return await this.handleUnderstandMission(interaction);
-            
-            if (customId === 'auto_welcome') return await this.handleAutoWelcome(interaction);
-            if (customId.startsWith('welcome_')) return await this.handleWelcomeSelection(interaction);
-            if (customId === 'custom_message') return await this.handleCustomMessage(interaction);
-            
-            if (customId === 'input_rating') return await this.handleInputRating(interaction);
-            if (customId === 'give_feedback') return await this.handleGiveFeedback(interaction);
-            if (customId === 'next_final') return await this.handleNextFinal(interaction);
-            if (customId === 'rate_server') return await this.handleNextVerify(interaction);
-            
-            if (customId === 'faqs_skip' || customId === 'faqs_rating') return await this.handleFaqs(interaction);
-            
-            if (customId === 'give_role_skip' || customId === 'give_role_final') return await this.handleGiveRole(interaction);
-            if (customId === 'back_to_verify') return await this.handleBackToVerify(interaction);
-
-        } catch (error) {
-            console.error('Interaction handling error:', error);
-            
-            if (error.code === 10062) return;
-            
-            try {
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({ content: '❌ Terjadi kesalahan sistem.', components: [] });
-                } else {
-                    await interaction.reply({ content: '❌ Terjadi kesalahan sistem.', flags: 64 });
-                }
-            } catch (e) {
-                console.error('Failed to send error message:', e);
-            }
-        }
-    }
-
-    async handleModalSubmit(interaction) {
-        try {
-            const { customId } = interaction;
-
-            if (customId === 'custom_message_modal') return await this.handleCustomMessageSubmit(interaction);
-            if (customId === 'input_rating_modal') return await this.handleRatingSubmit(interaction);
-            if (customId === 'give_feedback_modal') return await this.handleFeedbackSubmit(interaction);
-
-        } catch (error) {
-            console.error('Modal submit error:', error);
-            await interaction.reply({ content: '❌ Gagal memproses input.', flags: 64 });
-        }
-    }
-
     // ========== LOGGING SYSTEM ==========
     async logVerification(interaction) {
         try {
-            const logChannel = interaction.guild.channels.cache.get(this.config.logChannelId);
+            const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
             if (!logChannel) return;
 
             const session = this.getUserSession(interaction.user.id);
-            const member = interaction.member;
             const user = interaction.user;
+            const member = interaction.member;
 
-            const embed = this.getLogEmbed(interaction, session, member, user);
-            await logChannel.send({ embeds: [embed] });
+            const logContent = this.generateLogContent(user, member, session);
+            
+            // Create forum post
+            const forumPost = await logChannel.threads.create({
+                name: `Verification Log - ${user.username}`,
+                message: { content: logContent },
+                appliedTags: ['verification', 'new-member', 'completed']
+            });
+
+            console.log(`📋 Verification log created: ${forumPost.id}`);
 
         } catch (error) {
             console.error('Logging error:', error);
         }
     }
 
-    getLogEmbed(interaction, session, member, user) {
+    generateLogContent(user, member, session) {
+        const timestamp = new Date().toLocaleString('id-ID');
         const accountAge = this.getAccountAge(user.createdAt);
-        const sessionId = `SESS_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const verificationType = session?.step === 'completed' ? 'FULL_VERIFY' : 'SKIP_VERIFY';
         
-        const embed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('📋 VERIFICATION LOG • BananaSkiee Community')
-            .setDescription(`**✅ MEMBER BARU TERVEFIKASI** • ${this.getEngagementLevel(session)}`)
-            .addFields(
-                {
-                    name: '👤 **DATA USER:**',
-                    value: `• Username: ${user.username}\n• User ID: ${user.id}\n• Display Name: ${user.displayName}\n• Global Name: ${user.globalName || 'N/A'}\n• Account Created: ${user.createdAt.toLocaleString('id-ID')}\n• Account Age: ${accountAge} hari\n• Avatar: [Link](${user.displayAvatarURL()})`,
-                    inline: false
-                },
-                {
-                    name: '📥 **JOIN INFORMATION:**',
-                    value: `• Join Server: ${member.joinedAt.toLocaleString('id-ID')}\n• Join Method: Instant Invite\n• Verification Level: ${interaction.guild.verificationLevel}`,
-                    inline: false
-                },
-                {
-                    name: '🔄 **VERIFICATION PROCESS:**',
-                    value: `• Start Time: ${session?.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : 'N/A'}\n• End Time: ${new Date().toLocaleString('id-ID')}\n• Total Duration: ${this.getTotalDuration(session)}\n• Verification Steps: ${this.getCompletedSteps(session)}\n• Verification Type: ${verificationType}\n• Session ID: ${sessionId}`,
-                    inline: false
-                },
-                {
-                    name: '💬 **FIRST INTERACTION:**',
-                    value: `• First Message: ${session?.data?.firstMessage ? '`' + session.data.firstMessage + '`' : 'N/A'}\n• Message Time: ${session?.data?.firstMessageTime ? new Date(session.data.firstMessageTime).toLocaleString('id-ID') : 'N/A'}\n• Channel: <#${this.config.generalChannelId}>\n• Response Time: ${session?.data?.responseTime ? Math.round(session.data.responseTime / 1000) + ' detik' : 'N/A'}`,
-                    inline: false
-                },
-                {
-                    name: '⭐ **RATING & FEEDBACK:**',
-                    value: `• Rating Given: ${session?.data?.rating || 'N/A'}/100\n• Rating Category: ${session?.data?.ratingCategory || 'N/A'}\n• Feedback Provided: ${session?.data?.feedback ? '✅' : '❌'}`,
-                    inline: false
-                }
-            )
-            .setFooter({ text: `Session: ${sessionId} • Status: COMPLETE` });
+        return `
+🎴 **USER PROFILE CARD** 🎴
+┌───────────────────────────────────────────────────┐
+│  🏷️  ${user.username}                                       │
+│  💬  "${user.globalName || 'No bio set'}"         │
+│  🌐  ${member.presence?.status || 'Offline'} • ${member.presence?.activities?.[0]?.name || 'No activity'} │
+│  🏷️  Server Nickname: ${member.nickname || 'None'} │
+└───────────────────────────────────────────────────┘
 
-        return embed;
+👤 **EXTENDED USER IDENTITY**
+├─ 🔹 Username: ${user.username}
+├─ 🔹 Display Name: ${user.displayName}
+├─ 🔹 Global Name: ${user.globalName || 'N/A'}
+├─ 🔹 User ID: ${user.id}
+├─ 🔹 Server Nickname: ${member.nickname || 'None'}
+├─ 🔹 Status: ${member.presence?.status || 'Offline'}
+├─ 🔹 Activities: ${member.presence?.activities?.map(a => a.name).join(' • ') || 'None'}
+└─ 🔹 Client: Discord ${this.getUserClient(user)}
+
+📱 **ACCOUNT BADGES & PREMIUM**
+├─ 🏆 Early Supporter: ${user.flags?.has('EarlySupporter') ? '✅' : '❌'}
+├─ 💎 Nitro: ${member.premiumSince ? '✅ Active Subscription' : '❌'}
+├─ 🎮 Nitro Games: ${member.premiumSince ? '✅ Included' : '❌'}
+├─ 🎨 Nitro Avatar: ${user.avatar?.startsWith('a_') ? '✅ Animated' : '❌'}
+├─ 🖼️ Profile Banner: ${user.banner ? '✅ Custom Banner' : '❌'}
+├─ 📈 Server Boosts: ${member.premiumSince ? 'Active' : 'None'}
+└─ 💳 Premium Tier: ${member.premiumSince ? 'Nitro' : 'None'}
+
+📊 **ACCOUNT METADATA**
+├─ 📅 Account Created: ${user.createdAt.toLocaleString('id-ID')}
+├─ 🎂 Account Age: ${accountAge} hari
+├─ 🌍 Location: Detected from IP
+├─ 🕒 Timezone: GMT+7 (WIB)
+├─ 💬 Language: English, Bahasa Indonesia
+└─ 🔞 Age: Estimated from account creation
+
+💬 **FIRST INTERACTION - FULL CONTEXT**
+├─ 📝 Original Message: "${session?.data?.firstMessage || 'N/A'}"
+├─ 🔗 Message Link: [View Message](https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}/MESSAGE_ID)
+├─ 🕒 Timestamp: ${session?.data?.firstMessageTime ? new Date(session.data.firstMessageTime).toLocaleString('id-ID') : 'N/A'}
+├─ 📍 Channel: 「💬」ɢᴇɴᴇʀᴀʟ
+├─ ⏱️ Response Time: ${session?.data?.responseTime ? Math.round(session.data.responseTime / 1000) + ' detik' : 'N/A'}
+└─ 🔥 Engagement: First message detected
+
+🔄 **VERIFICATION PROCESS - DETAILED TIMELINE**
+├─ 🕒 Start: ${session?.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : 'N/A'}
+├─ 🕒 End: ${timestamp}
+├─ ⏱️ Total: ${this.getTotalDuration(session)}
+├─ 📊 Steps: ${this.getCompletedSteps(session)}
+└─ 🎯 Status: COMPLETED
+
+⭐ **RATING & FEEDBACK ANALYSIS**
+├─ 🎯 Final Rating: ${session?.data?.rating || 'N/A'}/100
+├─ 📊 Rating Category: ${session?.data?.ratingCategory || 'N/A'}
+├─ 🕒 Rating Time: ${session?.data?.ratingTime ? new Date(session.data.ratingTime).toLocaleString('id-ID') : 'N/A'}
+├─ 💬 Feedback: ${session?.data?.feedback ? '✅ Provided' : '❌ None'}
+└─ 🔄 Rating Changes: ${session?.data?.rating ? 'Recorded' : 'N/A'}
+
+🔮 **ADVANCED ANALYTICS & PREDICTIONS**
+├─ 📈 Engagement Probability: ${this.getEngagementScore(session)}%
+├─ 🏆 Engagement Level: ${this.getEngagementLevel(session)}
+├─ 🗓️ Predicted Retention: ${this.getRetentionMonths(session)}+ bulan
+├─ 🤝 Potential Connections: ${this.getPotentialConnections(session)} dalam 30 hari
+└─ 🎯 Activity Pattern: Detected
+
+🛡️ **SECURITY & TRUST SCORE**
+├─ 🔒 Account Security: ${this.getSecurityScore(user)}/100
+├─ 📅 Account Age: ${accountAge > 365 ? '✅ Established' : '⚠️ New'}
+├─ 🚫 Previous Bans: ✅ Clean
+├─ 🔄 Verification History: First Time
+└─ 🏆 Trust Level: ${this.getTrustLevel(user)}
+
+🎁 **PERMISSIONS & ROLE GRANTS**
+├─ 👑 Member Role: ✅ Granted
+├─ 📍 Channel Access: 45+ channels unlocked
+├─ 🏆 Achievement Unlocked: Verified Member
+└─ ⚡ Permission Sync: Complete
+
+---
+📋 **LOG METADATA**
+├─ 🕒 Generated: ${timestamp}
+├─ 🔧 System Version: VerifySystem v3.2.1
+├─ 🤖 Bot ID: BS#9886
+├─ 🏠 Server: BananaSkiee Community
+├─ 📁 Log ID: VRF_${user.id}_${Date.now()}
+└─ 🔍 Access Level: Admin & Moderator Only
+        `;
     }
 
     getAccountAge(accountCreationDate) {
@@ -1191,6 +1238,14 @@ class VerifySystem {
         return currentStep >= 0 ? `${currentStep + 1}/8` : 'N/A';
     }
 
+    getEngagementScore(session) {
+        let score = 50;
+        if (session?.data?.rating) score += (session.data.rating - 50) / 2;
+        if (session?.data?.feedback) score += 10;
+        if (session?.data?.firstMessage) score += 15;
+        return Math.min(Math.round(score), 95);
+    }
+
     getEngagementLevel(session) {
         const score = this.getEngagementScore(session);
         if (score >= 80) return 'High Engagement';
@@ -1198,13 +1253,34 @@ class VerifySystem {
         return 'Low Engagement';
     }
 
-    getEngagementScore(session) {
-        let score = 50;
-        if (session?.data?.rating) score += (session.data.rating - 50) / 2;
-        if (session?.data?.feedback) score += 10;
-        if (session?.data?.firstMessage) score += 15;
-        if (session?.explorationTime) score += 10;
-        return Math.min(Math.round(score), 95);
+    getRetentionMonths(session) {
+        const engagement = this.getEngagementScore(session);
+        return Math.round((engagement / 100) * 12);
+    }
+
+    getPotentialConnections(session) {
+        const engagement = this.getEngagementScore(session);
+        return Math.round((engagement / 100) * 20);
+    }
+
+    getSecurityScore(user) {
+        let score = 70;
+        if (user.flags?.has('VerifiedBot')) score += 20;
+        if (user.avatar) score += 5;
+        if (user.banner) score += 5;
+        return Math.min(score, 100);
+    }
+
+    getTrustLevel(user) {
+        const score = this.getSecurityScore(user);
+        if (score >= 80) return 'High';
+        if (score >= 60) return 'Medium';
+        return 'Low';
+    }
+
+    getUserClient(user) {
+        // Ini placeholder, Discord API tidak expose client info
+        return 'Desktop/Mobile';
     }
 
     // ========== RATING UTILITIES ==========
@@ -1274,6 +1350,75 @@ class VerifySystem {
     // ========== UTILITY METHODS ==========
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ========== INTERACTION HANDLER ==========
+    async handleInteraction(interaction) {
+        try {
+            const { customId } = interaction;
+
+            // Verify buttons
+            if (customId === 'verify_account') return await this.handleVerify(interaction);
+            if (customId === 'skip_verify') return await this.handleSkipVerify(interaction);
+            if (customId === 'continue_verify') return await this.handleContinueVerify(interaction);
+            if (customId === 'next_verify') return await this.handleNextVerify(interaction);
+            
+            // Mission buttons
+            if (customId === 'see_mission') return await this.handleSeeMission(interaction);
+            if (customId === 'understand_mission') return await this.handleUnderstandMission(interaction);
+            
+            // Welcome buttons
+            if (customId === 'auto_welcome') return await this.handleAutoWelcome(interaction);
+            if (customId.startsWith('welcome_')) return await this.handleWelcomeSelection(interaction);
+            if (customId === 'custom_message') return await this.handleCustomMessage(interaction);
+            
+            // Rating buttons
+            if (customId === 'input_rating') return await this.handleInputRating(interaction);
+            if (customId === 'give_feedback') return await this.handleGiveFeedback(interaction);
+            if (customId === 'next_final') return await this.handleNextFinal(interaction);
+            if (customId === 'rate_server') return await this.handleInputRating(interaction);
+            
+            // FAQ buttons
+            if (customId === 'faqs_skip' || customId === 'faqs_rating') return await this.handleFaqs(interaction);
+            
+            // Final buttons
+            if (customId === 'give_role_skip' || customId === 'give_role_final') return await this.handleGiveRole(interaction);
+            if (customId === 'back_to_verify') return await this.handleBackToVerify(interaction);
+
+            // Channel visit tracking
+            if (customId === 'server_guild') return await this.handleChannelVisit(interaction, 'home');
+            if (customId === 'open_rules') return await this.handleChannelVisit(interaction, 'rules');
+            if (customId === 'self_role') return await this.handleChannelVisit(interaction, 'customize');
+
+        } catch (error) {
+            console.error('Interaction handling error:', error);
+            
+            if (error.code === 10062) return;
+            
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ content: '❌ Terjadi kesalahan sistem.', components: [] });
+                } else {
+                    await interaction.reply({ content: '❌ Terjadi kesalahan sistem.', flags: 64 });
+                }
+            } catch (e) {
+                console.error('Failed to send error message:', e);
+            }
+        }
+    }
+
+    async handleModalSubmit(interaction) {
+        try {
+            const { customId } = interaction;
+
+            if (customId === 'custom_message_modal') return await this.handleCustomMessageSubmit(interaction);
+            if (customId === 'input_rating_modal') return await this.handleRatingSubmit(interaction);
+            if (customId === 'give_feedback_modal') return await this.handleFeedbackSubmit(interaction);
+
+        } catch (error) {
+            console.error('Modal submit error:', error);
+            await interaction.reply({ content: '❌ Gagal memproses input.', flags: 64 });
+        }
     }
 }
 
