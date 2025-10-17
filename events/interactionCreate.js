@@ -35,49 +35,6 @@ module.exports = {
         }
       }
 
-      // ========== VERIFY SYSTEM SELECT MENU HANDLERS ==========
-      if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
-        const selected = interaction.values[0];
-        
-        // ✅ FIX: Gunakan Promise instead of await di switch case
-        const rulesModule = require('../modules/rules');
-        
-        try {
-          const rules = await rulesModule.execute(interaction.client);
-          
-          let embed;
-          
-          switch(selected) {
-            case 'leveling':
-              embed = rules.levelingEmbed;
-              break;
-            case 'moderation':
-              embed = rules.moderationPolicyEmbed;
-              break;
-            case 'counting':
-              embed = rules.countingEmbed;
-              break;
-            default:
-              embed = new EmbedBuilder()
-                .setTitle("❌ Information Not Found")
-                .setDescription("Sorry, the selected option is not available.")
-                .setColor(0xFF0000);
-          }
-          
-          await interaction.reply({
-            embeds: [embed],
-            ephemeral: true
-          });
-        } catch (error) {
-          console.error('Error loading rules:', error);
-          await interaction.reply({
-            content: '❌ Error loading information.',
-            ephemeral: true
-          });
-        }
-        return;
-      }
-
       // ========== VERIFY SYSTEM BUTTON HANDLERS ==========
       if (interaction.isButton()) {
         const customId = interaction.customId;
@@ -96,35 +53,20 @@ module.exports = {
           return await verifySystem.handleBackToVerify(interaction);
         }
         
-        // ✅ TAMBAH HANDLER UNTUK NEXT VERIFY
+        // NEXT VERIFY
         if (customId === 'next_verify') {
           return await verifySystem.handleNextVerify(interaction);
         }
         
-        // SERVER EXPLORATION BUTTONS
-        if (customId === 'server_exploration_complete') {
-          return await verifySystem.handleServerExplorationComplete(interaction);
+        // SERVER EXPLORATION BUTTONS (Link buttons)
+        if (customId === 'server_guild') {
+          return await verifySystem.handleChannelVisit(interaction, 'home');
         }
-        if (customId === 'server_guild' || customId === 'open_rules' || customId === 'self_role') {
-          // Track channel visits untuk server exploration
-          const session = verifySystem.getUserSession(interaction.user.id);
-          if (session && session.step === 'server_exploration') {
-            const channelType = customId === 'server_guild' ? 'home' : 
-                              customId === 'open_rules' ? 'rules' : 'customize';
-            
-            if (!session.visitedChannels) session.visitedChannels = [];
-            if (!session.visitedChannels.includes(channelType)) {
-              session.visitedChannels.push(channelType);
-              verifySystem.updateUserSession(interaction.user.id, session);
-            }
-            
-            // Kirim feedback bahwa channel berhasil dikunjungi
-            await interaction.reply({
-              content: `✅ Berhasil mengunjungi ${channelType === 'home' ? 'Server Home' : channelType === 'rules' ? 'Rules' : 'Customize Profile'}!`,
-              ephemeral: true
-            });
-          }
-          return;
+        if (customId === 'open_rules') {
+          return await verifySystem.handleChannelVisit(interaction, 'rules');
+        }
+        if (customId === 'self_role') {
+          return await verifySystem.handleChannelVisit(interaction, 'customize');
         }
         
         // MISSION BUTTONS
@@ -133,10 +75,6 @@ module.exports = {
         }
         if (customId === 'understand_mission') {
           return await verifySystem.handleUnderstandMission(interaction);
-        }
-        if (customId === 'open_general') {
-          // Ini tombol link, tidak perlu handler khusus
-          return;
         }
         
         // WELCOME BUTTONS
@@ -157,14 +95,11 @@ module.exports = {
         if (customId === 'give_feedback') {
           return await verifySystem.handleGiveFeedback(interaction);
         }
-        if (customId === 'confirm_rating') {
-          return await verifySystem.showRatingStep(interaction);
-        }
         if (customId === 'next_final') {
           return await verifySystem.handleNextFinal(interaction);
         }
         if (customId === 'rate_server') {
-          return await verifySystem.showRatingStep(interaction);
+          return await verifySystem.handleInputRating(interaction);
         }
         
         // FAQ BUTTONS
@@ -176,6 +111,7 @@ module.exports = {
         if (customId === 'give_role_skip' || customId === 'give_role_final') {
           return await verifySystem.handleGiveRole(interaction);
         }
+      }
 
         // ========== GUIDEBOOK & RULES BUTTON HANDLERS ==========
         
