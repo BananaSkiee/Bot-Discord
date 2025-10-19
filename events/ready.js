@@ -13,6 +13,7 @@ const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
 const rulesModule = require("../modules/rules");
 const VerifySystem = require('../modules/verify');
+const { startAutoAnimation } = require("../modules/iconAnim");
 
 const verifySystem = new VerifySystem();
 
@@ -87,7 +88,8 @@ module.exports = {
     try { stickyHandler(client); } catch (err) { console.error("❌ Sticky handler error:", err); }
     try { autoGreeting(client); } catch (err) { console.error("❌ Auto greeting error:", err); }
     try { simulateBTC(client); } catch (err) { console.error("❌ Simulasi BTC error:", err); }
-
+    try { nickAnim(client); } catch (err) { console.error("❌ Nickname anim error:", err); }
+    
     try {
       await slashCommandSetup(client);
     } catch (err) {
