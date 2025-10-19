@@ -2,59 +2,57 @@ require("dotenv").config();
 
 module.exports = function srvName(client) {
   const GUILD_ID = process.env.GUILD_ID;
-  const FULL_NAME = "BananaSkiee Community";
-  const SPEED = 1000; // jeda antar frame grow/shrink
-  const BLINK_TEXT = "·"; // karakter kecil untuk kedip
+
+  const names = [
+    { steps: ["dsc.gg/BananaSkiee"], delay: 5000, blink: false },
+    { steps: ["The", "The Empire", "The Empire of", "The Empire of BS"], delay: 500, blink: true },
+    { steps: ["The", "The Legacy", "The Legacy of", "The Legacy of BS"], delay: 500, blink: true },
+    { steps: ["The", "The Nexus", "The Nexus of", "The Nexus of BS"], delay: 500, blink: true }
+  ];
 
   client.once("ready", async () => {
-    console.log("🎬 Animasi nama server aktif (grow + smart blink + shrink)");
+    console.log("🎬 Animasi nama server aktif");
 
     const guild = await client.guilds.fetch(GUILD_ID);
     if (!guild) return console.log("❌ Server tidak ditemukan!");
 
-    async function sleep(ms) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function randomBlink(text) {
+      return text.split("").map(c => {
+        if (c === " ") return " "; // spasi tetap
+        return Math.random() < 0.3 ? "·" : c; // 30% huruf kedip
+      }).join("");
     }
 
     async function animate() {
       try {
-        const len = FULL_NAME.length;
+        for (let i = 0; ; i = (i + 1) % names.length) {
+          const current = names[i];
 
-        // Stage 1: Grow dari kiri
-        for (let size = 2; size <= len; size++) {
-          const name = FULL_NAME.slice(0, size);
-          await guild.setName(name);
-          await sleep(SPEED);
+          // Animasi per step (per kata / frasa)
+          for (let step of current.steps) {
+            await guild.setName(step);
+            await sleep(current.delay);
+          }
+
+          // Jika blink = true, lakukan kedip acak
+          if (current.blink) {
+            for (let blinkCount = 0; blinkCount < 5; blinkCount++) {
+              await guild.setName(randomBlink(current.steps[current.steps.length - 1]));
+              await sleep(400); // kedip lambat 400ms
+            }
+            // set full name lagi
+            await guild.setName(current.steps[current.steps.length - 1]);
+            await sleep(500);
+          }
         }
-
-        // Stage 2: Kedip pelan 2x
-        for (let i = 0; i < 2; i++) {
-          await guild.setName(FULL_NAME);
-          await sleep(500); // on
-          await guild.setName(BLINK_TEXT.repeat(len));
-          await sleep(500); // off
-        }
-
-        // Stage 2.2: Kedip cepat 2x
-        for (let i = 0; i < 2; i++) {
-          await guild.setName(FULL_NAME);
-          await sleep(200); // on
-          await guild.setName(BLINK_TEXT.repeat(len));
-          await sleep(200); // off
-        }
-
-        // Stage 3: Shrink dari kanan
-        for (let size = len - 1; size >= 2; size--) {
-          const name = FULL_NAME.slice(0, size);
-          await guild.setName(name);
-          await sleep(SPEED);
-        }
-
-        await sleep(1500); // jeda sebelum ulang
       } catch (err) {
-        console.error("❌ Error animasi:", err);
-      } finally {
-        animate(); // ulang animasi
+        console.error("❌ Error animasi nama server:", err);
+        await sleep(2000);
+        animate(); // ulangi jika error
       }
     }
 
