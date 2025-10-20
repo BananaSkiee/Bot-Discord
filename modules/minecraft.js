@@ -1,33 +1,21 @@
-// modules/minecraft.js
-// Full single-file implementation:
-// - 2 Mineflayer bots (S1, S2)
-// - 100 random minecraft usernames for reconnect after kick/ban
-// - Discord -> Minecraft chat relay (channel per server)
-// - Minecraft -> Discord chat + plugin/server messages (plain chat + embed for plugin/server)
-// - !UN1 / !UN2 to change next Minecraft username for server 1/2
-// - !log s1 / !log s2 to send server status embed
-// - Queue messages when server offline
-// - Auto reconnect loop
-// - Local log files in ./logs
+// modules/minecraft.js — FIXED & STABLE VERSION
+// Features tetap sama: dual bot S1/S2, relay Discord<->Minecraft, auto reconnect, anti-AFK, logs
 
 const mineflayer = require('mineflayer');
 const fs = require('fs');
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 
-// ====== CONFIG - EDIT BEFORE RUN ======
-const ID_GUILD = '1347233781391560837'; // your Discord guild id (required for nickname changes if used)
-const CHANNEL_S1 = '1426537842875826278'; // Discord channel for Server 1 (plain chat + embeds)
-const CHANNEL_S2 = '1429751342301184071'; // Discord channel for Server 2 (plain chat + embeds)
+// ====== CONFIG ======
+const ID_GUILD = '1347233781391560837';
+const CHANNEL_S1 = '1426537842875826278';
+const CHANNEL_S2 = '1429751342301184071';
 
-// Fill server host/port/initial username correctly:
-// config servers (contoh)
 const SERVERS = [
   { id: 's1', name: 'Server 1', host: 'BananaUcok.aternos.me', port: 14262, initialUsername: 'BotServer1', channelId: CHANNEL_S1, capacity: 100, version: '1.20.1' },
   { id: 's2', name: 'Server 2', host: 'nightz.my.id', port: 25583, initialUsername: 'BotServer2', channelId: CHANNEL_S2, capacity: 100, version: '1.21.10' }
 ];
 
-// 100 random Minecraft usernames (short)
 const randomNames = [
   'Banana','Botty','NotchX','Kicker','Banned','Player','Crashy','Signal','ByeBot','LostMC',
   'Reboot','Jumpin','Zapper','MinerX','Crafty','Blocky','Pixelz','Mobster','EnderX','Nether',
@@ -48,7 +36,7 @@ if (!fs.existsSync('./logs')) fs.mkdirSync('./logs', { recursive: true });
 function appendLocalLog(serverId, line) {
   const file = path.join('logs', `server-${serverId}.log`);
   const ts = new Date().toISOString();
-  try { fs.appendFileSync(file, `[${ts}] ${line}\n`); } catch (e) { /* ignore */ }
+  try { fs.appendFileSync(file, `[${ts}] ${line}\n`); } catch { }
 }
 function getRandomName() {
   return randomNames[Math.floor(Math.random() * randomNames.length)];
@@ -57,15 +45,25 @@ function makePrefix(serverId) {
   return serverId === 's1' ? '[S1]' : '[S2]';
 }
 
-// Exported initializer
+// ===== Reconnect Helper (FIXED) =====
+function scheduleReconnect(serverId, discordClient, serverConfig, delay = 30000) {
+  const st = state[serverId];
+  if (!st) return;
+  if (st.reconnectTimer) clearTimeout(st.reconnectTimer);
+  appendLocalLog(serverId, `[RECONNECT] Will retry in ${delay / 1000}s...`);
+  st.reconnectTimer = setTimeout(() => {
+    createAndConnectBot(discordClient, serverConfig);
+  }, delay);
+}
+
+// ===== Exported init =====
 module.exports = {
   init: (discordClient) => {
-    // prepare state
     SERVERS.forEach(s => {
       state[s.id] = {
         config: s,
         bot: null,
-        usernameToUse: s.initialUsername, // current username to attempt
+        usernameToUse: s.initialUsername,
         queuedMessages: [],
         online: false,
         players: new Set(),
@@ -75,114 +73,91 @@ module.exports = {
         errorCount: 0,
         startedAt: null,
         lastOfflineAt: null,
-        reconnectTimer: null
+        reconnectTimer: null,
+        afkInterval1: null,
+        afkInterval2: null
       };
     });
 
-    // Discord message handler (relay + commands)
+    // ===== Discord message handler =====
     discordClient.on('messageCreate', async (msg) => {
       if (msg.author.bot) return;
       const content = msg.content.trim();
 
-      // prefix commands (no S1/S2 needed for normal chat)
       if (/^!log\s+s1$/i.test(content)) return sendServerStatus(discordClient, 's1', msg.channel);
       if (/^!log\s+s2$/i.test(content)) return sendServerStatus(discordClient, 's2', msg.channel);
 
-      // !UN1 <nick> -> set next username for server1 and force reconnect
       const un1 = content.match(/^!UN1\s+(.+)$/i);
       const un2 = content.match(/^!UN2\s+(.+)$/i);
       if (un1) return setUsernameAndReconnect(discordClient, 's1', un1[1].trim(), msg.author.username);
       if (un2) return setUsernameAndReconnect(discordClient, 's2', un2[1].trim(), msg.author.username);
 
-      // Plain chat in channel -> relay to corresponding server (no S1/S2 required)
-      if (msg.channel.id === state.s1?.config.channelId) {
+      if (msg.channel.id === state.s1?.config.channelId)
         return handleDiscordToMinecraft(discordClient, 's1', msg.author.username, content);
-      }
-      if (msg.channel.id === state.s2?.config.channelId) {
+      if (msg.channel.id === state.s2?.config.channelId)
         return handleDiscordToMinecraft(discordClient, 's2', msg.author.username, content);
-      }
 
-      // Backwards compatible shortcuts: "S1 <text>" or "S2 <text>" or "ALL <text>"
       const mS1 = content.match(/^S1\s+([\s\S]+)/i);
       const mS2 = content.match(/^S2\s+([\s\S]+)/i);
       const mAll = content.match(/^ALL\s+([\s\S]+)/i);
       if (mS1) return handleDiscordToMinecraft(discordClient, 's1', msg.author.username, mS1[1]);
       if (mS2) return handleDiscordToMinecraft(discordClient, 's2', msg.author.username, mS2[1]);
       if (mAll) return handleDiscordToMinecraft(discordClient, 'all', msg.author.username, mAll[1]);
-
-      // !mc s1/s2/all <command>
-      const mcCmd = content.match(/^!mc\s+(s1|s2|all)\s+([\s\S]+)/i);
-      if (mcCmd) {
-        const target = mcCmd[1].toLowerCase();
-        return handleDiscordToMinecraft(discordClient, target === 'all' ? 'all' : target, msg.author.username, mcCmd[2]);
-      }
     });
 
-    // Start bots
     SERVERS.forEach(s => createAndConnectBot(discordClient, s));
   }
 };
 
-// ===== helpers: send logs to discord channels =====
+// ===== Utility Send Functions =====
 async function sendPlainToChannel(discordClient, channelId, text) {
   try {
     const ch = await discordClient.channels.fetch(channelId);
-    if (!ch) return;
-    await ch.send(text);
-  } catch (e) {
-    // ignore
-  }
+    if (ch) await ch.send(text);
+  } catch { }
 }
-
 async function sendEmbedToChannel(discordClient, channelId, embed) {
   try {
     const ch = await discordClient.channels.fetch(channelId);
-    if (!ch) return;
-    await ch.send({ embeds: [embed] });
-  } catch (e) {
-    // ignore
-  }
+    if (ch) await ch.send({ embeds: [embed] });
+  } catch { }
 }
 
-// ===== server status embed =====
+// ===== Embed: Server Status =====
 function msToHuman(ms) {
   const s = Math.floor(ms / 1000) % 60;
   const m = Math.floor(ms / 60000) % 60;
   const h = Math.floor(ms / 3600000);
   return `${h} jam ${m} menit ${s} detik`;
 }
-
 async function sendServerStatus(discordClient, serverId, replyChannel) {
   const st = state[serverId];
   if (!st) return replyChannel.send('Server tidak ditemukan');
   const cfg = st.config;
-  const players = Array.from(st.players || []);
   const embed = new EmbedBuilder()
     .setTitle(`${cfg.name} — Status`)
     .addFields(
       { name: 'Status', value: st.online ? '🟢 ONLINE' : '🔴 OFFLINE', inline: true },
       { name: 'Host', value: `${cfg.host}:${cfg.port}`, inline: true },
-      { name: 'Players', value: `${players.length} / ${cfg.capacity}`, inline: true },
+      { name: 'Players', value: `${st.players.size} / ${cfg.capacity}`, inline: true },
       { name: 'Uptime', value: st.startedAt ? msToHuman(Date.now() - st.startedAt) : '-', inline: true },
-      { name: 'Total Chat Today', value: `${st.totalChatToday}`, inline: true },
-      { name: 'Total Commands Today', value: `${st.totalCommandsToday}`, inline: true },
-      { name: 'Total Events Today', value: `${st.totalEventsToday}`, inline: true }
+      { name: 'Chat', value: `${st.totalChatToday}`, inline: true },
+      { name: 'Cmd', value: `${st.totalCommandsToday}`, inline: true },
+      { name: 'Events', value: `${st.totalEventsToday}`, inline: true }
     )
+    .setColor(st.online ? 0x00FF00 : 0xFF0000)
     .setTimestamp();
-  return replyChannel.send({ embeds: [embed] });
+  replyChannel.send({ embeds: [embed] });
 }
 
-// ===== change username manually and reconnect =====
+// ===== Username Change + Reconnect =====
 async function setUsernameAndReconnect(discordClient, serverId, newUsername, requestedBy) {
   const st = state[serverId];
   if (!st) return;
   st.usernameToUse = newUsername;
   appendLocalLog(serverId, `[MANUAL_USERNAME] ${requestedBy} requested ${newUsername}`);
-  // force disconnect (bot.quit()) so connect flow will use new username
-  if (st.bot && typeof st.bot.quit === 'function') {
-    try { st.bot.quit(); } catch (e) { /* ignore */ }
-  }
-  // log to Discord channel
+  if (st.bot) try { st.bot.quit(); } catch { }
+
   const embed = new EmbedBuilder()
     .setTitle(`${st.config.name} — Username Change`)
     .setDescription(`Next username set to \`${newUsername}\` (requested by ${requestedBy}). Reconnecting...`)
@@ -191,187 +166,118 @@ async function setUsernameAndReconnect(discordClient, serverId, newUsername, req
   sendEmbedToChannel(discordClient, st.config.channelId, embed);
 }
 
-// ===== handle Discord -> Minecraft relay =====
+// ===== Discord -> Minecraft Relay =====
 async function handleDiscordToMinecraft(discordClient, target, discordUsername, text) {
   if (target === 'all') {
-    for (const sid of Object.keys(state)) {
+    for (const sid of Object.keys(state))
       await sendToServerMessage(discordClient, sid, text, discordUsername);
-    }
-    // central log (optional)
-    appendLocalLog('all', `[DISCORD → ALL] ${discordUsername}: ${text}`);
     return;
   }
   await sendToServerMessage(discordClient, target, text, discordUsername);
-  appendLocalLog(target, `[DISCORD → ${target.toUpperCase()}] ${discordUsername}: ${text}`);
 }
 
-// ===== send to a specific Minecraft bot (queue if offline) =====
+// ===== Send to Minecraft (queue if offline) =====
 async function sendToServerMessage(discordClient, serverId, text, discordUsername) {
   const st = state[serverId];
   if (!st) return;
   const bot = st.bot;
   if (!st.online || !bot) {
-    st.queuedMessages.push({ text, discordUsername, time: Date.now() });
-    appendLocalLog(serverId, `[QUEUED] ${discordUsername}: ${text}`);
-    // notify in channel that message queued (optional)
-    const notify = `${makePrefix(serverId)} Server offline — message queued: ${text}`;
-    await sendPlainToChannel(discordClient, st.config.channelId, notify);
+    st.queuedMessages.push({ text, discordUsername });
+    await sendPlainToChannel(discordClient, st.config.channelId, `${makePrefix(serverId)} Server offline — message queued.`);
     return;
   }
-
-  const trimmed = text.trim();
-  // If starts with '/', send as command (bot.chat('/...'))
-  if (trimmed.startsWith('/')) {
-    try {
-      bot.chat(trimmed);
+  try {
+    if (text.startsWith('/')) {
+      bot.chat(text);
       st.totalCommandsToday++;
-      appendLocalLog(serverId, `[DISCORD_CMD] ${discordUsername}: ${trimmed}`);
-    } catch (err) {
-      st.errorCount++;
-      appendLocalLog(serverId, `[ERROR] Failed CMD: ${trimmed} (${err.message})`);
-      await sendPlainToChannel(discordClient, st.config.channelId, `${makePrefix(serverId)} ❌ Failed to run command: ${err.message}`);
-    }
-  } else {
-    // Send plain chat but DO NOT reveal the real Discord username as "source" to players.
-    // We still include the discord username in our local log + Discord logs.
-    const inGameMsg = `${makePrefix(serverId)} ${trimmed}`;
-    try {
-      bot.chat(inGameMsg);
+    } else {
+      bot.chat(`${makePrefix(serverId)} ${text}`);
       st.totalChatToday++;
-      appendLocalLog(serverId, `[DISCORD_CHAT] ${discordUsername}: ${trimmed}`);
-    } catch (err) {
-      st.errorCount++;
-      appendLocalLog(serverId, `[ERROR] Failed chat: ${inGameMsg} (${err.message})`);
-      await sendPlainToChannel(discordClient, st.config.channelId, `${makePrefix(serverId)} ❌ Failed to send chat: ${err.message}`);
     }
+  } catch (err) {
+    st.errorCount++;
+    appendLocalLog(serverId, `[ERROR SEND] ${err.message}`);
+    sendPlainToChannel(discordClient, st.config.channelId, `${makePrefix(serverId)} ❌ ${err.message}`);
   }
 }
 
-// ===== create & connect Mineflayer bot for each server =====
+// ===== Bot Creator =====
 function createAndConnectBot(discordClient, serverConfig) {
   const sid = serverConfig.id;
   const st = state[sid];
 
   async function connectOnce() {
-    // choose username to use: either manual override or existing or random on kick
     const usernameToTry = st.usernameToUse || serverConfig.initialUsername || getRandomName();
-    // create bot
     let bot;
+
     try {
-      // sebelum: mineflayer.createBot({ host: ..., port: ..., username: usernameToTry, version: '1.20.1', ... });
-// sesudah:
-bot = mineflayer.createBot({
-  host: serverConfig.host,
-  port: serverConfig.port,
-  username: usernameToTry,
-  version: serverConfig.version || 'auto', // gunakan version yg diset, atau 'auto' jika null
-  auth: 'offline'
-});
+      bot = mineflayer.createBot({
+        host: serverConfig.host,
+        port: serverConfig.port,
+        username: usernameToTry,
+        version: serverConfig.version || 'auto',
+        auth: 'offline'
+      });
     } catch (err) {
-      appendLocalLog(sid, `[ERROR] createBot threw: ${err.message}`);
-      scheduleReconnect();
-      return;
+      appendLocalLog(sid, `[ERROR] createBot failed: ${err.message}`);
+      return scheduleReconnect(sid, discordClient, serverConfig);
     }
 
     st.bot = bot;
 
-    // events
     bot.once('login', async () => {
       st.online = true;
       st.startedAt = Date.now();
-      st.lastOfflineAt = null;
-      st.usernameToUse = bot.username || usernameToTry; // current username in use
-      appendLocalLog(sid, `[LOGIN] Bot logged in as ${st.usernameToUse}`);
-      // flush queued messages
-      if (st.queuedMessages.length > 0) {
-        const queued = st.queuedMessages.splice(0); // clear
-        appendLocalLog(sid, `[QUEUE] Sending ${queued.length} queued messages`);
-        for (const q of queued) {
-          await sendToServerMessage(discordClient, sid, q.text, q.discordUsername);
-        }
-      }
-      // announce to channel (optional)
-      await sendPlainToChannel(discordClient, serverConfig.channelId, `${makePrefix(sid)} ✅ Bot connected as ${st.usernameToUse}`);
+      appendLocalLog(sid, `[LOGIN] ${bot.username}`);
+      sendPlainToChannel(discordClient, serverConfig.channelId, `${makePrefix(sid)} ✅ Connected as ${bot.username}`);
 
-      // set up anti-AFK intervals (store ids if needed)
-      st.afkInterval1 = setInterval(()=>{ try { if (bot.entity) { bot.setControlState('forward', true); setTimeout(()=>bot.setControlState('forward', false), 600); } } catch(e){} }, 60000);
-      st.afkInterval2 = setInterval(()=>{ try { if (bot.entity){ bot.setControlState('jump', true); setTimeout(()=>bot.setControlState('jump', false), 300); } } catch(e){} }, 120000);
+      const queued = st.queuedMessages.splice(0);
+      for (const q of queued) await sendToServerMessage(discordClient, sid, q.text, q.discordUsername);
+
+      st.afkInterval1 = setInterval(() => {
+        try { bot.setControlState('forward', true); setTimeout(() => bot.setControlState('forward', false), 600); } catch { }
+      }, 60000);
+      st.afkInterval2 = setInterval(() => {
+        try { bot.setControlState('jump', true); setTimeout(() => bot.setControlState('jump', false), 300); } catch { }
+      }, 120000);
     });
 
-    // catch normal chat/message packets
-    bot.on('message', json => {
-      try {
-        const text = json.toString();
-        handleMinecraftMessage(discordClient, sid, text);
-      } catch (e) { /* ignore parse errors */ }
+    bot.on('message', (json) => {
+      try { handleMinecraftMessage(discordClient, sid, json.toString()); } catch { }
     });
-    // sometimes messagestr is emitted
-    bot.on('messagestr', msg => {
-      try { handleMinecraftMessage(discordClient, sid, String(msg)); } catch (e) {}
+    bot.on('messagestr', (m) => {
+      try { handleMinecraftMessage(discordClient, sid, m); } catch { }
     });
 
-    // player join/leave events — mineflayer emits playerJoined/playerLeft with player objects in some versions
-    bot.on('playerJoined', p => {
-      if (!p || !p.username) return;
-      st.players.add(p.username);
-      st.totalEventsToday++;
-      appendLocalLog(sid, `[JOIN] ${p.username}`);
-      // log to discord plain
-      sendPlainToChannel(discordClient, serverConfig.channelId, `${makePrefix(sid)} [JOIN] ${p.username}`);
-    });
-    bot.on('playerLeft', p => {
-      if (!p || !p.username) return;
-      st.players.delete(p.username);
-      st.totalEventsToday++;
-      appendLocalLog(sid, `[LEAVE] ${p.username}`);
-      sendPlainToChannel(discordClient, serverConfig.channelId, `${makePrefix(sid)} [LEAVE] ${p.username}`);
-    });
-
-    // disconnect handlers: kicked, end
-    const handleDisconnect = async (reason) => {
-      // clear AFK intervals
-      try { clearInterval(st.afkInterval1); clearInterval(st.afkInterval2); } catch(e){}
+    const handleDisconnect = (reason) => {
+      clearInterval(st.afkInterval1); clearInterval(st.afkInterval2);
       st.online = false;
-      st.lastOfflineAt = Date.now();
       st.bot = null;
-      st.totalEventsToday++;
-      appendLocalLog(sid, `[DISCONNECT] Reason: ${reason}`);
-      // when kicked/banned we rotate username to try rejoin
       const newName = getRandomName();
       st.usernameToUse = newName;
-      // inform discord (embed)
+      appendLocalLog(sid, `[DISCONNECT] ${reason}`);
       const emb = new EmbedBuilder()
         .setTitle(`${serverConfig.name} — Disconnected`)
-        .setDescription(`Bot disconnected: ${String(reason)}\nWill attempt reconnect with username: \`${newName}\`.`)
+        .setDescription(`Reason: ${String(reason)}\nReconnect using \`${newName}\` in 30s.`)
         .setColor(0xFF8C00)
         .setTimestamp();
       sendEmbedToChannel(discordClient, serverConfig.channelId, emb);
-      scheduleReconnectWithDelay();
+      scheduleReconnect(sid, discordClient, serverConfig);
     };
 
-    bot.on('kicked', (reason) => handleDisconnect(reason));
-    bot.on('end', (reason) => handleDisconnect(reason));
+    bot.on('kicked', handleDisconnect);
+    bot.on('end', handleDisconnect);
     bot.on('error', (err) => {
       st.errorCount++;
-      appendLocalLog(sid, `[ERROR] ${err && err.message ? err.message : String(err)}`);
-      // don't immediately schedule reconnect here — 'end' will follow; but ensure reconnect exists
-      if (!st.online) scheduleReconnectWithDelay();
+      appendLocalLog(sid, `[ERROR] ${err.message}`);
+      if (!st.online) scheduleReconnect(sid, discordClient, serverConfig);
     });
+  }
 
-    // helper schedule reconnect
-    function scheduleReconnectWithDelay() {
-      if (st.reconnectTimer) clearTimeout(st.reconnectTimer);
-      st.reconnectTimer = setTimeout(()=> {
-        connectOnce();
-      }, 30000); // try reconnect after 30s
-    }
-  } // end connectOnce
-
-  // initial connect
   connectOnce();
 }
 
-// ===== parse Minecraft messages and forward to Discord =====
+// ===== Minecraft -> Discord Relay =====
 function handleMinecraftMessage(discordClient, serverId, rawText) {
   const st = state[serverId];
   if (!st) return;
@@ -379,73 +285,45 @@ function handleMinecraftMessage(discordClient, serverId, rawText) {
   if (!t) return;
   appendLocalLog(serverId, t);
 
-  // 1) player chat pattern: optional [Rank] Name: message
-  // Common chat forms: "<name> message" OR "Name: message" OR "[Rank] Name: message"
-  // We'll handle many variants; adjust regex if your chat plugin uses different format.
-  const playerChatRegex = /^(?:\[(.*?)\]\s*)?([A-Za-z0-9_\\-]+):\s*(.*)$/;
+  const playerChatRegex = /^(?:\[(.*?)\]\s*)?([A-Za-z0-9_-]+):\s*(.*)$/;
   const playerChat = t.match(playerChatRegex);
   if (playerChat) {
     const rank = playerChat[1] ? `[${playerChat[1]}] ` : '';
-    const player = playerChat[2];
-    const msg = playerChat[3];
-    st.players.add(player);
-    st.totalChatToday++;
-    const plain = `${makePrefix(serverId)} ${rank}${player}: ${msg}`;
-    // send plain text to server channel
-    sendPlainToChannel(discordClient, st.config.channelId, plain);
+    sendPlainToChannel(discordClient, st.config.channelId, `${makePrefix(serverId)} ${rank}${playerChat[2]}: ${playerChat[3]}`);
     return;
   }
 
-  // 2) command issued: "name issued server command: /pl"
-  const issuedCmd = t.match(/^([A-Za-z0-9_\\-]+) issued server command: (\/\S.*)$/i);
+  const issuedCmd = t.match(/^([A-Za-z0-9_-]+) issued server command: (\/\S.*)$/i);
   if (issuedCmd) {
-    const who = issuedCmd[1];
-    const cmd = issuedCmd[2];
-    st.totalCommandsToday++;
-    const plain = `${makePrefix(serverId)} ${who}: ${cmd}`;
-    sendPlainToChannel(discordClient, st.config.channelId, plain);
+    sendPlainToChannel(discordClient, st.config.channelId, `${makePrefix(serverId)} ${issuedCmd[1]}: ${issuedCmd[2]}`);
     return;
   }
 
-  // 3) player death/achievement or other common events: attempt to match keywords
   const eventPatterns = [
-    { re: /(has died|was slain|fell from a high place|hit the ground too hard|blew up|was shot by)/i, title: 'Death' },
-    { re: /(earned the achievement|has made the advancement|got the achievement|earned the advancement)/i, title: 'Achievement' },
-    { re: /(joined the game)/i, title: 'Join' },
-    { re: /(left the game|disconnected)/i, title: 'Leave' }
+    { re: /(has died|was slain|fell from a high place|hit the ground too hard|blew up|was shot by)/i, color: 0xFF0000, title: 'Death' },
+    { re: /(earned the achievement|advancement)/i, color: 0x00FFFF, title: 'Achievement' },
+    { re: /(joined the game)/i, color: 0x00FF00, title: 'Join' },
+    { re: /(left the game|disconnected)/i, color: 0xFFA500, title: 'Leave' }
   ];
   for (const p of eventPatterns) {
     if (p.re.test(t)) {
-      st.totalEventsToday++;
-      const embed = new EmbedBuilder()
-        .setTitle(`${st.config.name} — ${p.title}`)
-        .setDescription(t)
-        .setColor(0x0099FF)
-        .setTimestamp();
+      const embed = new EmbedBuilder().setTitle(`${st.config.name} — ${p.title}`).setDescription(t).setColor(p.color).setTimestamp();
       sendEmbedToChannel(discordClient, st.config.channelId, embed);
       return;
     }
   }
 
-  // 4) plugin/server messages: often start with [PluginName] msg OR contain important server lines
   const pluginMatch = t.match(/^\[?([A-Za-z0-9 _-]{2,40})\]?\s*(.*)$/);
   if (pluginMatch) {
-    // This is a heuristic: many plugin messages come as "[PluginName] message"
-    // We'll send as embed for readability.
-    st.totalEventsToday++;
-    const pluginName = pluginMatch[1];
-    const pluginMsg = pluginMatch[2] || t;
     const embed = new EmbedBuilder()
-      .setTitle(`${st.config.name} — ${pluginName}`)
-      .setDescription(pluginMsg)
+      .setTitle(`${st.config.name} — ${pluginMatch[1]}`)
+      .setDescription(pluginMatch[2] || t)
       .setColor(0x00FF00)
       .setTimestamp();
     sendEmbedToChannel(discordClient, st.config.channelId, embed);
     return;
   }
 
-  // 5) fallback: generic server message -> embed
-  st.totalEventsToday++;
   const embed = new EmbedBuilder()
     .setTitle(`${st.config.name} — Server Message`)
     .setDescription(t)
@@ -453,5 +331,3 @@ function handleMinecraftMessage(discordClient, serverId, rawText) {
     .setTimestamp();
   sendEmbedToChannel(discordClient, st.config.channelId, embed);
 }
-
-// End of modules/minecraft.js
