@@ -5,7 +5,7 @@ const COLORS = [
   "#0000FF", "#4B0082", "#9400D3"
 ];
 
-module.exports = function rainbowRole(client, interval = 5000) {
+module.exports = function rainbowRole(client, interval = 25000) { // ← 25 detik
   const guild = client.guilds.cache.get(process.env.GUILD_ID);
   if (!guild) return console.log("❌ Guild tidak ditemukan.");
 
@@ -13,22 +13,18 @@ module.exports = function rainbowRole(client, interval = 5000) {
 
   roleIds.forEach(roleId => {
     console.log(`🌈 Rainbow role aktif untuk role: ${roleId}`);
-
     let index = 0;
+
     setInterval(async () => {
       try {
         const role = guild.roles.cache.get(roleId);
-        if (!role) {
-          console.log(`❌ Role tidak ditemukan: ${roleId}`);
-          return;
-        }
+        if (!role) return;
 
         await role.setColor(COLORS[index]);
         console.log(`🎨 [${role.name}] diubah ke ${COLORS[index]}`);
-
         index = (index + 1) % COLORS.length;
       } catch (err) {
-        console.error(`❌ Gagal mengubah warna untuk role ${roleId}:`, err);
+        console.error(`❌ Gagal mengubah warna untuk role ${roleId}:`, err.message);
       }
     }, interval);
   });
