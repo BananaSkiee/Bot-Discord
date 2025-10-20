@@ -14,8 +14,8 @@ const hariIndonesia = {
 };
 
 module.exports = (client) => {
-  // 🔁 Update tiap 5 menit aja biar aman
-  cron.schedule("*/5 * * * *", async () => {
+  // Cron jalan setiap 1 menit
+  cron.schedule("* * * * *", async () => {
     try {
       const channel = client.channels.cache.get(CHANNEL_ID);
       if (!channel || !channel.setName) return;
@@ -26,12 +26,9 @@ module.exports = (client) => {
       const jam = now.format("HH:mm");
       const namaBaru = `「 ${hariID}, ${tanggal} - ${jam} Jam 」`;
 
-      // 🧠 Cuma ubah kalau beda (biar gak spam Discord API)
       if (channel.name !== namaBaru) {
         await channel.setName(namaBaru);
         console.log(`✅ Nama channel diupdate: ${namaBaru}`);
-      } else {
-        console.log(`ℹ️ Nama channel sudah sama, skip update.`);
       }
     } catch (err) {
       console.error("❌ Gagal update voice channel waktu:", err.message);
