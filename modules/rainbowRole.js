@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-const log = global.log; // gunakan logger global
+const log = global.log || console; // fallback ke console kalau global.log belum siap
 const COLORS = [
   "#FF0000", "#FF7F00", "#FFFF00", "#00FF00",
   "#0000FF", "#4B0082", "#9400D3"
