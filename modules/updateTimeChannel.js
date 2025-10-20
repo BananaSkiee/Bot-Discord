@@ -1,13 +1,11 @@
 const moment = require("moment-timezone");
 const cron = require("node-cron");
 
-// ID voice channel kamu
-const CHANNEL_ID = "1360303391175217343"; // GANTI YAAA!
+const CHANNEL_ID = "1360303391175217343"; // Ganti ID channel jam
 
-// Mapping hari ke Bahasa Indonesia
 const hariIndonesia = {
   Sunday: "Minggu",
-  Monday: "Senin", 
+  Monday: "Senin",
   Tuesday: "Selasa",
   Wednesday: "Rabu",
   Thursday: "Kamis",
@@ -16,31 +14,24 @@ const hariIndonesia = {
 };
 
 module.exports = (client) => {
+  // Cron jalan setiap 1 menit
   cron.schedule("* * * * *", async () => {
     try {
-      // GUNAKAN CACHE, JANGAN FETCH
       const channel = client.channels.cache.get(CHANNEL_ID);
-      if (!channel || !channel.setName) {
-        console.log("❌ Channel tidak ditemukan di cache atau bukan voice channel");
-        return;
-      }
+      if (!channel || !channel.setName) return;
 
       const now = moment().tz("Asia/Jakarta");
-
-      const hariEN = now.format("dddd");
-      const hariID = hariIndonesia[hariEN] || hariEN;
-
-      const tanggal = now.format("D"); // Contoh: 16 Juli
+      const hariID = hariIndonesia[now.format("dddd")];
+      const tanggal = now.format("D");
       const jam = now.format("HH:mm");
-
       const namaBaru = `「 ${hariID}, ${tanggal} - ${jam} Jam 」`;
 
       if (channel.name !== namaBaru) {
         await channel.setName(namaBaru);
         console.log(`✅ Nama channel diupdate: ${namaBaru}`);
       }
-    } catch (error) {
-      console.error("❌ Gagal update voice channel waktu:", error.message);
+    } catch (err) {
+      console.error("❌ Gagal update voice channel waktu:", err.message);
     }
   });
 };
