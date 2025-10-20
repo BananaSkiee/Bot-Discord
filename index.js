@@ -13,6 +13,8 @@ const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
+require('./modules/rateLimiter')(client);     // log semua rate limit
+require('./modules/autoSafeRename')(client);  // lindungi rename otomatis
 
 const client = new Client({
   intents: [
