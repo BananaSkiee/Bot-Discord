@@ -1,4 +1,5 @@
 require("dotenv").config();
+require("./modules/globalLogger"); // ini aja yang baru
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
