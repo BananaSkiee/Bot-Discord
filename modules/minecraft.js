@@ -21,9 +21,10 @@ const CHANNEL_S1 = '1426537842875826278'; // Discord channel for Server 1 (plain
 const CHANNEL_S2 = '1429751342301184071'; // Discord channel for Server 2 (plain chat + embeds)
 
 // Fill server host/port/initial username correctly:
+// config servers (contoh)
 const SERVERS = [
-  { id: 's1', name: 'Server 1', host: 'BananaUcok.aternos.me', port: 14262, initialUsername: 'BotServer1', channelId: CHANNEL_S1, capacity: 100 },
-  { id: 's2', name: 'Server 2', host: 'nightz.my.id', port: 25583, initialUsername: 'BotServer2', channelId: CHANNEL_S2, capacity: 100 }
+  { id: 's1', name: 'Server 1', host: 'BananaUcok.aternos.me', port: 14262, initialUsername: 'BotServer1', channelId: CHANNEL_S1, capacity: 100, version: '1.20.1' },
+  { id: 's2', name: 'Server 2', host: 'nightz.my.id', port: 25583, initialUsername: 'BotServer2', channelId: CHANNEL_S2, capacity: 100, version: '1.21.10' }
 ];
 
 // 100 random Minecraft usernames (short)
@@ -257,14 +258,15 @@ function createAndConnectBot(discordClient, serverConfig) {
     // create bot
     let bot;
     try {
-      bot = mineflayer.createBot({
-        host: serverConfig.host,
-        port: serverConfig.port,
-        username: usernameToTry,
-        version: '1.20.1',
-        auth: 'offline',
-        // increasing timeout/resilience options could be set if needed
-      });
+      // sebelum: mineflayer.createBot({ host: ..., port: ..., username: usernameToTry, version: '1.20.1', ... });
+// sesudah:
+bot = mineflayer.createBot({
+  host: serverConfig.host,
+  port: serverConfig.port,
+  username: usernameToTry,
+  version: serverConfig.version || 'auto', // gunakan version yg diset, atau 'auto' jika null
+  auth: 'offline'
+});
     } catch (err) {
       appendLocalLog(sid, `[ERROR] createBot threw: ${err.message}`);
       scheduleReconnect();
