@@ -5,7 +5,7 @@ const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 
 // ==== CONFIG ====
-const ID_GUILD = '1347233781391560837'; 
+const ID_GUILD = '1347233781391560837';
 const LOG_CHANNEL_ID = '1426537842875826278';
 const CHANNEL_S1 = '1426537842875826278';
 const CHANNEL_S2 = '1429751342301184071';
@@ -29,36 +29,31 @@ const servers = [
 ];
 
 const state = {};
-if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
+if(!fs.existsSync('./logs')) fs.mkdirSync('./logs');
 
-function appendLocalLog(serverId, line) {
+function appendLocalLog(serverId,line){
   const file = path.join('logs', `server-${serverId}.log`);
   const ts = new Date().toISOString();
   fs.appendFile(file, `[${ts}] ${line}\n`, ()=>{});
 }
 
-function getRandomName() {
+function getRandomName(){
   return randomNames[Math.floor(Math.random()*randomNames.length)];
 }
 
-function makePrefix(serverId) {
+function makePrefix(serverId){
   return serverId==='s1'? '[S1]' : '[S2]';
 }
 
+// ===== INIT =====
 module.exports = {
   init: (client)=>{
-    // init state
     servers.forEach(s=>{
-      state[s.id]={
-        config:s, bot:null, reconnectTimeout:null, online:false,
-        queuedMessages:[], players:new Set(), totalCommandsToday:0,
-        totalChatToday:0, totalEventsToday:0, errorCount:0, intervals:[],
-        startedAt:null, lastOfflineAt:null
-      };
+      state[s.id] = { config:s, bot:null, reconnectTimeout:null, online:false, queuedMessages:[], players:new Set(), totalCommandsToday:0, totalChatToday:0, totalEventsToday:0, errorCount:0, intervals:[], startedAt:null, lastOfflineAt:null };
     });
 
     // Discord listener
-    client.on('messageCreate', async (msg)=>{
+    client.on('messageCreate', async msg=>{
       if(msg.author.bot) return;
       const content = msg.content.trim();
 
@@ -66,7 +61,7 @@ module.exports = {
       if(/^!log\s+s1$/i.test(content)) return sendServerStatus(client,'s1',msg.channel);
       if(/^!log\s+s2$/i.test(content)) return sendServerStatus(client,'s2',msg.channel);
 
-      // !UN1/!UN2
+      // !UN1 / !UN2
       const un1 = content.match(/^!UN1\s+(.+)$/i);
       const un2 = content.match(/^!UN2\s+(.+)$/i);
       if(un1) return changeBotNicknameAndRestart(client,'s1',un1[1]);
@@ -93,22 +88,22 @@ module.exports = {
   }
 };
 
-// ===== helpers =====
-async function sendLogToChannel(client, content, options={}){
+// ===== HELPERS =====
+async function sendLogToChannel(client,content,options={}){
   try{
     const ch = await client.channels.fetch(LOG_CHANNEL_ID);
     if(!ch) return;
     if(options.embed) return ch.send({embeds:[options.embed]});
     return ch.send(content);
-  }catch(err){console.error('Failed send log:',err);}
+  }catch(err){console.error(err);}
 }
 
-function simpleLog(client, serverId, line){
+function simpleLog(client,serverId,line){
   appendLocalLog(serverId,line);
   sendLogToChannel(client,line);
 }
 
-async function sendServerStatus(client, serverId, replyChannel){
+async function sendServerStatus(client,serverId,replyChannel){
   const st = state[serverId];
   if(!st) return replyChannel.send('Server tidak ditemukan');
   const conf = st.config;
@@ -118,7 +113,7 @@ async function sendServerStatus(client, serverId, replyChannel){
     .addFields(
       {name:'Status', value: st.online?'🟢 ONLINE':'🔴 OFFLINE', inline:true},
       {name:'IP', value:`${conf.host}:${conf.port}`, inline:true},
-      {name:'Players', value:`${players.length} / ${conf.capacity}`, inline:true},
+      {name:'Players', value:`${players.length}`, inline:true},
       {name:'Total Chat Today', value:`${st.totalChatToday}`, inline:true},
       {name:'Total Commands Today', value:`${st.totalCommandsToday}`, inline:true},
       {name:'Total Events Today', value:`${st.totalEventsToday}`, inline:true},
@@ -127,7 +122,7 @@ async function sendServerStatus(client, serverId, replyChannel){
   return replyChannel.send({embeds:[embed]});
 }
 
-async function changeBotNicknameAndRestart(client, serverId, newNick){
+async function changeBotNicknameAndRestart(client,serverId,newNick){
   const st = state[serverId]; if(!st) return;
   const guild = await client.guilds.fetch(ID_GUILD).catch(()=>null); if(!guild) return;
   try{
@@ -151,8 +146,7 @@ async function handleDiscordToMinecraft(client,target,author,text){
 }
 
 async function sendToServerMessage(client,serverId,text,fromDiscord=false,discordUser=null){
-  const st = state[serverId];
-  if(!st) return;
+  const st = state[serverId]; if(!st) return;
   const bot = st.bot;
   if(!st.online||!bot){
     st.queuedMessages.push({text,discordUser,time:Date.now()});
@@ -186,7 +180,7 @@ async function sendToServerMessage(client,serverId,text,fromDiscord=false,discor
   }
 }
 
-// ===== create bot =====
+// ===== CREATE BOT =====
 function createBotForServer(client,conf){
   const sid = conf.id;
   const st = state[sid];
@@ -196,7 +190,7 @@ function createBotForServer(client,conf){
       const bot = mineflayer.createBot({host:conf.host, port:conf.port, username:conf.username, version:'1.20.1', auth:'offline'});
       st.bot = bot;
       st.intervals.forEach(i=>clearInterval(i)); st.intervals=[];
-      
+
       bot.on('login', async ()=>{
         st.online=true; st.startedAt=Date.now(); st.lastOfflineAt=null;
         simpleLog(client,sid,`✅ Bot connected to ${conf.name}`);
@@ -204,22 +198,19 @@ function createBotForServer(client,conf){
           const guild = await client.guilds.fetch(ID_GUILD).catch(()=>null);
           if(guild){const member = await guild.members.fetch(client.user.id); await member.setNickname(conf.defaultNickname).catch(()=>null);}
         }catch(e){}
-        // send queued messages
+
         if(st.queuedMessages.length>0){
           const queued = st.queuedMessages.splice(0);
           simpleLog(client,sid,`[LOG] Sending ${queued.length} queued messages`);
           for(const qm of queued) await sendToServerMessage(client,sid,qm.text,true,qm.discordUser);
         }
 
-        // anti-afk intervals
         st.intervals.push(setInterval(()=>{if(bot && bot.entity){try{bot.setControlState('forward',true);setTimeout(()=>bot.setControlState('forward',false),500);}catch(e){}}},60000));
         st.intervals.push(setInterval(()=>{if(bot && bot.entity){try{bot.setControlState('jump',true);setTimeout(()=>bot.setControlState('jump',false),300);}catch(e){}}},120000));
         st.intervals.push(setInterval(()=>{if(bot){try{bot.chat('Masih di sini 😎');}catch(e){}}},300000));
       });
 
-      bot.on('message',(jsonMsg)=>{
-        try{handleMinecraftMessage(client,sid,jsonMsg.toString());}catch(e){}
-      });
+      bot.on('message',(jsonMsg)=>{try{handleMinecraftMessage(client,sid,jsonMsg.toString());}catch(e){}});
       bot.on('messagestr',(msg)=>{try{handleMinecraftMessage(client,sid,msg);}catch(e){}});
       bot.on('playerJoined',(p)=>{st.players.add(p.username); st.totalEventsToday++; simpleLog(client,sid,`[PLAYER JOIN] ${p.username}`);});
       bot.on('playerLeft',(p)=>{st.players.delete(p.username); st.totalEventsToday++; simpleLog(client,sid,`[PLAYER LEAVE] ${p.username}`);});
@@ -259,7 +250,7 @@ function createBotForServer(client,conf){
   connect();
 }
 
-// ===== message parsing =====
+// ===== HANDLE MINECRAFT MESSAGE =====
 function handleMinecraftMessage(client,serverId,text){
   const st=state[serverId]; if(!st) return;
   const t=String(text).trim(); if(!t) return;
@@ -271,3 +262,35 @@ function handleMinecraftMessage(client,serverId,text){
     const rank = playerChat[1]?`[${playerChat[1]}] `:'';
     const player = playerChat[2];
     const msg = playerChat[3];
+    const prefix = makePrefix(serverId);
+    const content = `${prefix}${rank}${player}: ${msg}`;
+    simpleLog(client, serverId, content);
+    client.channels.fetch(state[serverId].config.channel).then(ch=>ch.send(content)).catch(()=>{});
+    st.totalChatToday++;
+    return;
+  }
+
+  // plugin/server messages
+  const pluginMsg = t.match(/^\[(.+?)\]\s*(.*)$/);
+  if(pluginMsg){
+    const title = pluginMsg[1];
+    const msg = pluginMsg[2];
+    st.totalEventsToday++;
+    const embed = new EmbedBuilder()
+      .setTitle(`[${state[serverId].config.name}] ${title}`)
+      .setDescription(msg)
+      .setColor(0x00FF00)
+      .setTimestamp();
+    client.channels.fetch(state[serverId].config.channel).then(ch=>ch.send({embeds:[embed]})).catch(()=>{});
+    return;
+  }
+
+  // generic catch-all
+  st.totalEventsToday++;
+  const embed = new EmbedBuilder()
+    .setTitle(`[${state[serverId].config.name}] Server Message`)
+    .setDescription(t)
+    .setColor(0xFFFF00)
+    .setTimestamp();
+  client.channels.fetch(state[serverId].config.channel).then(ch=>ch.send({embeds:[embed]})).catch(()=>{});
+}
