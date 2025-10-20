@@ -12,7 +12,7 @@ const generateTextGraph = require("./modules/generateTextGraph");
 const startCryptoSimulation = require("./modules/cryptoSimulator");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
-const srvName = require("./modules/srvName.js");
+const srvName = require("./modules/srvName.js"); 
 
 const client = new Client({
   intents: [
@@ -34,11 +34,11 @@ const PORT = process.env.PORT || 3000;
 // Health check endpoint
 app.get("/", (_, res) => res.send("✅ Bot Akira aktif"));
 app.get("/health", (_, res) => {
-  res.status(200).json({
-    status: "OK",
+  res.status(200).json({ 
+    status: 'OK', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    memory: process.memoryUsage(),
+    memory: process.memoryUsage()
   });
 });
 
@@ -48,29 +48,29 @@ const server = app.listen(PORT, () => {
 
 // 🔄 Self-ping system untuk menjaga Koyeb tetap aktif
 function startSelfPing() {
-  const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || "parallel-helaine-bananaskiee-701c062c"}.koyeb.app/health`;
+  const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
   const PING_INTERVAL = 3 * 60 * 1000; // 3 menit
-
+  
   console.log(`🔄 Starting self-ping system to: ${SELF_PING_URL}`);
-
+  
   setInterval(async () => {
     try {
       const response = await fetch(SELF_PING_URL);
       if (response.ok) {
-        console.log("✅ Self-ping successful -", new Date().toLocaleTimeString());
+        console.log('✅ Self-ping successful -', new Date().toLocaleTimeString());
       } else {
-        console.log("⚠️ Self-ping returned status:", response.status);
+        console.log('⚠️ Self-ping returned status:', response.status);
       }
     } catch (error) {
-      console.log("❌ Self-ping failed:", error.message);
+      console.log('❌ Self-ping failed:', error.message);
     }
   }, PING_INTERVAL);
-
+  
   // Ping immediately on startup
   setTimeout(() => {
-    fetch(`https://${process.env.KOYEB_APP_NAME || "parallel-helaine-bananaskiee-701c062c"}.koyeb.app/`)
-      .then(() => console.log("✅ Initial ping successful"))
-      .catch((err) => console.log("❌ Initial ping failed:", err.message));
+    fetch(`https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/`)
+      .then(() => console.log('✅ Initial ping successful'))
+      .catch(err => console.log('❌ Initial ping failed:', err.message));
   }, 5000);
 }
 
@@ -97,15 +97,16 @@ client.on("interactionCreate", async (interaction) => {
     await command.execute(interaction, client);
   } catch (error) {
     console.error("❌ Interaction Error:", error);
-    const replyData = {
-      content: "❌ Terjadi error saat menjalankan perintah.",
-      ephemeral: true,
-    };
-
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(replyData);
+      await interaction.followUp({
+        content: "❌ Terjadi error saat menjalankan perintah.",
+        ephemeral: true,
+      });
     } else {
-      await interaction.reply(replyData);
+      await interaction.reply({
+        content: "❌ Terjadi error saat menjalankan perintah.",
+        ephemeral: true,
+      });
     }
   }
 });
@@ -132,12 +133,12 @@ process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
 });
 
-// 🚀 Bot ready event utama
+// 🚀 Start bot dan self-ping system
 client.once("ready", () => {
   console.log(`✅ ${client.user.tag} is now online!`);
-  startSelfPing();
+  startSelfPing(); // Start self-ping setelah bot ready
 
-  // 🔄 Jalankan sistem online counter setelah login
+  // 🔄 Jalankan sistem penghitung online setelah bot login
   try {
     const onlineCounter = require("./modules/online");
     onlineCounter(client);
@@ -150,12 +151,12 @@ client.once("ready", () => {
 // 🔐 Login bot
 client.login(config.token);
 
-// 🛑 Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("🛑 Received SIGTERM, shutting down gracefully");
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully');
   client.destroy();
   server.close(() => {
-    console.log("✅ Server closed");
+    console.log('✅ Server closed');
     process.exit(0);
   });
 });
