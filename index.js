@@ -6,7 +6,7 @@ const config = require("./config");
 
 // 🧠 Custom modules
 const stickyHandler = require("./sticky");
-const updateOnline = require("./online");
+const updateOnline = require("./modules/online");
 const autoGreeting = require("./modules/autoGreeting");
 const updateTimeChannel = require("./modules/updateTimeChannel");
 const generateTextGraph = require('./modules/generateTextGraph');
