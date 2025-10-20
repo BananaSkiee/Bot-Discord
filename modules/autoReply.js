@@ -1,5 +1,19 @@
+// modules/autoReply.js
+const cooldown = new Map();
+const COOLDOWN_TIME = 5000; // 5 detik
+const CHATBOT_CHANNEL_ID = "1352635177536327760"; // ❌ Jangan balas di sini
+
 module.exports = async (message) => {
   if (message.author.bot) return;
+  if (message.channel.id === CHATBOT_CHANNEL_ID) return; // ✅ skip channel chatbot
+
+  const userId = message.author.id;
+  const now = Date.now();
+
+  // Cek cooldown user
+  if (cooldown.has(userId) && now - cooldown.get(userId) < COOLDOWN_TIME) {
+    return; // masih cooldown → jangan balas
+  }
 
   const contentLower = message.content.toLowerCase();
 
@@ -25,7 +39,12 @@ module.exports = async (message) => {
   for (const [keyword, replies] of Object.entries(autoReplies)) {
     if (contentLower.includes(keyword)) {
       const reply = replies[Math.floor(Math.random() * replies.length)];
-      return message.reply(reply).catch(console.error);
+      await message.reply(reply).catch(console.error);
+
+      // Set cooldown user
+      cooldown.set(userId, now);
+      setTimeout(() => cooldown.delete(userId), COOLDOWN_TIME);
+      break;
     }
   }
 };
