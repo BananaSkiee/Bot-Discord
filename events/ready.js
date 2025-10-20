@@ -4,8 +4,6 @@ const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
 const joinvoice = require("../modules/joinvoice");
 const countValidator = require("../modules/countValidator");
-const simulateBTC = require("../modules/cryptoSimulator");
-const updateCryptoMessage = require("../modules/updateCrypto");
 const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
@@ -96,13 +94,6 @@ module.exports = {
       console.error("❌ Auto greeting error:", err);
     }
 
-    // 💹 Simulasi BTC
-    try {
-      simulateBTC(client);
-    } catch (err) {
-      console.error("❌ Simulasi BTC error:", err);
-    }
-
     // 🧠 Auto animasi icon server
     try {
       startAutoAnimation(client);
@@ -123,16 +114,6 @@ module.exports = {
     } catch (err) {
       console.error("❌ Auto berita error:", err);
     }
-
-    // 📈 Update pesan crypto tiap 1 menit
-    setInterval(async () => {
-      try {
-        const newContent = "📈 BTC: $65,000 (+0.4%)"; // contoh konten, bisa ganti sesuai data real
-        await updateCryptoMessage(client, newContent);
-      } catch (error) {
-        console.error("❌ Gagal update crypto:", error.message);
-      }
-    }, 60_000);
 
     // 🟡 Auto status rotasi tiap 1 menit
     const statuses = [
