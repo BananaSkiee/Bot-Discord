@@ -3,59 +3,81 @@ require("dotenv").config();
 module.exports = function srvName(client) {
   const GUILD_ID = process.env.GUILD_ID;
 
-  const names = [
-    { steps: ["dsc.gg/BananaSkiee"], delay: 5000, blink: false },
-    { steps: ["The", "The Empire", "The Empire of", "The Empire of BS"], delay: 500, blink: true },
-    { steps: ["The", "The Legacy", "The Legacy of", "The Legacy of BS"], delay: 500, blink: true },
-    { steps: ["The", "The Nexus", "The Nexus of", "The Nexus of BS"], delay: 500, blink: true }
+  const sequences = [
+    {
+      steps: ["dsc.gg/BananaSkiee"],
+      delay: 5000,
+      blink: false,
+    },
+    {
+      steps: ["The", "The Empire", "The Empire of", "The Empire of BS"],
+      delay: 600,
+      blink: true,
+    },
+    {
+      steps: ["The", "The Legacy", "The Legacy of", "The Legacy of BS"],
+      delay: 600,
+      blink: true,
+    },
+    {
+      steps: ["The", "The Nexus", "The Nexus of", "The Nexus of BS"],
+      delay: 600,
+      blink: true,
+    },
   ];
 
   client.once("ready", async () => {
-    console.log("🎬 Animasi nama server aktif");
+    console.log("🎬 Nama server auto-animasi aktif");
 
     const guild = await client.guilds.fetch(GUILD_ID);
     if (!guild) return console.log("❌ Server tidak ditemukan!");
 
     function sleep(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
+      return new Promise((r) => setTimeout(r, ms));
     }
 
     function randomBlink(text) {
-      return text.split("").map(c => {
-        if (c === " ") return " "; // spasi tetap
-        return Math.random() < 0.3 ? "·" : c; // 30% huruf kedip
-      }).join("");
+      return text
+        .split("")
+        .map((c) => {
+          if (c === " ") return " ";
+          return Math.random() < 0.25 ? "·" : c; // 25% blink
+        })
+        .join("");
     }
 
-    async function animate() {
-      try {
-        for (let i = 0; ; i = (i + 1) % names.length) {
-          const current = names[i];
+    async function runSequence(seq) {
+      // Animasi step-by-step
+      for (const step of seq.steps) {
+        await guild.setName(step);
+        await sleep(seq.delay);
+      }
 
-          // Animasi per step (per kata / frasa)
-          for (let step of current.steps) {
-            await guild.setName(step);
-            await sleep(current.delay);
-          }
-
-          // Jika blink = true, lakukan kedip acak
-          if (current.blink) {
-            for (let blinkCount = 0; blinkCount < 5; blinkCount++) {
-              await guild.setName(randomBlink(current.steps[current.steps.length - 1]));
-              await sleep(400); // kedip lambat 400ms
-            }
-            // set full name lagi
-            await guild.setName(current.steps[current.steps.length - 1]);
-            await sleep(500);
-          }
+      // Blink acak (kalau diaktifkan)
+      if (seq.blink) {
+        const finalText = seq.steps[seq.steps.length - 1];
+        for (let i = 0; i < 5; i++) {
+          await guild.setName(randomBlink(finalText));
+          await sleep(450);
         }
-      } catch (err) {
-        console.error("❌ Error animasi nama server:", err);
-        await sleep(2000);
-        animate(); // ulangi jika error
+        await guild.setName(finalText);
+        await sleep(800);
       }
     }
 
-    animate();
+    async function loop() {
+      while (true) {
+        try {
+          for (const seq of sequences) {
+            await runSequence(seq);
+          }
+        } catch (err) {
+          console.error("❌ Error animasi nama server:", err);
+          await sleep(3000);
+        }
+      }
+    }
+
+    loop();
   });
 };
