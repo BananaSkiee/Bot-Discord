@@ -15,7 +15,6 @@ const rulesModule = require("../modules/rules");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const updateTimeChannel = require("../modules/updateTimeChannel");
-const onlineCounter = require("../modules/online");
 
 const verifySystem = new VerifySystem();
 
@@ -74,13 +73,6 @@ module.exports = {
       setInterval(() => updateTimeChannel(client), 60_000);
     } catch (err) {
       console.error("❌ Gagal inisialisasi updateTimeChannel:", err);
-    }
-
-    // 👥 Online counter real-time
-    try {
-      onlineCounter(client);
-    } catch (err) {
-      console.error("❌ Gagal inisialisasi onlineCounter:", err);
     }
 
     // 🌈 Rainbow role (interval aman 25 detik)
