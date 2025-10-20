@@ -2,31 +2,36 @@
 const chalk = require("chalk");
 const dayjs = require("dayjs");
 
-// Logo “BS” versi universal (aman untuk semua versi chalk)
-const BRAND = chalk.bold(`[${chalk.yellowBright("BS")}]`);
-const time = () => chalk.dim(`[${dayjs().format("HH:mm:ss")}]`);
+// Manual warna kuning emas pakai kode ANSI (universal)
+const yellow = (text) => `\x1b[33m${text}\x1b[0m`;
+const gray = (text) => `\x1b[90m${text}\x1b[0m`;
+const bold = (text) => `\x1b[1m${text}\x1b[0m`;
 
-// Fungsi untuk format log
+// Logo “BS” aman semua versi
+const BRAND = bold(`[${yellow("BS")}]`);
+const time = () => gray(`[${dayjs().format("HH:mm:ss")}]`);
+
+// Format log universal
 function formatLog(level, color, icon, ...msg) {
-  const label = chalk.bold[color](`${icon} ${level.padEnd(5)}`);
-  return `${time()} ${chalk.gray("│")} ${BRAND} ${chalk.gray("│")} ${label} ${chalk.gray("│")} ${msg.join(" ")}`;
+  const label = bold(`${icon} ${level.padEnd(5)}`);
+  return `${time()} ${gray("│")} ${BRAND} ${gray("│")} ${label} ${gray("│")} ${msg.join(" ")}`;
 }
 
-// Simpan referensi asli biar gak bentrok
+// Simpan console asli
 const orig = {
   log: console.log,
   warn: console.warn,
   error: console.error
 };
 
-// Override semua console bawaan
+// Override log bawaan Node.js
 console.log = (...args) => orig.log(formatLog("INFO", "cyan", "ℹ️", ...args));
 console.warn = (...args) => orig.warn(formatLog("WARN", "yellow", "⚠️", ...args));
 console.error = (...args) => orig.error(formatLog("ERR", "red", "❌", ...args));
 
 // Banner awal
 console.clear();
-orig.log(chalk.yellowBright(`
+orig.log(yellow(`
 ██████╗ ███████╗
 ██╔══██╗██╔════╝
 ██████╔╝█████╗  
@@ -34,5 +39,5 @@ orig.log(chalk.yellowBright(`
 ██║  ██║███████╗
 ╚═╝  ╚═╝╚══════╝
 `));
-orig.log(chalk.yellowBright("🚀 BananaSkiee Systems (BS) Logger vAuto"));
-orig.log(chalk.gray("────────────────────────────────────────────────────────────"));
+orig.log(yellow("🚀 BananaSkiee Systems (BS) Logger vAuto"));
+orig.log(gray("────────────────────────────────────────────────────────────"));
