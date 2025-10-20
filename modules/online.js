@@ -1,3 +1,4 @@
+// modules/online.js
 const config = require("../config");
 
 async function updateOnlineCount(guild) {
@@ -17,14 +18,25 @@ async function updateOnlineCount(guild) {
   }
 }
 
-module.exports = (client) => {
-  client.on("presenceUpdate", (oldPresence, newPresence) => {
-    const guild = newPresence.guild || oldPresence?.guild;
+// fungsi utama: menerima client, otomatis register event
+module.exports = function onlineCounter(client) {
+  if (!client || !client.on) return console.error("❌ Invalid client passed to onlineCounter");
+
+  // trigger saat bot siap
+  client.on("ready", () => {
+    const guild = client.guilds.cache.first();
     if (guild) updateOnlineCount(guild);
   });
 
-  client.on("ready", () => {
-    const guild = client.guilds.cache.first();
+  // update saat presence berubah
+  client.on("presenceUpdate", (oldPresence, newPresence) => {
+    const guild = newPresence?.guild || oldPresence?.guild;
+    if (guild) updateOnlineCount(guild);
+  });
+
+  // update saat voiceState berubah
+  client.on("voiceStateUpdate", (oldState, newState) => {
+    const guild = newState?.guild || oldState?.guild;
     if (guild) updateOnlineCount(guild);
   });
 };
