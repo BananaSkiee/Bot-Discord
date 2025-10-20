@@ -1,4 +1,4 @@
-const updateOnline = require("../online");
+const updateOnline = require("../modules/online");
 
 module.exports = {
   name: "presenceUpdate",
