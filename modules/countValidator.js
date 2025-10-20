@@ -8,7 +8,7 @@ const FILE_PATH = path.join(__dirname, "../data/countData.json");
 
 if (!fs.existsSync("./data")) fs.mkdirSync("./data");
 if (!fs.existsSync(FILE_PATH)) {
-  fs.writeFileSync(FILE_PATH, JSON.stringify({ lastCount: 122, lastUserId: null }, null, 2));
+  fs.writeFileSync(FILE_PATH, JSON.stringify({ lastCount: 0, lastUserId: null }, null, 2));
 }
 
 module.exports = async (message) => {
