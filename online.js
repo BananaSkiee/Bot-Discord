@@ -1,41 +1,30 @@
-const config = require("./config");
+const config = require("../config");
 
-module.exports = async function updateOnline(guild) {
+async function updateOnlineCount(guild) {
   try {
     await guild.members.fetch({ withPresences: true });
-
     const onlineCount = guild.members.cache.filter(
-      (m) =>
-        !m.user.bot &&
-        ["online", "idle", "dnd"].includes(m.presence?.status)
+      (m) => !m.user.bot && ["online", "idle", "dnd"].includes(m.presence?.status)
     ).size;
 
-const voiceChannel = guild.channels.cache.get(config.voiceChannelId);
-const logChannel = guild.channels.cache.get(config.logChannelId);
-    
+    const voiceChannel = guild.channels.cache.get(config.voiceChannelId);
     if (voiceChannel && voiceChannel.isVoiceBased()) {
       await voiceChannel.setName(`「 Online: ${onlineCount} 」`);
       console.log(`✅ Channel rename → Online: ${onlineCount}`);
-
-    if (logChannel && logChannel.isTextBased()) {
-      logChannel.send({
-    content: `📢 Update status online!\nSaat ini ada **${onlineCount}** member yang aktif di server.`,
-       allowedMentions: { parse: [] }
-     });
-  }
-
-    } else {
-      console.warn("⚠️ Voice channel tidak ditemukan.");
-      if (logChannel && logChannel.isTextBased()) {
-        logChannel.send("⚠️ Gagal update voice channel: Tidak ditemukan.");
-      }
     }
-
-} catch (err) {
-  console.error("❌ Gagal update online:", err.message);
-  const logChannel = guild.channels.cache.get(config.logChannelId);
-  if (logChannel && logChannel.isTextBased()) {
-    logChannel.send(`❌ Error saat update: ${err.message}`);
-    }
+  } catch (err) {
+    console.error("❌ Gagal update online:", err.message);
   }
+}
+
+module.exports = (client) => {
+  client.on("presenceUpdate", (oldPresence, newPresence) => {
+    const guild = newPresence.guild || oldPresence?.guild;
+    if (guild) updateOnlineCount(guild);
+  });
+
+  client.on("ready", () => {
+    const guild = client.guilds.cache.first();
+    if (guild) updateOnlineCount(guild);
+  });
 };
