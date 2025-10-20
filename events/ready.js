@@ -77,7 +77,7 @@ module.exports = {
 
     // 🌈 Rainbow role (interval aman 25 detik)
     try {
-      rainbowRole(client, 25_000);
+      rainbowRole(client, 20_000);
     } catch (err) {
       console.error("❌ Rainbow role error:", err);
     }
