@@ -147,7 +147,6 @@ module.exports = {
 
       // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES
       if (interaction.isButton()) {
-        const customId = interaction.customId;
         
         // Tombol Guidebook
         if (customId === 'guidebook_btn') {
@@ -315,7 +314,6 @@ module.exports = {
 
       // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED ==========
       if (interaction.isButton() && interaction.customId) {
-        const customId = interaction.customId;
         
         if (customId.startsWith('item_') || 
             customId.startsWith('shoot_self_') || 
