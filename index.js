@@ -12,6 +12,7 @@ const updateTimeChannel = require("./modules/updateTimeChannel");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
+const { startAutoAnimation } = require("./modules/iconAnim");
 
 const client = new Client({
   intents: [
@@ -87,6 +88,7 @@ fs.readdirSync("./events").forEach((file) => {
 });
 
 srvName(client);
+startAutoAnimation(client);
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
