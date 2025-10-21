@@ -41,7 +41,7 @@ async function startAutoAnimation(client) {
     }
 
     await updateIcon(guild); // update pertama
-    interval = setInterval(() => updateIcon(guild), 10 * 1000); // tiap 30 detik
+    interval = setInterval(() => updateIcon(guild), 30 * 1000); // tiap 30 detik
     console.log("▶️ Auto animation icon dimulai...");
   } catch (err) {
     console.error("❌ Gagal start auto animation:", err.message);
