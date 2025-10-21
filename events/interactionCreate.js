@@ -113,140 +113,133 @@ module.exports = {
         }
 
         // ========== GUIDEBOOK & RULES BUTTON HANDLERS ==========
-      if (interaction.isStringSelectMenu() && interaction.customId === 'info_select') {
-        const selected = interaction.values[0];
-        
-        const rulesModule = require('../modules/rules');
-        const rules = await rulesModule.execute(interaction.client);
-        
-        let embed;
-        
-        switch(selected) {
-            case 'leveling':
-                embed = rules.levelingEmbed;
-                break;
-            case 'moderation':
-                embed = rules.moderationPolicyEmbed;
-                break;
-            case 'counting':
-                embed = rules.countingEmbed;
-                break;
-            default:
-                embed = new EmbedBuilder()
-                    .setTitle("❌ Information Not Found")
-                    .setDescription("Sorry, the selected option is not available.")
-                    .setColor(0xFF0000);
-        }
-        
-        await interaction.reply({
-            embeds: [embed],
-            ephemeral: true
-        });
-        return;
-      }
-
-      // 🆕 HANDLER: TOMBOL GUIDEBOOK, SERVER RULES
-      if (interaction.isButton()) {
         
         // Tombol Guidebook
         if (customId === 'guidebook_btn') {
-            const rulesModule = require('../modules/rules');
+          const rulesModule = require('../modules/rules');
+          
+          try {
             const rules = await rulesModule.execute(interaction.client);
             
             // Simpan session untuk intro
             guidebookSessions.set(interaction.user.id, {
-                currentPage: 0, // 0 = intro page
-                message: null
+              currentPage: 0, // 0 = intro page
+              message: null
             });
             
             await interaction.reply({
-                embeds: [rules.guidebookIntro],
-                components: [rules.startGuideButton],
-                ephemeral: true
+              embeds: [rules.guidebookIntro],
+              components: [rules.startGuideButton],
+              ephemeral: true
             });
-            return;
+          } catch (error) {
+            console.error('Error loading guidebook:', error);
+            await interaction.reply({
+              content: '❌ Error loading guidebook.',
+              ephemeral: true
+            });
+          }
+          return;
         }
         
         // Tombol Server Rules
         if (customId === 'server_rules_btn') {
-            const rulesModule = require('../modules/rules');
+          const rulesModule = require('../modules/rules');
+          
+          try {
             const rules = await rulesModule.execute(interaction.client);
             
             await interaction.reply({
-                embeds: [rules.rulesAllowedEmbed, rules.rulesNotAllowedEmbed],
-                ephemeral: true
+              embeds: [rules.rulesAllowedEmbed, rules.rulesNotAllowedEmbed],
+              ephemeral: true
             });
-            return;
+          } catch (error) {
+            console.error('Error loading server rules:', error);
+            await interaction.reply({
+              content: '❌ Error loading server rules.',
+              ephemeral: true
+            });
+          }
+          return;
         }
         
         // Tombol Start Guide
         if (customId === 'start_guide') {
-            const session = guidebookSessions.get(interaction.user.id);
-            if (!session) {
-                await interaction.reply({
-                    content: "❌ Session tidak ditemukan. Silakan buka Guidebook terlebih dahulu.",
-                    ephemeral: true
-                });
-                return;
-            }
-            
-            const rulesModule = require('../modules/rules');
+          const session = guidebookSessions.get(interaction.user.id);
+          if (!session) {
+            await interaction.reply({
+              content: "❌ Session tidak ditemukan. Silakan buka Guidebook terlebih dahulu.",
+              ephemeral: true
+            });
+            return;
+          }
+          
+          const rulesModule = require('../modules/rules');
+          
+          try {
             const rules = await rulesModule.execute(interaction.client);
             
             // Update session ke page 1
             guidebookSessions.set(interaction.user.id, {
-                ...session,
-                currentPage: 1
+              ...session,
+              currentPage: 1
             });
             
             await interaction.update({
-                embeds: [rules.guidebookPage1],
-                components: [rules.guidebookNavigation]
+              embeds: [rules.guidebookPage1],
+              components: [rules.guidebookNavigation]
             });
-            return;
+          } catch (error) {
+            console.error('Error loading guidebook page 1:', error);
+            await interaction.reply({
+              content: '❌ Error loading guidebook.',
+              ephemeral: true
+            });
+          }
+          return;
         }
         
-        // 🆕 HANDLER: GUIDEBOOK NAVIGATION
+        // GUIDEBOOK NAVIGATION
         if (customId === 'guide_prev' || customId === 'guide_next' || customId === 'guide_close') {
-            const session = guidebookSessions.get(interaction.user.id);
-            if (!session) {
-                await interaction.reply({
-                    content: "❌ Session tidak valid. Silakan buka Guidebook kembali.",
-                    ephemeral: true
-                });
-                return;
-            }
-            
-            const rulesModule = require('../modules/rules');
+          const session = guidebookSessions.get(interaction.user.id);
+          if (!session) {
+            await interaction.reply({
+              content: "❌ Session tidak valid. Silakan buka Guidebook kembali.",
+              ephemeral: true
+            });
+            return;
+          }
+          
+          const rulesModule = require('../modules/rules');
+          
+          try {
             const rules = await rulesModule.execute(interaction.client);
             
             let newPage = session.currentPage;
             
             if (customId === 'guide_prev') {
-                newPage = Math.max(0, session.currentPage - 1); // 0 = back ke intro
+              newPage = Math.max(0, session.currentPage - 1); // 0 = back ke intro
             } else if (customId === 'guide_next') {
-                newPage = Math.min(5, session.currentPage + 1);
+              newPage = Math.min(5, session.currentPage + 1);
             } else if (customId === 'guide_close') {
-                guidebookSessions.delete(interaction.user.id);
-                
-                try {
-                    // 🎯 SOLUSI: Delete message (jika memungkinkan)
-                    await interaction.message.delete();
-                } catch (error) {
-                    // 🎯 FALLBACK: Update dengan pesan minimal
-                    await interaction.update({
-                        content: "​", // Zero-width space
-                        embeds: [],
-                        components: []
-                    });
-                }
-                return;
+              guidebookSessions.delete(interaction.user.id);
+              
+              try {
+                await interaction.message.delete();
+              } catch (error) {
+                await interaction.update({
+                  content: "", 
+                  embeds: [],
+                  components: []
+                });
+              }
+              return;
             }
             
             // Update session
             guidebookSessions.set(interaction.user.id, {
-                ...session,
-                currentPage: newPage
+              ...session,
+              currentPage: newPage
             });
             
             // Get the correct page embed dan components
@@ -254,39 +247,45 @@ module.exports = {
             let components;
             
             if (newPage === 0) {
-                // Kembali ke intro dengan tombol Start Guide
-                currentEmbed = rules.guidebookIntro;
-                components = rules.startGuideButton;
+              currentEmbed = rules.guidebookIntro;
+              components = rules.startGuideButton;
             } else {
-                switch(newPage) {
-                    case 1:
-                        currentEmbed = rules.guidebookPage1;
-                        components = rules.guidebookNavigation;
-                        break;
-                    case 2:
-                        currentEmbed = rules.guidebookPage2;
-                        components = rules.guidebookNavigation;
-                        break;
-                    case 3:
-                        currentEmbed = rules.guidebookPage3;
-                        components = rules.guidebookNavigation;
-                        break;
-                    case 4:
-                        currentEmbed = rules.guidebookPage4;
-                        components = rules.guidebookNavigation;
-                        break;
-                    case 5:
-                        currentEmbed = rules.guidebookPage5;
-                        components = rules.guidebookClose;
-                        break;
-                }
+              switch(newPage) {
+                case 1:
+                  currentEmbed = rules.guidebookPage1;
+                  components = rules.guidebookNavigation;
+                  break;
+                case 2:
+                  currentEmbed = rules.guidebookPage2;
+                  components = rules.guidebookNavigation;
+                  break;
+                case 3:
+                  currentEmbed = rules.guidebookPage3;
+                  components = rules.guidebookNavigation;
+                  break;
+                case 4:
+                  currentEmbed = rules.guidebookPage4;
+                  components = rules.guidebookNavigation;
+                  break;
+                case 5:
+                  currentEmbed = rules.guidebookPage5;
+                  components = rules.guidebookClose;
+                  break;
+              }
             }
             
             await interaction.update({
-                embeds: [currentEmbed],
-                components: [components]
+              embeds: [currentEmbed],
+              components: [components]
             });
-            return;
+          } catch (error) {
+            console.error('Error loading guidebook navigation:', error);
+            await interaction.reply({
+              content: '❌ Error loading guidebook.',
+              ephemeral: true
+            });
+          }
+          return;
         }
       }
 
@@ -314,6 +313,7 @@ module.exports = {
 
       // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED ==========
       if (interaction.isButton() && interaction.customId) {
+        const customId = interaction.customId;
         
         if (customId.startsWith('item_') || 
             customId.startsWith('shoot_self_') || 
