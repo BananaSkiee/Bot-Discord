@@ -13,8 +13,8 @@ const CHANNEL_S1 = '1426537842875826278';
 const CHANNEL_S2 = '1429751342301184071';
 
 const SERVERS = [
-  { id: 's1', name: 'Server 1', host: 'BananaUcok.aternos.me', port: 14262, initialUsername: 'BotServer1', channelId: CHANNEL_S1, capacity: 100, version: '1.20.1' },
-  { id: 's2', name: 'Server 2', host: 'nightz.my.id', port: 25583, initialUsername: 'Chizen404', channelId: CHANNEL_S2, capacity: 100, version: '1.21.10' }
+  { id: 's1', name: 'Server 1', host: 'nightz.my.id', port: 25583, initialUsername: 'Chizen404', channelId: CHANNEL_S1, capacity: 100, version: '1.20.1' },
+  { id: 's2', name: 'Server 2', host: 'BananaUcok.aternos.me', port: 14262, initialUsername: 'BotServer2', channelId: CHANNEL_S2, capacity: 100, version: '1.21.10' }
 ];
 
 const MAX_SIM_PER_SERVER = 20;
