@@ -14,7 +14,7 @@ const CHANNEL_S2 = '1429751342301184071';
 
 const SERVERS = [
   { id: 's1', name: 'Server 1', host: 'BananaUcok.aternos.me', port: 14262, initialUsername: 'BotServer1', channelId: CHANNEL_S1, capacity: 100, version: '1.20.1' },
-  { id: 's2', name: 'Server 2', host: '', port: 25583, initialUsername: 'Chizen404', channelId: CHANNEL_S2, capacity: 100, version: '1.21.10' }
+  { id: 's2', name: 'Server 2', host: 'nightz', port: 25583, initialUsername: 'BotServer2', channelId: CHANNEL_S2, capacity: 100, version: '1.21.10' }
 ];
 
 const MAX_SIM_PER_SERVER = 20;
@@ -27,7 +27,7 @@ const CMD_CAPTURE_MS = 2500; // capture command output window
 
 // random names
 const randomNames = [
-  'delta','Botty','NotchX','Kicker','Banned','Player','Crashy','Signal','ByeBot','LostMC',
+  'Delta','Botty','NotchX','Kicker','Banned','Player','Crashy','Signal','ByeBot','LostMC',
   'Reboot','Jumpin','Zapper','MinerX','Crafty','Blocky','Pixelz','Mobster','EnderX','Nether',
   'SkyBot','RedMC','BlueMC','GhostX','LavaMC','AquaBot','Frosty','StormX','BlazeX','IronMC',
   'GoldMC','Diamond','Emerald','SwiftX','LuckyX','MegaMC','MicroX','TinyBot','AlphaX','BetaMC'
