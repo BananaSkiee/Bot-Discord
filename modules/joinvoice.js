@@ -30,7 +30,7 @@ module.exports = async (client) => {
         // Kalau belum ada Stage Instance, buat dulu
         if (!stageInstance) {
           await channel.createStageInstance({
-            topic: "Akira di atas panggung 🎶",
+            topic: "Server Maintenance",
           });
         }
 
