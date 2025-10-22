@@ -27,7 +27,7 @@ const CMD_CAPTURE_MS = 2500; // capture command output window
 
 // random names
 const randomNames = [
-  'Banana','Botty','NotchX','Kicker','Banned','Player','Crashy','Signal','ByeBot','LostMC',
+  'delta','Botty','NotchX','Kicker','Banned','Player','Crashy','Signal','ByeBot','LostMC',
   'Reboot','Jumpin','Zapper','MinerX','Crafty','Blocky','Pixelz','Mobster','EnderX','Nether',
   'SkyBot','RedMC','BlueMC','GhostX','LavaMC','AquaBot','Frosty','StormX','BlazeX','IronMC',
   'GoldMC','Diamond','Emerald','SwiftX','LuckyX','MegaMC','MicroX','TinyBot','AlphaX','BetaMC'
