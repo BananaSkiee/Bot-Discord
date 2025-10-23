@@ -42,7 +42,7 @@ function getRandomColor() {
 }
 
 module.exports = async function autoNews(client) {
-  const channelId = "1352331574376665178"; // ID channel target
+  const channelId = "1430736631954014258"; // ID channel target
   const scheduleHours = [8, 14, 20]; // Jam pengiriman WIB
 
   setInterval(async () => {
