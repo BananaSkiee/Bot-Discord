@@ -335,30 +335,17 @@ async handleContinueVerify(interaction) {
 
         this.updateUserSession(interaction.user.id, { 
             step: 'server_exploration',
-            explorationStart: Date.now(),
-            visitedChannels: {
-                home: false,
-                rules: false,
-                customize: false
+            explorationStart: Date.now()
+        });
+
+        // AUTO LANJUT SETELAH 30 DETIK - TANPA TRACKING
+        setTimeout(async () => {
+            try {
+                await this.autoProceedToMission(interaction);
+            } catch (error) {
+                console.error('Auto proceed error:', error);
             }
-        });
-
-        // TAMBAHIN SPECIAL TRACKING BUTTON
-        const trackingButton = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('track_visited')
-                    .setLabel('✅ SUDAH KUNJUNGI SEMUA')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('🎯')
-            );
-
-        await interaction.followUp({
-            content: `${interaction.user}`,
-            embeds: [],
-            components: [trackingButton],
-            flags: 64
-        });
+        }, 30000);
 
     } catch (error) {
         console.error('Continue verify error:', error);
@@ -367,7 +354,7 @@ async handleContinueVerify(interaction) {
             components: []
         });
     }
-}
+ }
 
 // ========== STATE TRACKING SYSTEM ==========
 async handleChannelVisit(interaction, channelType) {
@@ -425,7 +412,7 @@ async updateVisitProgress(interaction, visitedCount, totalChannels) {
 async autoProceedToMission(interaction) {
     try {
         const session = this.getUserSession(interaction.user.id);
-        if (!session || session.step !== 'server_exploration') return;
+        if (!session) return;
 
         console.log(`🚀 Auto proceeding to mission for ${interaction.user.username}`);
 
@@ -447,19 +434,15 @@ async autoProceedToMission(interaction) {
                     .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
             );
 
-        // EDIT MESSAGE - GANTI EMBED
-        await interaction.message.edit({ 
+        await interaction.editReply({ 
             embeds: [embed], 
             components: [buttons] 
         });
 
-        // UPDATE SESSION
         this.updateUserSession(interaction.user.id, { 
             step: 'introduction_mission',
             missionStartTime: Date.now()
         });
-
-        console.log(`✅ User ${interaction.user.username} moved to mission`);
 
     } catch (error) {
         console.error('❌ Auto proceed to mission error:', error);
