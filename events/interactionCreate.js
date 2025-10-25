@@ -19,50 +19,109 @@ module.exports = {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
       // ========== VERIFY SYSTEM HANDLERS ==========
+      
+      // ✅ BUTTON INTERACTIONS
       if (interaction.isButton()) {
-        // VERIFY BUTTON
-        if (interaction.customId === 'verify_account') {
+        const { customId } = interaction;
+        console.log(`🔘 Button clicked: ${customId}`);
+
+        // Verify Account Button
+        if (customId === 'verify_account') {
           return await verifySystem.handleVerify(interaction);
         }
         
-        // START COMMUNITY BUTTON
-        if (interaction.customId === 'start_community') {
-          return await verifySystem.handleStartCommunity(interaction);
+        // Skip Verify Button
+        if (customId === 'skip_verify') {
+          return await verifySystem.handleSkipVerify(interaction);
         }
         
-        // START ONBOARDING BUTTON
-        if (interaction.customId === 'start_onboarding') {
-          return await verifySystem.handleStartOnboarding(interaction);
+        // Continue Verify Button
+        if (customId === 'continue_verify') {
+          return await verifySystem.handleContinueVerify(interaction);
         }
         
-        // CONFIRM ONBOARDING BUTTON
-        if (interaction.customId === 'confirm_onboarding') {
-          return await verifySystem.handleConfirmOnboarding(interaction);
+        // Next Verify Button
+        if (customId === 'next_verify') {
+          return await verifySystem.handleNextVerify(interaction);
         }
         
-        // SKIP ONBOARDING BUTTON
-        if (interaction.customId === 'skip_onboarding') {
-          return await verifySystem.handleSkipOnboarding(interaction);
+        // Auto Welcome Button
+        if (customId === 'auto_welcome') {
+          return await verifySystem.handleAutoWelcome(interaction);
         }
         
-        // CUSTOM FORM BUTTON
-        if (interaction.customId === 'custom_form') {
-          await interaction.reply({ 
-            content: '🚧 Fitur custom form dalam pengembangan', 
-            ephemeral: true 
-          });
-          return;
+        // Welcome Selection Buttons
+        if (customId.startsWith('welcome_')) {
+          return await verifySystem.handleWelcomeSelection(interaction);
+        }
+        
+        // Custom Message Button
+        if (customId === 'custom_message') {
+          return await verifySystem.handleCustomMessage(interaction);
+        }
+        
+        // Input Rating Button
+        if (customId === 'input_rating') {
+          return await verifySystem.handleInputRating(interaction);
+        }
+        
+        // Give Feedback Button
+        if (customId === 'give_feedback') {
+          return await verifySystem.handleGiveFeedback(interaction);
+        }
+        
+        // Next Final Button
+        if (customId === 'next_final') {
+          return await verifySystem.handleNextFinal(interaction);
+        }
+        
+        // Rate Server Button
+        if (customId === 'rate_server') {
+          return await verifySystem.handleInputRating(interaction);
+        }
+        
+        // FAQ Buttons
+        if (customId === 'faqs_skip' || customId === 'faqs_rating') {
+          return await verifySystem.handleFaqs(interaction);
+        }
+        
+        // Give Role Buttons
+        if (customId === 'give_role_skip' || customId === 'give_role_final') {
+          return await verifySystem.handleGiveRole(interaction);
+        }
+        
+        // Back to Verify Button
+        if (customId === 'back_to_verify') {
+          return await verifySystem.handleBackToVerify(interaction);
+        }
+
+        // Mission Buttons
+        if (customId === 'see_mission') {
+          return await verifySystem.handleSeeMission(interaction);
+        }
+        
+        if (customId === 'understand_mission') {
+          return await verifySystem.handleUnderstandMission(interaction);
         }
       }
 
-      // VERIFY SELECT MENU HANDLERS
-      if (interaction.isStringSelectMenu()) {
-        if (interaction.customId.startsWith('select_')) {
-          return await verifySystem.handleSelectMenu(interaction);
+      // ✅ MODAL SUBMIT INTERACTIONS
+      if (interaction.isModalSubmit()) {
+        const { customId } = interaction;
+        console.log(`📝 Modal submitted: ${customId}`);
+
+        if (customId === 'custom_message_modal') {
+          return await verifySystem.handleCustomMessageSubmit(interaction);
+        }
+        
+        if (customId === 'input_rating_modal') {
+          return await verifySystem.handleRatingSubmit(interaction);
+        }
+        
+        if (customId === 'give_feedback_modal') {
+          return await verifySystem.handleFeedbackSubmit(interaction);
         }
       }
-
-
 
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
