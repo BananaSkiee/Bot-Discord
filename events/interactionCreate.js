@@ -20,37 +20,49 @@ module.exports = {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
       // ========== VERIFY SYSTEM HANDLERS ==========
-      
       // ✅ BUTTON INTERACTIONS
-      if (interaction.isButton()) {
-        const { customId } = interaction;
-        console.log(`🔘 Button clicked: ${customId}`);
+if (interaction.isButton()) {
+  const { customId } = interaction;
+  console.log(`🔘 Button clicked: ${customId}`);
 
-        // Verify Account Button
-        if (customId === 'verify_account') {
-          return await verifySystem.handleVerify(interaction);
-        }
-        
-        // Skip Verify Button
-        if (customId === 'skip_verify') {
-          return await verifySystem.handleSkipVerify(interaction);
-        }
-        
-        // Continue Verify Button
-        if (customId === 'continue_verify') {
-          return await verifySystem.handleContinueVerify(interaction);
-        }
-        
-        // Next Verify Button
-        if (customId === 'next_verify') {
-          return await verifySystem.handleNextVerify(interaction);
-        }
-        
-        // Auto Welcome Button
-        if (customId === 'auto_welcome') {
-          return await verifySystem.handleAutoWelcome(interaction);
-        }
-        
+  // Verify Account Button
+  if (customId === 'verify_account') {
+    return await verifySystem.handleVerify(interaction);
+  }
+  
+  // Skip Verify Button
+  if (customId === 'skip_verify') {
+    return await verifySystem.handleSkipVerify(interaction);
+  }
+  
+  // Continue Verify Button
+  if (customId === 'continue_verify') {
+    return await verifySystem.handleContinueVerify(interaction);
+  }
+  
+  // ========== CHANNEL VISIT BUTTONS ========== ⬅️ TAMBAHIN DI SINI
+  if (customId === 'visit_home') {
+    return await verifySystem.handleChannelVisit(interaction, 'home');
+  }
+  
+  if (customId === 'visit_rules') {
+    return await verifySystem.handleChannelVisit(interaction, 'rules');
+  }
+  
+  if (customId === 'visit_customize') {
+    return await verifySystem.handleChannelVisit(interaction, 'customize');
+  }
+  
+  // Next Verify Button
+  if (customId === 'next_verify') {
+    return await verifySystem.handleNextVerify(interaction);
+  }
+  
+  // Auto Welcome Button
+  if (customId === 'auto_welcome') {
+    return await verifySystem.handleAutoWelcome(interaction);
+  }
+
         // Welcome Selection Buttons
         if (customId.startsWith('welcome_')) {
           return await verifySystem.handleWelcomeSelection(interaction);
@@ -122,8 +134,8 @@ module.exports = {
         if (customId === 'give_feedback_modal') {
           return await verifySystem.handleFeedbackSubmit(interaction);
         }
-      }
-
+            }
+          
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
