@@ -5,9 +5,6 @@ const { EmbedBuilder } = require("discord.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
-// Store untuk guidebook sessions
-const guidebookSessions = new Map();
-
 // ========== IMPORT VERIFY SYSTEM ==========
 const VerifySystem = require('../modules/verify');
 const verifySystem = new VerifySystem();
