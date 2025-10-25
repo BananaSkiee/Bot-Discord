@@ -52,6 +52,11 @@ if (interaction.isButton()) {
   if (customId === 'visit_customize') {
     return await verifySystem.handleChannelVisit(interaction, 'customize');
   }
+
+  // Di interactionCreate.js - TAMBAHIN INI
+if (customId === 'track_visited') {
+    return await verifySystem.handleTrackVisited(interaction);
+}
   
   // Next Verify Button
   if (customId === 'next_verify') {
