@@ -365,10 +365,11 @@ module.exports = {
           !interaction.customId.startsWith('auto_') &&
           !interaction.customId.startsWith('custom_')) {
         
-      await interaction.reply({
-        content: "⚠️ Tombol tidak dikenali.",
-        ephemeral: true,
-      });
+        await interaction.reply({
+          content: "⚠️ Tombol tidak dikenali.",
+          ephemeral: true,
+        });
+      }
 
     } catch (err) {
       console.error("❌ ERROR GLOBAL DI INTERACTIONCREATE:", err);
