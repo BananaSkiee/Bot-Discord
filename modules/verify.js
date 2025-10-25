@@ -328,7 +328,9 @@ async handleContinueVerify(interaction) {
                     .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
             );
 
+        // ⚡ EDIT DENGAN MENTION USER
         await interaction.editReply({ 
+            content: `${interaction.user}`, // ✅ PASTIKAN ADA MENTION
             embeds: [embed], 
             components: [linkButtons] 
         });
@@ -338,7 +340,7 @@ async handleContinueVerify(interaction) {
             explorationStart: Date.now()
         });
 
-        // AUTO LANJUT SETELAH 30 DETIK - TANPA TRACKING
+        // AUTO LANJUT SETELAH 30 DETIK
         setTimeout(async () => {
             try {
                 await this.autoProceedToMission(interaction);
@@ -354,8 +356,8 @@ async handleContinueVerify(interaction) {
             components: []
         });
     }
- }
-
+}
+    
 // ========== STATE TRACKING SYSTEM ==========
 async handleChannelVisit(interaction, channelType) {
     try {
@@ -434,9 +436,9 @@ async autoProceedToMission(interaction) {
                     .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
             );
 
-        // ⚡ EDIT MESSAGE YANG SUDAH ADA - BUKAN KIRIM BARU
+        // ⚡ EDIT MESSAGE YANG SUDAH ADA - DENGAN MENTION USER
         await interaction.editReply({ 
-            content: `${interaction.user}`,
+            content: `${interaction.user}`, // ✅ PASTIKAN ADA MENTION
             embeds: [embed], 
             components: [buttons] 
         });
@@ -531,16 +533,21 @@ async editVerifyChannelToRating(user, client, userMessage) {
             return;
         }
 
-        // CARI MESSAGE USER DI VERIFY CHANNEL
+        // CARI MESSAGE USER DI VERIFY CHANNEL - BETTER SEARCH
         const messages = await verifyChannel.messages.fetch({ limit: 50 });
         const userVerifyMessage = messages.find(msg => {
             if (msg.author.id !== client.user.id) return false;
             if (msg.embeds.length === 0) return false;
             
             const embed = msg.embeds[0];
-            // Cari embed yang ada username user ATAU tentang misi
-            return (embed.description && embed.description.includes(user.username)) ||
-                   (embed.title && embed.title.includes('MISI PERKENALAN'));
+            // Cari berdasarkan:
+            // 1. Ada mention user
+            // 2. Ada content user mention  
+            // 3. Embed tentang misi
+            return msg.content.includes(user.id) ||
+                   (embed.description && embed.description.includes(user.username)) ||
+                   (embed.title && embed.title.includes('MISI PERKENALAN')) ||
+                   (embed.footer && embed.footer.text.includes('Auto detect'));
         });
 
         if (userVerifyMessage) {
@@ -579,7 +586,12 @@ async editVerifyChannelToRating(user, client, userMessage) {
             console.log(`✅ Verify channel EDITED to rating for ${user.username}`);
             
         } else {
-            console.log('❌ No user message found in verify channel');
+            console.log('❌ No user message found in verify channel - semua messages:', messages.map(m => ({ 
+                id: m.id, 
+                content: m.content,
+                embedTitle: m.embeds[0]?.title,
+                hasMention: m.content.includes(user.id)
+            })));
         }
 
     } catch (error) {
