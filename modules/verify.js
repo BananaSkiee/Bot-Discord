@@ -302,148 +302,166 @@ class VerifySystem {
         }
     }
 
-    async handleContinueVerify(interaction) {
-        try {
-            await interaction.deferUpdate();
-            
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🏠 KUNJUNGI AREA SERVER')
-                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
-                .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
+async handleContinueVerify(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🏠 KUNJUNGI AREA SERVER')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Guide** - Lihat overview server\n📋 **<#1352326247186694164>** - Baca peraturan server  \n🎨 **Channels & Roles** - Setup roles dan channels\n\n**📌 Klik tombol dibawah setelah mengunjungi masing-masing channel**')
+            .setFooter({ text: 'Auto lanjut setelah semua channel dikunjungi' });
 
-            const linkButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('🏠 SERVER GUILD')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
-                    new ButtonBuilder()
-                        .setLabel('📋 OPEN RULES')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
-                    new ButtonBuilder()
-                        .setLabel('🎨 SELF ROLE')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
-                );
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('visit_home')
+                    .setLabel('✅ SERVER GUIDE')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('visit_rules')
+                    .setLabel('✅ RULES')
+                    .setStyle(ButtonStyle.Success),
+                new ButtonBuilder()
+                    .setCustomId('visit_customize')
+                    .setLabel('🎯 CHANNELS & ROLES')
+                    .setStyle(ButtonStyle.Primary) // Tombol terakhir yang bisa ganti embed
+            );
 
-            await interaction.editReply({ 
-                embeds: [embed], 
-                components: [linkButtons] 
-            });
+        await interaction.editReply({ 
+            embeds: [embed], 
+            components: [buttons] 
+        });
 
-            this.updateUserSession(interaction.user.id, { 
-                step: 'server_exploration',
-                explorationStart: Date.now(),
-                visitedChannels: {
-                    home: false,
-                    rules: false,
-                    customize: false
-                }
-            });
+        this.updateUserSession(interaction.user.id, { 
+            step: 'server_exploration',
+            explorationStart: Date.now(),
+            visitedChannels: {
+                home: false,
+                rules: false,
+                customize: false
+            }
+        });
 
-            setTimeout(async () => {
-                try {
-                    await this.autoProceedServerExploration(interaction);
-                } catch (error) {
-                    console.error('Auto server exploration complete error:', error);
-                }
-            }, 30000);
+        // HAPUS TIMEOUT 30 DETIK - SEKARANG AUTO DETECT
 
-        } catch (error) {
-            console.error('Continue verify error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to start server exploration.',
-                components: []
-            });
-        }
+    } catch (error) {
+        console.error('Continue verify error:', error);
+        await interaction.editReply({
+            content: '❌ Failed to start server exploration.',
+            components: []
+        });
     }
+}
 
-    async autoProceedServerExploration(interaction) {
-        try {
-            const session = this.getUserSession(interaction.user.id);
-            if (!session || session.step !== 'server_exploration') return;
+// ========== STATE TRACKING SYSTEM ==========
+async handleChannelVisit(interaction, channelType) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        if (session && session.step === 'server_exploration') {
+            session.visitedChannels[channelType] = true;
+            this.updateUserSession(interaction.user.id, session);
 
-            console.log(`🚀 Auto proceeding to introduction for ${interaction.user.username}`);
+            console.log(`✅ ${interaction.user.username} visited ${channelType}`);
 
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
-                .setFooter({ text: 'Auto detect • No button needed' });
-
-            await interaction.editReply({ 
-                embeds: [embed], 
-                components: [] // HAPUS TOMBOL, LANGSUNG AUTO DETECT
-            });
-
-            // UPDATE SESSION
-            this.updateUserSession(interaction.user.id, { 
-                step: 'introduction_mission',
-                missionStartTime: Date.now()
-            });
-
-            console.log(`✅ User ${interaction.user.username} moved to introduction mission`);
-
-        } catch (error) {
-            console.error('❌ Auto proceed server exploration error:', error);
+            // Check if all channels visited
+            if (this.allChannelsVisited(session)) {
+                await this.autoProceedToMission(interaction);
+            }
         }
+    } catch (error) {
+        console.error('Channel visit tracking error:', error);
     }
+}
 
-    // ========== MESSAGE DETECTION SYSTEM ==========
-    async detectFirstMessage(message) {
-        try {
-            console.log(`🔍 Checking message from ${message.author.username} in ${message.channel.name}`);
-            
-            // Filter penting
-            if (message.channel.id !== this.config.generalChannelId) {
-                console.log('❌ Wrong channel');
-                return;
-            }
-            if (message.author.bot) {
-                console.log('❌ Bot message');
-                return;
-            }
-            if (message.member.roles.cache.has(this.config.memberRoleId)) {
-                console.log('❌ Already has role');
-                return;
-            }
+allChannelsVisited(session) {
+    return session.visitedChannels.home && 
+           session.visitedChannels.rules && 
+           session.visitedChannels.customize;
+}
 
-            const userId = message.author.id;
-            let session = this.getUserSession(userId);
-            
-            console.log(`📝 Session found:`, session);
+async autoProceedToMission(interaction) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        if (!session || session.step !== 'server_exploration') return;
 
-            // Buat session baru jika belum ada
-            if (!session) {
-                console.log('🆕 Creating new session for user');
-                session = this.createUserSession(userId);
-                session.step = 'introduction_mission';
-                session.missionStartTime = Date.now();
-            }
+        console.log(`🚀 Auto proceeding to mission for ${interaction.user.username}`);
 
-            // Update session dengan data pesan
-            session.data = session.data || {};
-            session.data.firstMessage = message.content;
-            session.data.firstMessageTime = Date.now();
-            session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
-            session.step = 'ready_for_rating'; // LANGSUNG LANJUT KE RATING READY
-            
-            this.updateUserSession(userId, session);
-            console.log(`✅ Session updated to ready_for_rating for ${message.author.username}`);
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('👋 MISI PERKENALAN')
+            .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+            .setFooter({ text: 'Auto detect • No button needed' });
 
-            // ⚡ LANGSUNG UBAH EMBED DI VERIFY CHANNEL KE RATING
-            await this.updateVerifyChannelToRating(message.author, message.client);
-            
-            // Juga enable tombol NEXT VERIFY di general (backup)
-            await this.enableNextVerifyButton(message.author, message.client);
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('see_mission')
+                    .setLabel('📝 SEE MISSION')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setLabel('🔗 TO CHANNEL')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+            );
 
-        } catch (error) {
-            console.error('❌ First message detection error:', error);
+        // EDIT MESSAGE - GANTI EMBED
+        await interaction.message.edit({ 
+            embeds: [embed], 
+            components: [buttons] 
+        });
+
+        // UPDATE SESSION
+        this.updateUserSession(interaction.user.id, { 
+            step: 'introduction_mission',
+            missionStartTime: Date.now()
+        });
+
+        console.log(`✅ User ${interaction.user.username} moved to mission`);
+
+    } catch (error) {
+        console.error('❌ Auto proceed to mission error:', error);
+    }
+}
+    
+// ========== MESSAGE DETECTION SYSTEM ==========
+async detectFirstMessage(message) {
+    try {
+        console.log(`🔍 Checking message from ${message.author.username} in ${message.channel.name}`);
+        
+        // Filter
+        if (message.channel.id !== this.config.generalChannelId) return;
+        if (message.author.bot) return;
+        if (message.member.roles.cache.has(this.config.memberRoleId)) return;
+
+        const userId = message.author.id;
+        const session = this.getUserSession(userId);
+        
+        // Cek jika user sedang dalam misi introduction
+        if (!session || session.step !== 'introduction_mission') {
+            console.log('❌ User not in introduction mission');
+            return;
         }
-    }
 
+        console.log(`✅ ${message.author.username} completed mission with message: "${message.content}"`);
+
+        // UPDATE SESSION
+        session.step = 'ready_for_rating';
+        session.data = session.data || {};
+        session.data.firstMessage = message.content;
+        session.data.firstMessageTime = Date.now();
+        session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
+        
+        this.updateUserSession(userId, session);
+
+        // ⚡ LANGSUNG UBAH EMBED DI VERIFY CHANNEL KE RATING
+        await this.updateVerifyChannelToRating(message.author, message.client);
+
+    } catch (error) {
+        console.error('❌ First message detection error:', error);
+    }
+      }
+    
     async updateVerifyChannelToRating(user, client) {
         try {
             console.log(`🔄 Updating verify channel to RATING for ${user.username}`);
