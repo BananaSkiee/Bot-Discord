@@ -9,7 +9,6 @@ const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
-const rulesModule = require("../modules/rules");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const updateTimeChannel = require("../modules/updateTimeChannel");
@@ -28,37 +27,6 @@ module.exports = {
       console.log("✅ Verify system initialized");
     } catch (error) {
       console.error("❌ Gagal initialize verify system:", error);
-    }
-
-    // 🆕 Auto Rules
-    try {
-      const RULES_CHANNEL_ID = "1352326247186694164";
-      const rulesChannel = await client.channels.fetch(RULES_CHANNEL_ID);
-
-      if (rulesChannel?.type === ChannelType.GuildText) {
-        const messages = await rulesChannel.messages.fetch({ limit: 50 });
-        for (const message of messages.values()) {
-          try {
-            await message.delete();
-            await new Promise((res) => setTimeout(res, 100));
-          } catch (error) {
-            console.log("⚠️ Tidak bisa hapus pesan lama:", error.message);
-          }
-        }
-
-        console.log("🗑️ Pesan lama dihapus, mengirim rules baru...");
-        const rules = await rulesModule.execute(client);
-        await rulesChannel.send({
-          embeds: [rules.welcomeEmbed],
-          components: [rules.welcomeButtons, rules.infoSelectMenu],
-        });
-
-        console.log("✅ Rules berhasil dikirim ke channel");
-      } else {
-        console.error("❌ Channel rules tidak ditemukan atau bukan text channel");
-      }
-    } catch (error) {
-      console.error("❌ Gagal mengirim rules:", error);
     }
 
     // 🧭 Server Info
