@@ -434,7 +434,9 @@ async autoProceedToMission(interaction) {
                     .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
             );
 
+        // ⚡ EDIT MESSAGE YANG SUDAH ADA - BUKAN KIRIM BARU
         await interaction.editReply({ 
+            content: `${interaction.user}`,
             embeds: [embed], 
             components: [buttons] 
         });
@@ -510,89 +512,80 @@ async detectFirstMessage(message) {
         
         this.updateUserSession(userId, session);
 
-        // ⚡ LANGSUNG UBAH EMBED DI VERIFY CHANNEL KE RATING
-        await this.updateVerifyChannelToRating(message.author, message.client);
+        // ⚡ EDIT MESSAGE YANG SUDAH ADA DI VERIFY CHANNEL
+        await this.editVerifyChannelToRating(message.author, message.client, message.content);
 
     } catch (error) {
         console.error('❌ First message detection error:', error);
     }
-      }
-    
-    async updateVerifyChannelToRating(user, client) {
-        try {
-            console.log(`🔄 Updating verify channel to RATING for ${user.username}`);
-            
-            const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
-            if (!verifyChannel) {
-                console.log('❌ Verify channel not found');
-                return;
-            }
+}
 
-            // Cari SEMUA message user di verify channel
-            const messages = await verifyChannel.messages.fetch({ limit: 50 });
-            
-            // Cari message yang ada component/embed untuk user ini
-            const userVerifyMessage = messages.find(msg => {
-                if (msg.author.id !== client.user.id) return false;
-                if (msg.embeds.length === 0) return false;
-                
-                const embed = msg.embeds[0];
-                // Cari embed yang ada username user atau tentang misi
-                return (embed.description && embed.description.includes(user.username)) ||
-                       (embed.title && (embed.title.includes('MISI PERKENALAN') || 
-                                        embed.title.includes('BERI PENILAIAN')));
-            });
-
-            if (userVerifyMessage) {
-                console.log(`📝 Found user message in verify channel, changing to RATING embed...`);
-                
-                const session = this.getUserSession(user.id);
-                const firstMessage = session?.data?.firstMessage || 'Pesan terkirim';
-                
-                // EMBED RATING BARU
-                const ratingEmbed = new EmbedBuilder()
-                    .setColor(0xFFD700)
-                    .setTitle('⭐ BERI PENILAIAN - MISI SELESAI! ✅')
-                    .setDescription(`**Hai ${user.username}!**\n\n**Misi perkenalan di #general SUDAH SELESAI!** 🎉\n\nSekarang beri rating pengalaman verifikasi Anda:\n\n**📊 Rating Scale:**\n• 🟢 1-50: Perlu improvement\n• 🟡 51-75: Cukup memuaskan  \n• 🔵 76-90: Baik & profesional\n• 🟣 91-100: Luar biasa`)
-                    .addFields(
-                        { name: '📝 Pesan Perkenalan Anda', value: `"${firstMessage}"`, inline: false }
-                    )
-                    .setFooter({ text: 'Langkah terakhir sebelum role member!' });
-
-                const ratingButtons = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('input_rating')
-                            .setLabel('🎯 INPUT RATING 1-100')
-                            .setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder()
-                            .setCustomId('give_feedback')
-                            .setLabel('💬 KASIH SARAN')
-                            .setStyle(ButtonStyle.Secondary),
-                        new ButtonBuilder()
-                            .setCustomId('faqs_rating')
-                            .setLabel('❓ TANYA FAQ')
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-
-                // ⚡ EDIT MESSAGE - UBAH EMBED JADI RATING
-                await userVerifyMessage.edit({ 
-                    embeds: [ratingEmbed], 
-                    components: [ratingButtons] 
-                });
-                
-                console.log(`✅ Verify channel changed to RATING for ${user.username}`);
-                
-            } else {
-                console.log('❌ No user message found in verify channel');
-                // Backup: Kirim message baru
-                await this.sendNewRatingMessage(verifyChannel, user);
-            }
-
-        } catch (error) {
-            console.error('❌ Update verify channel to rating error:', error);
+// ========== EDIT VERIFY CHANNEL MESSAGE ==========
+async editVerifyChannelToRating(user, client, userMessage) {
+    try {
+        console.log(`🔄 Editing verify channel to RATING for ${user.username}`);
+        
+        const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
+        if (!verifyChannel) {
+            console.log('❌ Verify channel not found');
+            return;
         }
+
+        // CARI MESSAGE USER DI VERIFY CHANNEL
+        const messages = await verifyChannel.messages.fetch({ limit: 50 });
+        const userVerifyMessage = messages.find(msg => {
+            if (msg.author.id !== client.user.id) return false;
+            if (msg.embeds.length === 0) return false;
+            
+            const embed = msg.embeds[0];
+            // Cari embed yang ada username user ATAU tentang misi
+            return (embed.description && embed.description.includes(user.username)) ||
+                   (embed.title && embed.title.includes('MISI PERKENALAN'));
+        });
+
+        if (userVerifyMessage) {
+            console.log(`📝 Found user message, EDITING to rating embed...`);
+            
+            // EMBED RATING BARU - EDIT MESSAGE YANG SUDAH ADA
+            const ratingEmbed = new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setTitle(`⭐ LANJUTKAN VERIFIKASI - RATING`)
+                .setDescription(`Hai ${user.username}!\n\nVerifikasi Anda dilanjutkan ke step rating.\n**Misi perkenalan di #general SUDAH SELESAI!** ✅\n\nBeri rating pengalaman verifikasi:\n\n**Pesan Anda:** "${userMessage}"`)
+                .setFooter({ text: 'Auto-pindah dari misi general' });
+
+            const ratingButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('input_rating')
+                        .setLabel('🎯 INPUT RATING')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId('give_feedback')
+                        .setLabel('💬 GIVE FEEDBACK')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('faqs_rating')
+                        .setLabel('❓ FAQS')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+            // ⚡ EDIT MESSAGE YANG SUDAH ADA - BUKAN KIRIM BARU
+            await userVerifyMessage.edit({ 
+                content: `${user}`,
+                embeds: [ratingEmbed], 
+                components: [ratingButtons] 
+            });
+            
+            console.log(`✅ Verify channel EDITED to rating for ${user.username}`);
+            
+        } else {
+            console.log('❌ No user message found in verify channel');
+        }
+
+    } catch (error) {
+        console.error('❌ Edit verify channel to rating error:', error);
     }
+}
 
     async sendNewRatingMessage(verifyChannel, user) {
         try {
