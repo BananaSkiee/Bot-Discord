@@ -5,9 +5,8 @@ const { EmbedBuilder } = require("discord.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
-// ========== IMPORT VERIFY SYSTEM ==========
-const VerifySystem = require('../modules/verify');
-const verifySystem = new VerifySystem();
+// Import verify system
+const verifySystem = require('../modules/verify');
 
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
@@ -19,95 +18,51 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-      // ========== VERIFY SYSTEM MODAL HANDLERS ==========
-      if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'custom_message_modal') {
-          return await verifySystem.handleCustomMessageSubmit(interaction);
+      // ========== VERIFY SYSTEM HANDLERS ==========
+      if (interaction.isButton()) {
+        // VERIFY BUTTON
+        if (interaction.customId === 'verify_account') {
+          return await verifySystem.handleVerify(interaction);
         }
-        if (interaction.customId === 'input_rating_modal') {
-          return await verifySystem.handleRatingSubmit(interaction);
+        
+        // START COMMUNITY BUTTON
+        if (interaction.customId === 'start_community') {
+          return await verifySystem.handleStartCommunity(interaction);
         }
-        if (interaction.customId === 'give_feedback_modal') {
-          return await verifySystem.handleFeedbackSubmit(interaction);
+        
+        // START ONBOARDING BUTTON
+        if (interaction.customId === 'start_onboarding') {
+          return await verifySystem.handleStartOnboarding(interaction);
+        }
+        
+        // CONFIRM ONBOARDING BUTTON
+        if (interaction.customId === 'confirm_onboarding') {
+          return await verifySystem.handleConfirmOnboarding(interaction);
+        }
+        
+        // SKIP ONBOARDING BUTTON
+        if (interaction.customId === 'skip_onboarding') {
+          return await verifySystem.handleSkipOnboarding(interaction);
+        }
+        
+        // CUSTOM FORM BUTTON
+        if (interaction.customId === 'custom_form') {
+          await interaction.reply({ 
+            content: '🚧 Fitur custom form dalam pengembangan', 
+            ephemeral: true 
+          });
+          return;
         }
       }
 
-      // ========== VERIFY SYSTEM BUTTON HANDLERS ==========
-      if (interaction.isButton()) {
-        const customId = interaction.customId;
-        
-        // VERIFY BUTTONS
-        if (customId === 'verify_account') {
-          return await verifySystem.handleVerify(interaction);
+      // VERIFY SELECT MENU HANDLERS
+      if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('select_')) {
+          return await verifySystem.handleSelectMenu(interaction);
         }
-        if (customId === 'skip_verify') {
-          return await verifySystem.handleSkipVerify(interaction);
-        }
-        if (customId === 'continue_verify') {
-          return await verifySystem.handleContinueVerify(interaction);
-        }
-        if (customId === 'back_to_verify') {
-          return await verifySystem.handleBackToVerify(interaction);
-        }
-        
-        // NEXT VERIFY
-        if (customId === 'next_verify') {
-          return await verifySystem.handleNextVerify(interaction);
-        }
-        
-        // SERVER EXPLORATION BUTTONS (Link buttons)
-        if (customId === 'server_guild') {
-          return await verifySystem.handleChannelVisit(interaction, 'home');
-        }
-        if (customId === 'open_rules') {
-          return await verifySystem.handleChannelVisit(interaction, 'rules');
-        }
-        if (customId === 'self_role') {
-          return await verifySystem.handleChannelVisit(interaction, 'customize');
-        }
-        
-        // MISSION BUTTONS
-        if (customId === 'see_mission') {
-          return await verifySystem.handleSeeMission(interaction);
-        }
-        if (customId === 'understand_mission') {
-          return await verifySystem.handleUnderstandMission(interaction);
-        }
-        
-        // WELCOME BUTTONS
-        if (customId === 'auto_welcome') {
-          return await verifySystem.handleAutoWelcome(interaction);
-        }
-        if (customId === 'custom_message') {
-          return await verifySystem.handleCustomMessage(interaction);
-        }
-        if (customId.startsWith('welcome_')) {
-          return await verifySystem.handleWelcomeSelection(interaction);
-        }
-        
-        // RATING BUTTONS
-        if (customId === 'input_rating') {
-          return await verifySystem.handleInputRating(interaction);
-        }
-        if (customId === 'give_feedback') {
-          return await verifySystem.handleGiveFeedback(interaction);
-        }
-        if (customId === 'next_final') {
-          return await verifySystem.handleNextFinal(interaction);
-        }
-        if (customId === 'rate_server') {
-          return await verifySystem.handleInputRating(interaction);
-        }
-        
-        // FAQ BUTTONS
-        if (customId === 'faqs_skip' || customId === 'faqs_rating') {
-          return await verifySystem.handleFaqs(interaction);
-        }
-        
-        // FINAL BUTTONS
-        if (customId === 'give_role_skip' || customId === 'give_role_final') {
-          return await verifySystem.handleGiveRole(interaction);
-        }
+      }
+
+
 
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
@@ -247,6 +202,8 @@ module.exports = {
           ephemeral: true,
         });
       }
+
+      const customId = interaction.customId;
 
       const taggedUsers = fs.existsSync(filePath)
         ? JSON.parse(fs.readFileSync(filePath, "utf8"))
