@@ -248,8 +248,6 @@ module.exports = {
         });
       }
 
-      const customId = interaction.customId;
-
       const taggedUsers = fs.existsSync(filePath)
         ? JSON.parse(fs.readFileSync(filePath, "utf8"))
         : {};
