@@ -309,28 +309,28 @@ async handleContinueVerify(interaction) {
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle('🏠 KUNJUNGI AREA SERVER')
-            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 **Server Guide** - Lihat overview server\n📋 **<#1352326247186694164>** - Baca peraturan server  \n🎨 **Channels & Roles** - Setup roles dan channels\n\n**📌 Klik tombol dibawah setelah mengunjungi masing-masing channel**')
-            .setFooter({ text: 'Auto lanjut setelah semua channel dikunjungi' });
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
+            .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
 
-        const buttons = new ActionRowBuilder()
+        const linkButtons = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
-                    .setCustomId('visit_home')
-                    .setLabel('✅ SERVER GUIDE')
-                    .setStyle(ButtonStyle.Success),
+                    .setLabel('🏠 SERVER GUIDE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
                 new ButtonBuilder()
-                    .setCustomId('visit_rules')
-                    .setLabel('✅ RULES')
-                    .setStyle(ButtonStyle.Success),
+                    .setLabel('📋 OPEN RULES')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
                 new ButtonBuilder()
-                    .setCustomId('visit_customize')
-                    .setLabel('🎯 CHANNELS & ROLES')
-                    .setStyle(ButtonStyle.Primary) // Tombol terakhir yang bisa ganti embed
+                    .setLabel('🎨 SELF ROLE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
             );
 
         await interaction.editReply({ 
             embeds: [embed], 
-            components: [buttons] 
+            components: [linkButtons] 
         });
 
         this.updateUserSession(interaction.user.id, { 
@@ -343,7 +343,22 @@ async handleContinueVerify(interaction) {
             }
         });
 
-        // HAPUS TIMEOUT 30 DETIK - SEKARANG AUTO DETECT
+        // TAMBAHIN SPECIAL TRACKING BUTTON
+        const trackingButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('track_visited')
+                    .setLabel('✅ SUDAH KUNJUNGI SEMUA')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('🎯')
+            );
+
+        await interaction.followUp({
+            content: `${interaction.user}`,
+            embeds: [],
+            components: [trackingButton],
+            flags: 64
+        });
 
     } catch (error) {
         console.error('Continue verify error:', error);
@@ -364,9 +379,16 @@ async handleChannelVisit(interaction, channelType) {
 
             console.log(`✅ ${interaction.user.username} visited ${channelType}`);
 
-            // Check if all channels visited
-            if (this.allChannelsVisited(session)) {
+            // Check progress
+            const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
+            const totalChannels = Object.keys(session.visitedChannels).length;
+            
+            if (visitedCount === totalChannels) {
+                // Semua channel sudah dikunjungi
                 await this.autoProceedToMission(interaction);
+            } else {
+                // Update button progress
+                await this.updateVisitProgress(interaction, visitedCount, totalChannels);
             }
         }
     } catch (error) {
@@ -374,10 +396,30 @@ async handleChannelVisit(interaction, channelType) {
     }
 }
 
-allChannelsVisited(session) {
-    return session.visitedChannels.home && 
-           session.visitedChannels.rules && 
-           session.visitedChannels.customize;
+async updateVisitProgress(interaction, visitedCount, totalChannels) {
+    try {
+        const progress = Math.round((visitedCount / totalChannels) * 100);
+        const progressText = `✅ ${visitedCount}/${totalChannels} channel dikunjungi (${progress}%)`;
+        
+        const trackingButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('track_visited')
+                    .setLabel(`📊 ${progressText}`)
+                    .setStyle(ButtonStyle.Secondary)
+                    .setEmoji('🎯')
+                    .setDisabled(visitedCount === totalChannels)
+            );
+
+        await interaction.message.edit({
+            components: [trackingButton]
+        });
+
+        await interaction.deferUpdate();
+
+    } catch (error) {
+        console.error('Update progress error:', error);
+    }
 }
 
 async autoProceedToMission(interaction) {
@@ -421,6 +463,37 @@ async autoProceedToMission(interaction) {
 
     } catch (error) {
         console.error('❌ Auto proceed to mission error:', error);
+    }
+}
+
+async handleTrackVisited(interaction) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        if (!session || session.step !== 'server_exploration') {
+            return await interaction.reply({
+                content: '❌ Kamu belum memulai server exploration!',
+                flags: 64
+            });
+        }
+
+        const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
+        const totalChannels = Object.keys(session.visitedChannels).length;
+
+        if (visitedCount === totalChannels) {
+            await this.autoProceedToMission(interaction);
+        } else {
+            await interaction.reply({
+                content: `📊 Progress: ${visitedCount}/${totalChannels} channel sudah dikunjungi. Klik semua tombol link di atas dulu!`,
+                flags: 64
+            });
+        }
+
+    } catch (error) {
+        console.error('Track visited error:', error);
+        await interaction.reply({
+            content: '❌ Gagal memproses.',
+            flags: 64
+        });
     }
 }
     
