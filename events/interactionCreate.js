@@ -5,8 +5,9 @@ const { EmbedBuilder } = require("discord.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
-// Import verify system
-const verifySystem = require('../modules/verify');
+// Import verify system - PERBAIKAN IMPORT
+const VerifySystem = require('../modules/verify');
+const verifySystem = new VerifySystem(); // ⚡ INSTANSIASI CLASS
 
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
@@ -349,6 +350,21 @@ module.exports = {
       }
 
       // ========== UNKNOWN BUTTON ==========
+      // Hanya handle jika bukan button verify system
+      if (!interaction.customId.startsWith('verify_') && 
+          !interaction.customId.startsWith('skip_') &&
+          !interaction.customId.startsWith('continue_') &&
+          !interaction.customId.startsWith('next_') &&
+          !interaction.customId.startsWith('welcome_') &&
+          !interaction.customId.startsWith('rate_') &&
+          !interaction.customId.startsWith('faqs_') &&
+          !interaction.customId.startsWith('give_') &&
+          !interaction.customId.startsWith('back_') &&
+          !interaction.customId.startsWith('see_') &&
+          !interaction.customId.startsWith('understand_') &&
+          !interaction.customId.startsWith('auto_') &&
+          !interaction.customId.startsWith('custom_')) {
+        
       await interaction.reply({
         content: "⚠️ Tombol tidak dikenali.",
         ephemeral: true,
