@@ -11,7 +11,7 @@ class VerifySystem {
         
         this.config = {
             verifyChannelId: '1352823970054803509',
-            logChannelId: '1428789734993432676', // Forum channel
+            logChannelId: '1428789734993432676',
             memberRoleId: '1352286235233620108',
             generalChannelId: '1352404526870560788',
             serverId: '1347233781391560837',
@@ -360,68 +360,253 @@ class VerifySystem {
         }
     }
 
-    async handleChannelVisit(interaction, channelType) {
-        try {
-            const session = this.getUserSession(interaction.user.id);
-            if (session && session.step === 'server_exploration') {
-                session.visitedChannels[channelType] = true;
-                this.updateUserSession(interaction.user.id, session);
-
-                // Check if all channels visited
-                if (this.allChannelsVisited(session)) {
-                    await this.autoProceedServerExploration(interaction);
-                }
-            }
-        } catch (error) {
-            console.error('Channel visit tracking error:', error);
-        }
-    }
-
-    allChannelsVisited(session) {
-        return session.visitedChannels.home && 
-               session.visitedChannels.rules && 
-               session.visitedChannels.customize;
-    }
-
     async autoProceedServerExploration(interaction) {
         try {
             const session = this.getUserSession(interaction.user.id);
             if (!session || session.step !== 'server_exploration') return;
 
+            console.log(`🚀 Auto proceeding to introduction for ${interaction.user.username}`);
+
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`Sekarang saatnya perkenalan!\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan perkenalkan diri\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\``)
-                .setFooter({ text: 'Bot akan otomatis detect chat Anda' });
-
-            const linkButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('🔗 OPEN GENERAL')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
-                );
-
-            const actionButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('see_mission')
-                        .setLabel('📝 SEE MISSION')
-                        .setStyle(ButtonStyle.Primary)
-                );
+                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+                .setFooter({ text: 'Auto detect • No button needed' });
 
             await interaction.editReply({ 
                 embeds: [embed], 
-                components: [linkButton, actionButton] 
+                components: [] // HAPUS TOMBOL, LANGSUNG AUTO DETECT
             });
 
+            // UPDATE SESSION
             this.updateUserSession(interaction.user.id, { 
                 step: 'introduction_mission',
                 missionStartTime: Date.now()
             });
 
+            console.log(`✅ User ${interaction.user.username} moved to introduction mission`);
+
         } catch (error) {
-            console.error('Auto proceed server exploration error:', error);
+            console.error('❌ Auto proceed server exploration error:', error);
+        }
+    }
+
+    // ========== MESSAGE DETECTION SYSTEM ==========
+    async detectFirstMessage(message) {
+        try {
+            console.log(`🔍 Checking message from ${message.author.username} in ${message.channel.name}`);
+            
+            // Filter penting
+            if (message.channel.id !== this.config.generalChannelId) {
+                console.log('❌ Wrong channel');
+                return;
+            }
+            if (message.author.bot) {
+                console.log('❌ Bot message');
+                return;
+            }
+            if (message.member.roles.cache.has(this.config.memberRoleId)) {
+                console.log('❌ Already has role');
+                return;
+            }
+
+            const userId = message.author.id;
+            let session = this.getUserSession(userId);
+            
+            console.log(`📝 Session found:`, session);
+
+            // Buat session baru jika belum ada
+            if (!session) {
+                console.log('🆕 Creating new session for user');
+                session = this.createUserSession(userId);
+                session.step = 'introduction_mission';
+                session.missionStartTime = Date.now();
+            }
+
+            // Update session dengan data pesan
+            session.data = session.data || {};
+            session.data.firstMessage = message.content;
+            session.data.firstMessageTime = Date.now();
+            session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
+            session.step = 'ready_for_rating'; // LANGSUNG LANJUT KE RATING READY
+            
+            this.updateUserSession(userId, session);
+            console.log(`✅ Session updated to ready_for_rating for ${message.author.username}`);
+
+            // ⚡ LANGSUNG UBAH EMBED DI VERIFY CHANNEL KE RATING
+            await this.updateVerifyChannelToRating(message.author, message.client);
+            
+            // Juga enable tombol NEXT VERIFY di general (backup)
+            await this.enableNextVerifyButton(message.author, message.client);
+
+        } catch (error) {
+            console.error('❌ First message detection error:', error);
+        }
+    }
+
+    async updateVerifyChannelToRating(user, client) {
+        try {
+            console.log(`🔄 Updating verify channel to RATING for ${user.username}`);
+            
+            const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
+            if (!verifyChannel) {
+                console.log('❌ Verify channel not found');
+                return;
+            }
+
+            // Cari SEMUA message user di verify channel
+            const messages = await verifyChannel.messages.fetch({ limit: 50 });
+            
+            // Cari message yang ada component/embed untuk user ini
+            const userVerifyMessage = messages.find(msg => {
+                if (msg.author.id !== client.user.id) return false;
+                if (msg.embeds.length === 0) return false;
+                
+                const embed = msg.embeds[0];
+                // Cari embed yang ada username user atau tentang misi
+                return (embed.description && embed.description.includes(user.username)) ||
+                       (embed.title && (embed.title.includes('MISI PERKENALAN') || 
+                                        embed.title.includes('BERI PENILAIAN')));
+            });
+
+            if (userVerifyMessage) {
+                console.log(`📝 Found user message in verify channel, changing to RATING embed...`);
+                
+                const session = this.getUserSession(user.id);
+                const firstMessage = session?.data?.firstMessage || 'Pesan terkirim';
+                
+                // EMBED RATING BARU
+                const ratingEmbed = new EmbedBuilder()
+                    .setColor(0xFFD700)
+                    .setTitle('⭐ BERI PENILAIAN - MISI SELESAI! ✅')
+                    .setDescription(`**Hai ${user.username}!**\n\n**Misi perkenalan di #general SUDAH SELESAI!** 🎉\n\nSekarang beri rating pengalaman verifikasi Anda:\n\n**📊 Rating Scale:**\n• 🟢 1-50: Perlu improvement\n• 🟡 51-75: Cukup memuaskan  \n• 🔵 76-90: Baik & profesional\n• 🟣 91-100: Luar biasa`)
+                    .addFields(
+                        { name: '📝 Pesan Perkenalan Anda', value: `"${firstMessage}"`, inline: false }
+                    )
+                    .setFooter({ text: 'Langkah terakhir sebelum role member!' });
+
+                const ratingButtons = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('input_rating')
+                            .setLabel('🎯 INPUT RATING 1-100')
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setCustomId('give_feedback')
+                            .setLabel('💬 KASIH SARAN')
+                            .setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder()
+                            .setCustomId('faqs_rating')
+                            .setLabel('❓ TANYA FAQ')
+                            .setStyle(ButtonStyle.Secondary)
+                    );
+
+                // ⚡ EDIT MESSAGE - UBAH EMBED JADI RATING
+                await userVerifyMessage.edit({ 
+                    embeds: [ratingEmbed], 
+                    components: [ratingButtons] 
+                });
+                
+                console.log(`✅ Verify channel changed to RATING for ${user.username}`);
+                
+            } else {
+                console.log('❌ No user message found in verify channel');
+                // Backup: Kirim message baru
+                await this.sendNewRatingMessage(verifyChannel, user);
+            }
+
+        } catch (error) {
+            console.error('❌ Update verify channel to rating error:', error);
+        }
+    }
+
+    async sendNewRatingMessage(verifyChannel, user) {
+        try {
+            console.log(`📤 Sending new rating message for ${user.username}`);
+            
+            const session = this.getUserSession(user.id);
+            const firstMessage = session?.data?.firstMessage || 'Pesan terkirim';
+            
+            const ratingEmbed = new EmbedBuilder()
+                .setColor(0xFFD700)
+                .setTitle('⭐ LANJUTKAN VERIFIKASI - RATING')
+                .setDescription(`**Hai ${user.username}!**\n\nVerifikasi Anda dilanjutkan ke step rating.\n**Misi perkenalan di #general SUDAH SELESAI!** ✅\n\nBeri rating pengalaman verifikasi:\n\n**Pesan Anda:** "${firstMessage}"`)
+                .setFooter({ text: 'Auto-pindah dari misi general' });
+
+            const ratingButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('input_rating')
+                        .setLabel('🎯 BERI RATING')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setCustomId('give_feedback')
+                        .setLabel('💬 FEEDBACK')
+                        .setStyle(ButtonStyle.Secondary)
+                );
+
+            await verifyChannel.send({ 
+                content: `${user}`,
+                embeds: [ratingEmbed], 
+                components: [ratingButtons] 
+            });
+            
+        } catch (error) {
+            console.error('❌ Send new rating message error:', error);
+        }
+    }
+
+    async enableNextVerifyButton(user, client) {
+        try {
+            console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
+            
+            const generalChannel = await client.channels.fetch(this.config.generalChannelId);
+            if (!generalChannel) {
+                console.log('❌ General channel not found');
+                return;
+            }
+
+            // Cari welcome message user di general channel
+            const messages = await generalChannel.messages.fetch({ limit: 20 });
+            const userWelcomeMessage = messages.find(msg => {
+                if (msg.author.id !== client.user.id) return false;
+                if (msg.embeds.length === 0) return false;
+                const embed = msg.embeds[0];
+                return embed.title && embed.title.includes('SELAMAT DATANG') && 
+                       msg.content.includes(user.toString());
+            });
+
+            if (userWelcomeMessage) {
+                console.log(`📝 Found welcome message, enabling button...`);
+                
+                const enabledButtons = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('auto_welcome')
+                            .setLabel('👋 AUTO WELCOME')
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setCustomId('custom_message')
+                            .setLabel('💬 CUSTOM MESSAGE')
+                            .setStyle(ButtonStyle.Secondary),
+                        new ButtonBuilder()
+                            .setCustomId('next_verify')
+                            .setLabel('✅ NEXT VERIFY')
+                            .setStyle(ButtonStyle.Success)
+                            .setDisabled(false) // ✅ ENABLE BUTTON!
+                    );
+
+                await userWelcomeMessage.edit({
+                    components: [enabledButtons]
+                });
+                
+                console.log(`✅ NEXT VERIFY button enabled for ${user.username}`);
+            } else {
+                console.log('❌ User welcome message not found in general');
+            }
+
+        } catch (error) {
+            console.error('❌ Enable next verify button error:', error);
         }
     }
 
@@ -432,89 +617,21 @@ class VerifySystem {
             
             if (!session || session.step !== 'ready_for_rating') {
                 return await interaction.reply({
-                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan perkenalkan diri di channel general terlebih dahulu.',
+                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.',
                     flags: 64
                 });
             }
 
             await interaction.deferUpdate();
             
-            // Kirim embed shortcut di general (dismiss message)
-            const shortcutEmbed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('🎯 LANJUTKAN VERIFIKASI')
-                .setDescription(`Hai ${interaction.user.username}! Klik tombol dibawah untuk langsung ke channel verify dan lanjutkan proses verifikasi:`)
-                .setFooter({ text: 'Shortcut ke Verify Channel' });
-
-            const shortcutButton = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('↗️ TO VERIFY')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.verifyChannelId}`)
-                );
-
+            // Langsung pindah ke rating di verify channel
+            await this.updateVerifyChannelToRating(interaction.user, interaction.client);
+            
+            // Kasih feedback
             await interaction.followUp({
-                content: `${interaction.user}`,
-                embeds: [shortcutEmbed],
-                components: [shortcutButton],
+                content: `✅ ${interaction.user} Langsung ke verify channel untuk rating!`,
                 flags: 64
             });
-
-            // Ubah embed di verify channel jadi rating
-            const ratingEmbed = new EmbedBuilder()
-                .setColor(0xFFD700)
-                .setTitle('⭐ BERI PENILAIAN')
-                .setDescription(`Hai ${interaction.user.username}! Silakan beri rating pengalaman verifikasi:\n\nBeri rating 1-100:\n\n• 1-50: Perlu improvement\n• 51-75: Cukup memuaskan  \n• 76-90: Baik & profesional\n• 91-100: Luar biasa`)
-                .setFooter({ text: 'Bantu kami improve experience' });
-
-            const ratingButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('input_rating')
-                        .setLabel('🎯 INPUT RATING')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('give_feedback')
-                        .setLabel('💬 GIVE FEEDBACK')
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId('faqs_rating')
-                        .setLabel('❓ FAQS')
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await interaction.editReply({ 
-                embeds: [ratingEmbed], 
-                components: [ratingButtons] 
-            });
-
-            // Update session & hilangkan tombol NEXT VERIFY di general
-            session.step = 'rating';
-            this.updateUserSession(interaction.user.id, session);
-            
-            const disabledButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('auto_welcome')
-                        .setLabel('👋 AUTO WELCOME')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('custom_message')
-                        .setLabel('💬 CUSTOM MESSAGE')
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId('next_verify')
-                        .setLabel('✅ NEXT VERIFY')
-                        .setStyle(ButtonStyle.Success)
-                        .setDisabled(true)
-                );
-
-            await interaction.message.edit({
-                components: [disabledButtons]
-            });
-
-            console.log(`✅ User ${interaction.user.username} pindah ke rating via next verify`);
 
         } catch (error) {
             console.error('Next verify error:', error);
@@ -522,46 +639,6 @@ class VerifySystem {
                 content: '❌ Gagal memproses next verify.',
                 components: []
             });
-        }
-    }
-
-    async handleSeeMission(interaction) {
-        try {
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('📝 DETAIL MISI PERKENALAN')
-                .setDescription('**Yang bisa dibagikan:**\n• Asal sekolah/kampus\n• Hobi dan minat  \n• Mata pelajaran favorit\n• Cita-cita atau impian\n\n**Contoh:**\n\`"Halo! Saya Andi dari SMA Jakarta\nHobi main game dan coding\nSenang bisa join server ini! 🎮"\`')
-                .setFooter({ text: 'Jangan ragu untuk bertanya!' });
-
-            const button = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('understand_mission')
-                        .setLabel('🆗 SAYA MENGERTI')
-                        .setStyle(ButtonStyle.Success)
-                );
-
-            await interaction.reply({
-                embeds: [embed],
-                components: [button],
-                flags: 64
-            });
-
-        } catch (error) {
-            console.error('See mission error:', error);
-            await interaction.reply({
-                content: '❌ Failed to show mission details.',
-                flags: 64
-            });
-        }
-    }
-
-    async handleUnderstandMission(interaction) {
-        try {
-            await interaction.deferUpdate();
-            await interaction.deleteReply();
-        } catch (error) {
-            console.error('Understand mission error:', error);
         }
     }
 
@@ -594,7 +671,7 @@ class VerifySystem {
                         .setCustomId('next_verify')
                         .setLabel('✅ NEXT VERIFY')
                         .setStyle(ButtonStyle.Success)
-                        .setDisabled(true)
+                        .setDisabled(true) // Default disabled
                 );
 
             const welcomeMessage = await generalChannel.send({ 
@@ -786,14 +863,6 @@ class VerifySystem {
                 this.updateUserSession(interaction.user.id, session);
             }
 
-            // Cek apakah sudah ada embed result
-            const messages = await interaction.channel.messages.fetch({ limit: 10 });
-            const existingResult = messages.find(msg => 
-                msg.author.id === interaction.client.user.id &&
-                msg.embeds.length > 0 &&
-                msg.embeds[0].title?.includes('TERIMA KASIH ATAS RATING')
-            );
-
             const resultEmbed = new EmbedBuilder()
                 .setColor(this.getRatingColor(rating))
                 .setTitle(`⭐ TERIMA KASIH ATAS RATING ${rating}/100!`)
@@ -808,20 +877,11 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
 
-            if (existingResult) {
-                // Edit embed yang sudah ada
-                await existingResult.edit({
-                    embeds: [resultEmbed],
-                    components: [resultButtons]
-                });
-            } else {
-                // Kirim embed baru
-                await interaction.reply({
-                    embeds: [resultEmbed],
-                    components: [resultButtons],
-                    flags: 64
-                });
-            }
+            await interaction.reply({
+                embeds: [resultEmbed],
+                components: [resultButtons],
+                flags: 64
+            });
 
         } catch (error) {
             console.error('Rating submit error:', error);
@@ -1025,78 +1085,6 @@ class VerifySystem {
         }
     }
 
-    // ========== MESSAGE DETECTION ==========
-    async detectFirstMessage(message) {
-        try {
-            if (message.channel.id !== this.config.generalChannelId) return;
-            if (message.author.bot) return;
-
-            if (message.member.roles.cache.has(this.config.memberRoleId)) return;
-
-            let session = this.getUserSession(message.author.id);
-            
-            if (!session) {
-                session = this.createUserSession(message.author.id);
-                this.updateUserSession(message.author.id, {
-                    step: 'introduction_mission',
-                    missionStartTime: Date.now(),
-                    data: {
-                        firstMessage: message.content,
-                        firstMessageTime: Date.now(),
-                        recovered: true
-                    }
-                });
-            }
-            
-            if (session.step === 'introduction_mission') {
-                session.data = session.data || {};
-                session.data.firstMessage = message.content;
-                session.data.firstMessageTime = Date.now();
-                session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
-                session.step = 'ready_for_rating';
-                this.updateUserSession(message.author.id, session);
-                
-                await this.sendWelcomeMessage(message.author, message.client);
-                
-                // Enable tombol NEXT VERIFY di welcome message
-                const welcomeMessages = await message.channel.messages.fetch({ limit: 10 });
-                const userWelcomeMessage = welcomeMessages.find(msg => 
-                    msg.author.id === message.client.user.id &&
-                    msg.embeds.length > 0 &&
-                    msg.embeds[0].title?.includes('SELAMAT DATANG') &&
-                    msg.components.length > 0
-                );
-
-                if (userWelcomeMessage) {
-                    const enabledButtons = new ActionRowBuilder()
-                        .addComponents(
-                            new ButtonBuilder()
-                                .setCustomId('auto_welcome')
-                                .setLabel('👋 AUTO WELCOME')
-                                .setStyle(ButtonStyle.Primary),
-                            new ButtonBuilder()
-                                .setCustomId('custom_message')
-                                .setLabel('💬 CUSTOM MESSAGE')
-                                .setStyle(ButtonStyle.Secondary),
-                            new ButtonBuilder()
-                                .setCustomId('next_verify')
-                                .setLabel('✅ NEXT VERIFY')
-                                .setStyle(ButtonStyle.Success)
-                                .setDisabled(false)
-                        );
-
-                    await userWelcomeMessage.edit({
-                        components: [enabledButtons]
-                    });
-                }
-                return;
-            }
-
-        } catch (error) {
-            console.error('First message detection error:', error);
-        }
-    }
-
     // ========== LOGGING SYSTEM ==========
     async logVerification(interaction) {
         try {
@@ -1279,7 +1267,6 @@ class VerifySystem {
     }
 
     getUserClient(user) {
-        // Ini placeholder, Discord API tidak expose client info
         return 'Desktop/Mobile';
     }
 
@@ -1363,10 +1350,6 @@ class VerifySystem {
             if (customId === 'continue_verify') return await this.handleContinueVerify(interaction);
             if (customId === 'next_verify') return await this.handleNextVerify(interaction);
             
-            // Mission buttons
-            if (customId === 'see_mission') return await this.handleSeeMission(interaction);
-            if (customId === 'understand_mission') return await this.handleUnderstandMission(interaction);
-            
             // Welcome buttons
             if (customId === 'auto_welcome') return await this.handleAutoWelcome(interaction);
             if (customId.startsWith('welcome_')) return await this.handleWelcomeSelection(interaction);
@@ -1384,11 +1367,6 @@ class VerifySystem {
             // Final buttons
             if (customId === 'give_role_skip' || customId === 'give_role_final') return await this.handleGiveRole(interaction);
             if (customId === 'back_to_verify') return await this.handleBackToVerify(interaction);
-
-            // Channel visit tracking
-            if (customId === 'server_guild') return await this.handleChannelVisit(interaction, 'home');
-            if (customId === 'open_rules') return await this.handleChannelVisit(interaction, 'rules');
-            if (customId === 'self_role') return await this.handleChannelVisit(interaction, 'customize');
 
         } catch (error) {
             console.error('Interaction handling error:', error);
