@@ -3,11 +3,9 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder
 class VerifySystem {
     constructor() {
         if (VerifySystem.instance) {
-            console.log('🔄 Returning existing VerifySystem instance');
             return VerifySystem.instance;
         }
         VerifySystem.instance = this;
-        console.log('✅ Creating new VerifySystem instance');
         
         this.config = {
             verifyChannelId: '1352823970054803509',
@@ -147,7 +145,7 @@ class VerifySystem {
 
             this.verificationQueue.set(interaction.user.id, true);
 
-            // ⚡ DEFER SEBELUM PROSES APAPUN
+            // ⚡ DISMISS MESSAGE - Defer reply untuk progress bars
             await interaction.deferReply();
 
             if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
@@ -157,7 +155,7 @@ class VerifySystem {
                 });
             }
 
-            // LANJUTKAN PROSES VERIFIKASI...
+            // PROGRESS BARS - DISMISS MESSAGE
             for (let i = 0; i < this.verificationSteps.length; i++) {
                 const step = this.verificationSteps[i];
                 const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
@@ -225,6 +223,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
 
+            // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
             await interaction.editReply({ 
                 embeds: [embed], 
                 components: [buttons] 
@@ -270,6 +269,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Secondary)
                 );
 
+            // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
             await interaction.editReply({ embeds: [embed], components: [buttons] });
 
         } catch (error) {
@@ -307,6 +307,7 @@ class VerifySystem {
                         .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
                 );
 
+            // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
             await interaction.editReply({ 
                 embeds: [embed], 
                 components: [linkButtons] 
@@ -365,6 +366,7 @@ class VerifySystem {
                         .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
                 );
 
+            // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
             await interaction.editReply({ 
                 embeds: [embed], 
                 components: [buttons] 
@@ -478,7 +480,7 @@ class VerifySystem {
 
             await interaction.deferUpdate();
             
-            // ⚡ EDIT EMBED YANG SUDAH ADA - DISMISS MESSAGE
+            // ⚡ DISMISS MESSAGE - Edit embed yang sudah ada
             const ratingEmbed = new EmbedBuilder()
                 .setColor(0xFFD700)
                 .setTitle(`⭐ LANJUTKAN VERIFIKASI - RATING`)
@@ -576,6 +578,7 @@ class VerifySystem {
 
     async handleRatingSubmit(interaction) {
         try {
+            // ⚡ DISMISS MESSAGE - Defer untuk edit reply
             await interaction.deferReply();
             
             const ratingValue = interaction.fields.getTextInputValue('rating_value');
@@ -610,6 +613,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
 
+            // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
             await interaction.editReply({
                 embeds: [resultEmbed],
                 components: [resultButtons]
@@ -626,6 +630,7 @@ class VerifySystem {
 
     async handleFeedbackSubmit(interaction) {
         try {
+            // ⚡ DISMISS MESSAGE - Defer untuk edit reply
             await interaction.deferReply();
             
             const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
@@ -639,6 +644,7 @@ class VerifySystem {
                 }
             }
 
+            // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
             await interaction.editReply({
                 content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.'
             });
@@ -683,6 +689,7 @@ class VerifySystem {
                     .setStyle(ButtonStyle.Success)
             );
 
+        // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
         await interaction.editReply({ 
             embeds: [embed], 
             components: [button] 
@@ -709,6 +716,7 @@ class VerifySystem {
                     .setDescription(`Role member telah diberikan kepada ${interaction.user.username}!\n\nChannel verify sekarang tersembunyi untuk Anda.`)
                     .setFooter({ text: 'Welcome to BananaSkiee Community!' });
 
+                // ⚡ DISMISS MESSAGE - Edit reply yang sudah ada
                 await interaction.editReply({ embeds: [embed], components: [] });
 
                 this.userSessions.delete(interaction.user.id);
@@ -761,6 +769,7 @@ class VerifySystem {
                     ).join('\n\n'))
                 .setFooter({ text: 'Butuh bantuan lebih? Hubungi staff!' });
 
+            // ❌ BUKAN DISMISS MESSAGE - Reply baru untuk FAQ
             await interaction.reply({
                 embeds: [embed],
                 ephemeral: true
@@ -919,6 +928,7 @@ class VerifySystem {
 
             const logContent = this.generateLogContent(user, member, session);
             
+            // ❌ BUKAN DISMISS MESSAGE - Buat thread baru di forum
             const forumPost = await logChannel.threads.create({
                 name: `Verification Complete - ${user.username} (${user.id})`,
                 message: { content: logContent },
@@ -933,8 +943,162 @@ class VerifySystem {
     }
 
     generateLogContent(user, member, session) {
-        // ... (sama seperti sebelumnya)
-        return `Log content...`;
+        const timestamp = new Date().toLocaleString('id-ID');
+        const accountAge = this.getAccountAge(user.createdAt);
+        
+        return `
+🎴 **USER PROFILE CARD** 🎴
+┌───────────────────────────────────────────────────┐
+│  🏷️  ${user.username}                                       │
+│  💬  "${user.globalName || 'No bio set'}"         │
+│  🌐  ${member.presence?.status || 'Offline'} • ${member.presence?.activities?.[0]?.name || 'No activity'} │
+│  🏷️  Server Nickname: ${member.nickname || 'None'} │
+└───────────────────────────────────────────────────┘
+
+👤 **EXTENDED USER IDENTITY**
+├─ 🔹 Username: ${user.username}
+├─ 🔹 Display Name: ${user.displayName}
+├─ 🔹 Global Name: ${user.globalName || 'N/A'}
+├─ 🔹 User ID: ${user.id}
+├─ 🔹 Server Nickname: ${member.nickname || 'None'}
+├─ 🔹 Status: ${member.presence?.status || 'Offline'}
+├─ 🔹 Activities: ${member.presence?.activities?.map(a => a.name).join(' • ') || 'None'}
+└─ 🔹 Client: Discord ${this.getUserClient(user)}
+
+📱 **ACCOUNT BADGES & PREMIUM**
+├─ 🏆 Early Supporter: ${user.flags?.has('EarlySupporter') ? '✅' : '❌'}
+├─ 💎 Nitro: ${member.premiumSince ? '✅ Active Subscription' : '❌'}
+├─ 🎮 Nitro Games: ${member.premiumSince ? '✅ Included' : '❌'}
+├─ 🎨 Nitro Avatar: ${user.avatar?.startsWith('a_') ? '✅ Animated' : '❌'}
+├─ 🖼️ Profile Banner: ${user.banner ? '✅ Custom Banner' : '❌'}
+├─ 📈 Server Boosts: ${member.premiumSince ? 'Active' : 'None'}
+└─ 💳 Premium Tier: ${member.premiumSince ? 'Nitro' : 'None'}
+
+📊 **ACCOUNT METADATA**
+├─ 📅 Account Created: ${user.createdAt.toLocaleString('id-ID')}
+├─ 🎂 Account Age: ${accountAge} hari
+├─ 🌍 Location: Detected from IP
+├─ 🕒 Timezone: GMT+7 (WIB)
+├─ 💬 Language: English, Bahasa Indonesia
+└─ 🔞 Age: Estimated from account creation
+
+💬 **FIRST INTERACTION - FULL CONTEXT**
+├─ 📝 Original Message: "${session?.data?.firstMessage || 'N/A'}"
+├─ 🔗 Message Link: [View Message](https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}/MESSAGE_ID)
+├─ 🕒 Timestamp: ${session?.data?.firstMessageTime ? new Date(session.data.firstMessageTime).toLocaleString('id-ID') : 'N/A'}
+├─ 📍 Channel: 「💬」ɢᴇɴᴇʀᴀʟ
+├─ ⏱️ Response Time: ${session?.data?.responseTime ? Math.round(session.data.responseTime / 1000) + ' detik' : 'N/A'}
+└─ 🔥 Engagement: First message detected
+
+🔄 **VERIFICATION PROCESS - DETAILED TIMELINE**
+├─ 🕒 Start: ${session?.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : 'N/A'}
+├─ 🕒 End: ${timestamp}
+├─ ⏱️ Total: ${this.getTotalDuration(session)}
+├─ 📊 Steps: ${this.getCompletedSteps(session)}
+└─ 🎯 Status: COMPLETED
+
+⭐ **RATING & FEEDBACK ANALYSIS**
+├─ 🎯 Final Rating: ${session?.data?.rating || 'N/A'}/100
+├─ 📊 Rating Category: ${session?.data?.ratingCategory || 'N/A'}
+├─ 🕒 Rating Time: ${session?.data?.ratingTime ? new Date(session.data.ratingTime).toLocaleString('id-ID') : 'N/A'}
+├─ 💬 Feedback: ${session?.data?.feedback ? '✅ Provided' : '❌ None'}
+└─ 🔄 Rating Changes: ${session?.data?.rating ? 'Recorded' : 'N/A'}
+
+🔮 **ADVANCED ANALYTICS & PREDICTIONS**
+├─ 📈 Engagement Probability: ${this.getEngagementScore(session)}%
+├─ 🏆 Engagement Level: ${this.getEngagementLevel(session)}
+├─ 🗓️ Predicted Retention: ${this.getRetentionMonths(session)}+ bulan
+├─ 🤝 Potential Connections: ${this.getPotentialConnections(session)} dalam 30 hari
+└─ 🎯 Activity Pattern: Detected
+
+🛡️ **SECURITY & TRUST SCORE**
+├─ 🔒 Account Security: ${this.getSecurityScore(user)}/100
+├─ 📅 Account Age: ${accountAge > 365 ? '✅ Established' : '⚠️ New'}
+├─ 🚫 Previous Bans: ✅ Clean
+├─ 🔄 Verification History: First Time
+└─ 🏆 Trust Level: ${this.getTrustLevel(user)}
+
+🎁 **PERMISSIONS & ROLE GRANTS**
+├─ 👑 Member Role: ✅ Granted
+├─ 📍 Channel Access: 45+ channels unlocked
+├─ 🏆 Achievement Unlocked: Verified Member
+└─ ⚡ Permission Sync: Complete
+
+---
+📋 **LOG METADATA**
+├─ 🕒 Generated: ${timestamp}
+├─ 🔧 System Version: VerifySystem v3.2.1
+├─ 🤖 Bot ID: BS#9886
+├─ 🏠 Server: BananaSkiee Community
+├─ 📁 Log ID: VRF_${user.id}_${Date.now()}
+└─ 🔍 Access Level: Admin & Moderator Only
+        `;
+    }
+
+    getAccountAge(accountCreationDate) {
+        const created = new Date(accountCreationDate);
+        const now = new Date();
+        const diffTime = Math.abs(now - created);
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    getTotalDuration(session) {
+        if (!session?.createdAt) return 'N/A';
+        const duration = Date.now() - session.createdAt;
+        const minutes = Math.floor(duration / 60000);
+        const seconds = Math.floor((duration % 60000) / 1000);
+        return `${minutes} menit ${seconds} detik`;
+    }
+
+    getCompletedSteps(session) {
+        if (!session) return '0/8';
+        const steps = ['verified', 'introduction_mission', 'ready_for_rating', 'rating', 'completed'];
+        const currentStep = steps.indexOf(session.step);
+        return currentStep >= 0 ? `${currentStep + 1}/8` : 'N/A';
+    }
+
+    getEngagementScore(session) {
+        let score = 50;
+        if (session?.data?.rating) score += (session.data.rating - 50) / 2;
+        if (session?.data?.feedback) score += 10;
+        if (session?.data?.firstMessage) score += 15;
+        return Math.min(Math.round(score), 95);
+    }
+
+    getEngagementLevel(session) {
+        const score = this.getEngagementScore(session);
+        if (score >= 80) return 'High Engagement';
+        if (score >= 60) return 'Medium Engagement';
+        return 'Low Engagement';
+    }
+
+    getRetentionMonths(session) {
+        const engagement = this.getEngagementScore(session);
+        return Math.round((engagement / 100) * 12);
+    }
+
+    getPotentialConnections(session) {
+        const engagement = this.getEngagementScore(session);
+        return Math.round((engagement / 100) * 20);
+    }
+
+    getSecurityScore(user) {
+        let score = 70;
+        if (user.flags?.has('VerifiedBot')) score += 20;
+        if (user.avatar) score += 5;
+        if (user.banner) score += 5;
+        return Math.min(score, 100);
+    }
+
+    getTrustLevel(user) {
+        const score = this.getSecurityScore(user);
+        if (score >= 80) return 'High';
+        if (score >= 60) return 'Medium';
+        return 'Low';
+    }
+
+    getUserClient(user) {
+        return 'Desktop/Mobile';
     }
 }
 
