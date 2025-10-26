@@ -5,9 +5,9 @@ const { EmbedBuilder } = require("discord.js");
 
 const filePath = path.join(__dirname, "../data/taggedUsers.json");
 
-// Import verify system - PERBAIKAN IMPORT
+// Import verify system
 const VerifySystem = require('../modules/verify');
-const verifySystem = new VerifySystem(); // ⚡ INSTANSIASI CLASS
+const verifySystem = new VerifySystem();
 
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
@@ -21,52 +21,34 @@ module.exports = {
 
       // ========== VERIFY SYSTEM HANDLERS ==========
       // ✅ BUTTON INTERACTIONS
-if (interaction.isButton()) {
-  const { customId } = interaction;
-  console.log(`🔘 Button clicked: ${customId}`);
+      if (interaction.isButton()) {
+        const { customId } = interaction;
+        console.log(`🔘 Button clicked: ${customId}`);
 
-  // Verify Account Button
-  if (customId === 'verify_account') {
-    return await verifySystem.handleVerify(interaction);
-  }
-  
-  // Skip Verify Button
-  if (customId === 'skip_verify') {
-    return await verifySystem.handleSkipVerify(interaction);
-  }
-  
-  // Continue Verify Button
-  if (customId === 'continue_verify') {
-    return await verifySystem.handleContinueVerify(interaction);
-  }
-  
-  // ========== CHANNEL VISIT BUTTONS ========== ⬅️ TAMBAHIN DI SINI
-  if (customId === 'visit_home') {
-    return await verifySystem.handleChannelVisit(interaction, 'home');
-  }
-  
-  if (customId === 'visit_rules') {
-    return await verifySystem.handleChannelVisit(interaction, 'rules');
-  }
-  
-  if (customId === 'visit_customize') {
-    return await verifySystem.handleChannelVisit(interaction, 'customize');
-  }
-
-  // Di interactionCreate.js - TAMBAHIN INI
-if (customId === 'track_visited') {
-    return await verifySystem.handleTrackVisited(interaction);
-}
-  
-  // Next Verify Button
-  if (customId === 'next_verify') {
-    return await verifySystem.handleNextVerify(interaction);
-  }
-  
-  // Auto Welcome Button
-  if (customId === 'auto_welcome') {
-    return await verifySystem.handleAutoWelcome(interaction);
-  }
+        // Verify Account Button
+        if (customId === 'verify_account') {
+          return await verifySystem.handleVerify(interaction);
+        }
+        
+        // Skip Verify Button
+        if (customId === 'skip_verify') {
+          return await verifySystem.handleSkipVerify(interaction);
+        }
+        
+        // Continue Verify Button
+        if (customId === 'continue_verify') {
+          return await verifySystem.handleContinueVerify(interaction);
+        }
+        
+        // Next Verify Button
+        if (customId === 'next_verify') {
+          return await verifySystem.handleNextVerify(interaction);
+        }
+        
+        // Auto Welcome Button
+        if (customId === 'auto_welcome') {
+          return await verifySystem.handleAutoWelcome(interaction);
+        }
 
         // Welcome Selection Buttons
         if (customId.startsWith('welcome_')) {
@@ -112,15 +94,6 @@ if (customId === 'track_visited') {
         if (customId === 'back_to_verify') {
           return await verifySystem.handleBackToVerify(interaction);
         }
-
-        // Mission Buttons
-        if (customId === 'see_mission') {
-          return await verifySystem.handleSeeMission(interaction);
-        }
-        
-        if (customId === 'understand_mission') {
-          return await verifySystem.handleUnderstandMission(interaction);
-        }
       }
 
       // ✅ MODAL SUBMIT INTERACTIONS
@@ -139,8 +112,8 @@ if (customId === 'track_visited') {
         if (customId === 'give_feedback_modal') {
           return await verifySystem.handleFeedbackSubmit(interaction);
         }
-            }
-          
+      }
+      
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
@@ -377,8 +350,6 @@ if (customId === 'track_visited') {
           !interaction.customId.startsWith('faqs_') &&
           !interaction.customId.startsWith('give_') &&
           !interaction.customId.startsWith('back_') &&
-          !interaction.customId.startsWith('see_') &&
-          !interaction.customId.startsWith('understand_') &&
           !interaction.customId.startsWith('auto_') &&
           !interaction.customId.startsWith('custom_')) {
         
