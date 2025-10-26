@@ -100,6 +100,24 @@ if (interaction.isButton()) {
     return await verifySystem.handleBackToVerify(interaction);
   }
 }
+
+    // ✅ MODAL SUBMIT INTERACTIONS - PASTIKAN INI ADA
+if (interaction.isModalSubmit()) {
+    const { customId } = interaction;
+    console.log(`📝 Modal submitted: ${customId}`);
+
+    if (customId === 'input_rating_modal') {
+        return await verifySystem.handleRatingSubmit(interaction);
+    }
+    
+    if (customId === 'give_feedback_modal') {
+        return await verifySystem.handleFeedbackSubmit(interaction);
+    }
+    
+    if (customId === 'custom_message_modal') {
+        return await verifySystem.handleCustomMessageSubmit(interaction);
+    }
+}  
       
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
@@ -367,3 +385,4 @@ if (interaction.isButton()) {
     }
   },
 };
+                  
