@@ -1,6 +1,6 @@
 // File: /workspace/modules/verify.js
 
-// PERBAIKAN SYNTAX: Pastikan MessageFlags diimport dari discord.js
+// FINAL FIX: Pastikan MessageFlags diimport dari discord.js
 const { 
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
     ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, 
@@ -112,7 +112,7 @@ class VerifySystem {
                 // PESAN INI EPHEMERAL/DISMISS
                 return await interaction.reply({
                     content: '⏳ Verification already in progress. Please wait...',
-                    flags: [MessageFlags.Ephemeral] // <-- FIX Ephemeral
+                    flags: [MessageFlags.Ephemeral] // <-- FIX: Menggunakan flags
                 });
             }
 
@@ -144,7 +144,7 @@ class VerifySystem {
             if (error.code === 10062) return;
             // Kirim error message sebagai ephemeral (Dismissive)
             if (!interaction.replied && !interaction.deferred) {
-                 await interaction.reply({ content: '❌ Terjadi kesalahan saat verifikasi.', flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+                 await interaction.reply({ content: '❌ Terjadi kesalahan saat verifikasi.', flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
             } else if (interaction.deferred) {
                  await interaction.editReply({ content: '❌ Terjadi kesalahan saat verifikasi.', components: [] });
             }
@@ -279,6 +279,7 @@ class VerifySystem {
             // AUTO LANJUT SETELAH 30 DETIK
             setTimeout(async () => {
                 try {
+                    // Ambil pesan dari interaksi awal untuk diedit
                     const message = await interaction.channel.messages.fetch(interaction.message.id);
                     if (message) {
                         await this.autoProceedToMission(message);
@@ -319,7 +320,7 @@ class VerifySystem {
                 // PESAN INI EPHEMERAL/DISMISS
                 return await interaction.reply({ 
                     content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.', 
-                    flags: [MessageFlags.Ephemeral] // <-- FIX Ephemeral
+                    flags: [MessageFlags.Ephemeral] // <-- FIX: Menggunakan flags
                 }); 
             }
             
@@ -357,7 +358,7 @@ class VerifySystem {
             if (interaction.deferred) {
                 await interaction.editReply({ content: '❌ Gagal memproses next verify.', components: [] });
             } else {
-                await interaction.reply({ content: '❌ Gagal memproses next verify.', flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+                await interaction.reply({ content: '❌ Gagal memproses next verify.', flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
             }
         } 
     }
@@ -428,7 +429,7 @@ class VerifySystem {
         try {
             // PESAN INI EPHEMERAL/DISMISS
             await interaction.reply({ 
-                flags: [MessageFlags.Ephemeral], // <-- FIX Ephemeral
+                flags: [MessageFlags.Ephemeral], // <-- FIX: Menggunakan flags
                 embeds: [new EmbedBuilder()
                     .setColor(0x5865F2)
                     .setTitle('📋 DETAIL MISI PERKENALAN')
@@ -438,7 +439,7 @@ class VerifySystem {
             });
         } catch (error) {
             console.error('See mission error:', error);
-            await interaction.reply({ content: '❌ Gagal menampilkan detail misi.', flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+            await interaction.reply({ content: '❌ Gagal menampilkan detail misi.', flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
         } 
     }
 
@@ -451,10 +452,10 @@ class VerifySystem {
                 .setFooter({ text: 'Butuh bantuan lebih? Hubungi staff!' });
             
             // PESAN INI EPHEMERAL/DISMISS
-            await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+            await interaction.reply({ embeds: [embed], flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
         } catch (error) {
             console.error('FAQs error:', error);
-            await interaction.reply({ content: '❌ Failed to show FAQs.', flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+            await interaction.reply({ content: '❌ Failed to show FAQs.', flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
         }
     }
 
@@ -504,7 +505,7 @@ class VerifySystem {
     async handleRatingSubmit(interaction) {
         try {
             // DeferReply NON-EPHEMERAL karena ini akan mengedit pesan utama
-            await interaction.deferReply({ ephemeral: false }); 
+            await interaction.deferReply(); 
 
             const ratingValue = interaction.fields.getTextInputValue('rating_value');
             const rating = parseInt(ratingValue);
@@ -514,7 +515,7 @@ class VerifySystem {
                 // Menggunakan editReply pada deferReply NON-EPHEMERAL sebelumnya.
                 return await interaction.editReply({ 
                     content: '❌ Harap masukkan angka yang valid antara 1-100.', 
-                    flags: [MessageFlags.Ephemeral] // <-- FIX Ephemeral
+                    flags: [MessageFlags.Ephemeral] // <-- FIX: Menggunakan flags
                 }); 
             }
 
@@ -546,7 +547,7 @@ class VerifySystem {
         } catch (error) {
             console.error('Rating submit error:', error);
             // Error tetap harus Ephemeral jika terjadi kegagalan total
-            await interaction.editReply({ content: '❌ Failed to process rating.', flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+            await interaction.editReply({ content: '❌ Failed to process rating.', flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
         } 
     }
 
@@ -554,7 +555,7 @@ class VerifySystem {
     async handleFeedbackSubmit(interaction) {
         try {
             // DeferReply EPHEMERAL karena ini hanya konfirmasi
-            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+            await interaction.deferReply({ flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
 
             const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
             
@@ -574,12 +575,12 @@ class VerifySystem {
             });
         } catch (error) {
             console.error('Feedback submit error:', error);
-            await interaction.editReply({ content: '❌ Failed to process feedback.', flags: [MessageFlags.Ephemeral] }); // <-- FIX Ephemeral
+            await interaction.editReply({ content: '❌ Failed to process feedback.', flags: [MessageFlags.Ephemeral] }); // <-- FIX: Menggunakan flags
         } 
     }
     
     // ========== DETECT MESSAGE & AUTO PROCEED (Dipanggil dari messageCreate.js) ==========
-    async detectFirstMessage(message) {
+    async detectFirstMessage(message) { // <-- FIX: Tambahkan 'async' di sini
         const userId = message.author.id;
         const generalChannelId = this.config.generalChannelId;
         const session = this.getUserSession(userId);
@@ -610,7 +611,7 @@ class VerifySystem {
                 this.updateUserSession(userId, session);
                 
                 // Panggil fungsi untuk mengaktifkan tombol Next Verify
-                await this.enableNextVerifyButton(verifyMessage);
+                await this.enableNextVerifyButton(verifyMessage); // <-- 'await' sekarang valid
             }
         }
     }
@@ -781,20 +782,19 @@ class VerifySystem {
 ├─ 🔹 Server Nickname: ${member.nickname || 'None'}
 ├─ 🔹 Status: ${member.presence?.status || 'Offline'}
 ├─ 🔹 Activities: ${member.presence?.activities?.map(a => a.name).join(' • ') || 'None'}
+├─ 📅 Account Created: ${user.createdAt.toLocaleString('id-ID')}
+├─ 🎂 Account Age: ${accountAge} hari
 └─ 🔹 Client: ${this.getUserClient(user)}
 
 📱 ACCOUNT BADGES & PREMIUM
 ├─ 🏆 Early Supporter: ${earlySupporterStatus}
 ├─ 💎 Nitro: ${member.premiumSince ? '✅ Active Subscription' : '❌'}
-├─ 🎮 Nitro Games: ${member.premiumSince ? '✅ Included' : '❌'}
 ├─ 🎨 Nitro Avatar: ${user.avatar?.startsWith('a_') ? '✅ Animated' : '❌'}
 ├─ 🖼️ Profile Banner: ${user.banner ? '✅ Custom Banner' : '❌'}
 ├─ 📈 Server Boosts: ${member.premiumSince ? 'Active' : 'None'}
 └─ 💳 Premium Tier: ${member.premiumSince ? 'Nitro' : 'None'}
 
 📊 ACCOUNT METADATA
-├─ 📅 Account Created: ${user.createdAt.toLocaleString('id-ID')}
-├─ 🎂 Account Age: ${accountAge} hari
 ├─ 🌍 Location: Detected from IP
 ├─ 🕒 Timezone: GMT+7 (WIB)
 ├─ 💬 Language: English, Bahasa Indonesia
