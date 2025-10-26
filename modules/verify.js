@@ -148,11 +148,11 @@ async handleVerify(interaction) {
         this.verificationQueue.set(interaction.user.id, true);
 
         // ⚡ DEFER SEBELUM PROSES LAMA
-        await interaction.deferReply(); // ✅ TAMBAH INI
+        await interaction.deferReply();
 
         if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
             this.verificationQueue.delete(interaction.user.id);
-            return await interaction.editReply({ // ✅ GUNAKAN editReply
+            return await interaction.editReply({
                 content: '✅ Anda sudah terverifikasi!'
             });
         }
@@ -161,7 +161,7 @@ async handleVerify(interaction) {
         for (let i = 0; i < this.verificationSteps.length; i++) {
             const step = this.verificationSteps[i];
             const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
-            await interaction.editReply({ embeds: [embed] }); // ✅ GUNAKAN editReply
+            await interaction.editReply({ embeds: [embed] });
             await this.delay(step.duration);
         }
 
@@ -171,88 +171,91 @@ async handleVerify(interaction) {
     } catch (error) {
         console.error('Verify handling error:', error);
         this.verificationQueue.delete(interaction.user.id);
-    }
-                }
-    
-            try {
-                await interaction.reply({
-                    content: '❌ System error. Please try again later.',
-                    flags: 64
-                });
-            } catch (e) {
-                console.error('Failed to send error message:', e);
-            }
-        }
-    }
-
-    getProgressEmbed(step, currentStep, totalSteps) {
-        const progress = Math.round((currentStep / totalSteps) * 100);
-        const progressBar = this.generateProgressBar(progress);
-        const timeElapsed = (currentStep * 2.5 + Math.random() * 0.5).toFixed(1);
         
-        const tasksText = step.tasks.map((task, index) => {
-            const status = index < currentStep - 1 ? '✅' : (index === currentStep - 1 ? '🔄' : '⏳');
-            return `• ${task}: ${status}`;
-        }).join('\n');
-
-        const embed = new EmbedBuilder()
-            .setColor(0x3498db)
-            .setTitle(`${step.emoji} PROSES VERIFIKASI - ${progress}%`)
-            .setDescription(`${step.name} sedang berjalan...\n\n${progressBar}\n\n${tasksText}`)
-            .setFooter({ text: `⏱️ ${timeElapsed} detik • ${step.name}` });
-
-        return embed;
-    }
-
-    generateProgressBar(percentage) {
-        const bars = 20;
-        const filledBars = Math.round((percentage / 100) * bars);
-        const emptyBars = bars - filledBars;
-        return `━━━━━━━━━━━━━━━━━━━━\n${'█'.repeat(filledBars)}${'▒'.repeat(emptyBars)}\n━━━━━━━━━━━━━━━━━━━━`;
-    }
-
-    async showVerificationSuccess(interaction) {
+        if (error.code === 10062) {
+            console.log('⚠️ Interaction expired');
+            return;
+        }
+        
         try {
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('🎊 VERIFIKASI BERHASIL')
-                .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\n**PILIHAN LANJUTAN:**\n[🚀 SKIP VERIFY] - Langsung dapat role\n[🎯 CONTINUE VERIFY] - Lanjut verifikasi lengkap\n\n**⚠️ CATATAN PENTING:**\n• Setelah memilih CONTINUE VERIFY, tidak bisa kembali ke step ini\n• Setelah mendapatkan role member, channel verify akan hilang`)
-                .setFooter({ text: 'Platinum Member • Professional Network' });
-
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('skip_verify')
-                        .setLabel('🚀 SKIP VERIFY')
-                        .setStyle(ButtonStyle.Secondary),
-                    new ButtonBuilder()
-                        .setCustomId('continue_verify')
-                        .setLabel('🎯 CONTINUE VERIFY')
-                        .setStyle(ButtonStyle.Primary)
-                );
-
-            if (interaction.replied || interaction.deferred) {
-                await interaction.editReply({ 
-                    embeds: [embed], 
-                    components: [buttons] 
-                });
-            } else {
-                await interaction.reply({ 
-                    embeds: [embed], 
-                    components: [buttons],
-                    flags: 64
-                });
-            }
-
-            this.createUserSession(interaction.user.id);
-
-        } catch (error) {
-            console.error('Show verification success error:', error);
-            if (error.code === 10062) return;
-            throw error;
+            await interaction.reply({
+                content: '❌ System error. Please try again later.',
+                flags: 64
+            });
+        } catch (e) {
+            console.error('Failed to send error message:', e);
         }
     }
+}
 
+getProgressEmbed(step, currentStep, totalSteps) {
+    const progress = Math.round((currentStep / totalSteps) * 100);
+    const progressBar = this.generateProgressBar(progress);
+    const timeElapsed = (currentStep * 2.5 + Math.random() * 0.5).toFixed(1);
+    
+    const tasksText = step.tasks.map((task, index) => {
+        const status = index < currentStep - 1 ? '✅' : (index === currentStep - 1 ? '🔄' : '⏳');
+        return `• ${task}: ${status}`;
+    }).join('\n');
+
+    const embed = new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle(`${step.emoji} PROSES VERIFIKASI - ${progress}%`)
+        .setDescription(`${step.name} sedang berjalan...\n\n${progressBar}\n\n${tasksText}`)
+        .setFooter({ text: `⏱️ ${timeElapsed} detik • ${step.name}` });
+
+    return embed;
+}
+
+generateProgressBar(percentage) {
+    const bars = 20;
+    const filledBars = Math.round((percentage / 100) * bars);
+    const emptyBars = bars - filledBars;
+    return `━━━━━━━━━━━━━━━━━━━━\n${'█'.repeat(filledBars)}${'▒'.repeat(emptyBars)}\n━━━━━━━━━━━━━━━━━━━━`;
+}
+
+async showVerificationSuccess(interaction) {
+    try {
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('🎊 VERIFIKASI BERHASIL')
+            .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\n**PILIHAN LANJUTAN:**\n[🚀 SKIP VERIFY] - Langsung dapat role\n[🎯 CONTINUE VERIFY] - Lanjut verifikasi lengkap\n\n**⚠️ CATATAN PENTING:**\n• Setelah memilih CONTINUE VERIFY, tidak bisa kembali ke step ini\n• Setelah mendapatkan role member, channel verify akan hilang`)
+            .setFooter({ text: 'Platinum Member • Professional Network' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('skip_verify')
+                    .setLabel('🚀 SKIP VERIFY')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('continue_verify')
+                    .setLabel('🎯 CONTINUE VERIFY')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        if (interaction.replied || interaction.deferred) {
+            await interaction.editReply({ 
+                embeds: [embed], 
+                components: [buttons] 
+            });
+        } else {
+            await interaction.reply({ 
+                embeds: [embed], 
+                components: [buttons],
+                flags: 64
+            });
+        }
+
+        this.createUserSession(interaction.user.id);
+
+    } catch (error) {
+        console.error('Show verification success error:', error);
+        if (error.code === 10062) return;
+        throw error;
+    }
+}
+    
     // ========== BUTTON HANDLERS ==========
     async handleSkipVerify(interaction) {
         try {
@@ -301,59 +304,41 @@ async handleContinueVerify(interaction) {
         
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
-            .setTitle('🏠 KUNJUNGI AREA SERVER')
-            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
-            .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
+            .setTitle('👋 MISI PERKENALAN')
+            .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+            .setFooter({ text: 'Auto detect • No button needed' });
 
-        const linkButtons = new ActionRowBuilder()
+        const buttons = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
-                    .setLabel('🏠 SERVER GUIDE')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
+                    .setCustomId('see_mission')
+                    .setLabel('📝 LIHAT MISI')
+                    .setStyle(ButtonStyle.Primary),
                 new ButtonBuilder()
-                    .setLabel('📋 OPEN RULES')
+                    .setLabel('🔗 KE GENERAL')
                     .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
-                new ButtonBuilder()
-                    .setLabel('🎨 SELF ROLE')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
             );
 
         await interaction.editReply({ 
             content: `${interaction.user}`,
             embeds: [embed], 
-            components: [linkButtons] 
+            components: [buttons] 
         });
 
         this.updateUserSession(interaction.user.id, { 
-            step: 'server_exploration',
-            explorationStart: Date.now(),
-            visitedChannels: {
-                home: false,
-                rules: false,
-                customize: false
-            }
+            step: 'introduction_mission',
+            missionStartTime: Date.now()
         });
-
-        // AUTO LANJUT SETELAH 30 DETIK
-        setTimeout(async () => {
-            try {
-                await this.autoProceedToMission(interaction);
-            } catch (error) {
-                console.error('Auto proceed error:', error);
-            }
-        }, 30000);
 
     } catch (error) {
         console.error('Continue verify error:', error);
         await interaction.editReply({
-            content: '❌ Failed to start server exploration.',
+            content: '❌ Failed to start introduction mission.',
             components: []
         });
     }
-}
+} // ✅ PASTIKAN ADA KURUNG TUTUP YANG BENAR
 
 // ========== STATE TRACKING SYSTEM ==========
 async handleChannelVisit(interaction, channelType) {
