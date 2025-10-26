@@ -45,22 +45,22 @@ if (interaction.isButton()) {
     return await verifySystem.handleNextVerify(interaction);
   }
   
-  // See Mission Button
+  // See Mission Button - ✅ INI YANG DITAMBAH
   if (customId === 'see_mission') {
     return await verifySystem.handleSeeMission(interaction);
   }
   
-  // Auto Welcome Button (JIKA ANDA MENGGUNAKAN INI)
+  // Auto Welcome Button
   if (customId === 'auto_welcome') {
     return await verifySystem.handleAutoWelcome(interaction);
   }
 
-  // Welcome Selection Buttons (JIKA ANDA MENGGUNAKAN INI)
+  // Welcome Selection Buttons
   if (customId.startsWith('welcome_')) {
     return await verifySystem.handleWelcomeSelection(interaction);
   }
   
-  // Custom Message Button (JIKA ANDA MENGGUNAKAN INI)
+  // Custom Message Button
   if (customId === 'custom_message') {
     return await verifySystem.handleCustomMessage(interaction);
   }
@@ -101,7 +101,7 @@ if (interaction.isButton()) {
   }
 }
 
-    // ✅ MODAL SUBMIT INTERACTIONS - INI WAJIB UNTUK RATING/FEEDBACK
+    // ✅ MODAL SUBMIT INTERACTIONS - PASTIKAN INI ADA
 if (interaction.isModalSubmit()) {
     const { customId } = interaction;
     console.log(`📝 Modal submitted: ${customId}`);
@@ -114,13 +114,12 @@ if (interaction.isModalSubmit()) {
         return await verifySystem.handleFeedbackSubmit(interaction);
     }
     
-    // JIKA ADA MODAL CUSTOM MESSAGE LAIN
     if (customId === 'custom_message_modal') {
         return await verifySystem.handleCustomMessageSubmit(interaction);
     }
 }  
       
-      // ========== DUEL ACCEPT/REJECT HANDLER (TIDAK DIUBAH) ==========
+      // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
           interaction.customId.startsWith('accept_duel_') || 
           interaction.customId.startsWith('reject_duel_')
@@ -128,7 +127,7 @@ if (interaction.isModalSubmit()) {
           console.log(`🎯 Processing duel button: ${interaction.customId}`);
           
           const parts = interaction.customId.split('_');
-          const action = parts[0]; 
+          const action = parts[0]; // accept or reject
           const duelId = parts.slice(2).join('_');
           
           const shotgunCommand = require('../commands/shotgunCommand');
@@ -142,7 +141,7 @@ if (interaction.isModalSubmit()) {
           return;
       }
 
-      // ========== SHOTGUN DUELS BUTTON HANDLER (TIDAK DIUBAH) ==========
+      // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED ==========
       if (interaction.isButton() && interaction.customId) {
         const customId = interaction.customId;
         
@@ -155,6 +154,7 @@ if (interaction.isModalSubmit()) {
             
             let gameId, action, itemIndex;
             
+            // FIX: Parsing yang benar untuk customId
             if (customId.startsWith('item_')) {
                 const parts = customId.split('_');
                 gameId = parts[1];
@@ -243,7 +243,7 @@ if (interaction.isModalSubmit()) {
         }
       }
 
-      // ========== EXISTING CODE - TAGGING NICKNAME (TIDAK DIUBAH) ==========
+      // ========== EXISTING CODE - TIDAK DIUBAH ==========
       if (!interaction.isButton()) return;
       
       const username = interaction.user.globalName ?? interaction.user.username;
@@ -264,6 +264,7 @@ if (interaction.isModalSubmit()) {
         ? JSON.parse(fs.readFileSync(filePath, "utf8"))
         : {};
 
+      // ========== TOMBOL ✅ UMUM ==========
       if (customId === "use_tag") {
         const role = ROLES.find(r => member.roles.cache.has(r.id));
         if (!role) {
@@ -283,6 +284,7 @@ if (interaction.isModalSubmit()) {
         });
       }
 
+      // ========== TOMBOL ❌ HAPUS TAG UMUM ==========
       if (customId === "remove_tag") {
         await member.setNickname(username).catch(console.error);
         taggedUsers[member.id] = false;
@@ -294,6 +296,7 @@ if (interaction.isModalSubmit()) {
         });
       }
 
+      // ========== TOMBOL TEST ✅ / ❌ ==========
       if (customId && (customId.startsWith("test_use_tag_") || customId.startsWith("test_remove_tag_"))) {
         const parts = customId.split("_");
         const action = parts[1];
@@ -382,3 +385,4 @@ if (interaction.isModalSubmit()) {
     }
   },
 };
+                  
