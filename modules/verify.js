@@ -136,51 +136,44 @@ class VerifySystem {
     }
 
     // ========== MAIN VERIFICATION FLOW ==========
-    async handleVerify(interaction) {
-        try {
-            if (this.verificationQueue.has(interaction.user.id)) {
-                return await interaction.reply({
-                    content: '⏳ Verification already in progress. Please wait...',
-                    flags: 64
-                });
-            }
-
-            this.verificationQueue.set(interaction.user.id, true);
-
-            if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
-                this.verificationQueue.delete(interaction.user.id);
-                return await interaction.reply({
-                    content: '✅ Anda sudah terverifikasi!',
-                    flags: 64
-                });
-            }
-
-            await interaction.reply({ 
-                content: '🔄 Memulai verifikasi...', 
-                flags: 64 
+async handleVerify(interaction) {
+    try {
+        if (this.verificationQueue.has(interaction.user.id)) {
+            return await interaction.reply({
+                content: '⏳ Verification already in progress. Please wait...',
+                flags: 64
             });
+        }
 
-            for (let i = 0; i < this.verificationSteps.length; i++) {
-                const step = this.verificationSteps[i];
-                const progress = Math.round(((i + 1) / this.verificationSteps.length) * 100);
-                
-                const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
-                await interaction.editReply({ embeds: [embed] });
-                await this.delay(step.duration);
-            }
+        this.verificationQueue.set(interaction.user.id, true);
 
-            await this.showVerificationSuccess(interaction);
+        // ⚡ DEFER SEBELUM PROSES LAMA
+        await interaction.deferReply(); // ✅ TAMBAH INI
+
+        if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
             this.verificationQueue.delete(interaction.user.id);
+            return await interaction.editReply({ // ✅ GUNAKAN editReply
+                content: '✅ Anda sudah terverifikasi!'
+            });
+        }
 
-        } catch (error) {
-            console.error('Verify handling error:', error);
-            this.verificationQueue.delete(interaction.user.id);
-            
-            if (error.code === 10062) {
-                console.log('⚠️ Interaction expired');
-                return;
-            }
-            
+        // LANJUTKAN DENGAN PROSES VERIFIKASI...
+        for (let i = 0; i < this.verificationSteps.length; i++) {
+            const step = this.verificationSteps[i];
+            const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
+            await interaction.editReply({ embeds: [embed] }); // ✅ GUNAKAN editReply
+            await this.delay(step.duration);
+        }
+
+        await this.showVerificationSuccess(interaction);
+        this.verificationQueue.delete(interaction.user.id);
+
+    } catch (error) {
+        console.error('Verify handling error:', error);
+        this.verificationQueue.delete(interaction.user.id);
+    }
+                }
+    
             try {
                 await interaction.reply({
                     content: '❌ System error. Please try again later.',
@@ -548,93 +541,130 @@ async handleSeeMission(interaction) {
         }
     }
 
-    async enableNextVerifyButton(user, client) {
-        try {
-            console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
+async enableNextVerifyButton(user, client) {
+    try {
+        console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
+        
+        const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
+        if (!verifyChannel) return;
+
+        // ⚡ CARI SEMUA MESSAGE USER DI VERIFY CHANNEL
+        const messages = await verifyChannel.messages.fetch({ limit: 100 });
+        
+        const userVerifyMessage = messages.find(msg => {
+            if (msg.author.id !== client.user.id) return false;
+            return msg.content.includes(user.id); // ✅ CARI BERDASARKAN USER MENTION
+        });
+
+        if (userVerifyMessage) {
+            console.log(`📝 Found user message: ${userVerifyMessage.id}`);
             
-            // CARI DI VERIFY CHANNEL
-            const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
-            if (!verifyChannel) {
-                console.log('❌ Verify channel not found');
-                return;
-            }
+            const enabledButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('see_mission')
+                        .setLabel('📝 LIHAT MISI')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setLabel('🔗 KE GENERAL')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
+                    new ButtonBuilder()
+                        .setCustomId('next_verify')
+                        .setLabel('✅ NEXT VERIFY')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(false)
+                );
 
-            // CARI MESSAGE USER DI VERIFY CHANNEL
-            const messages = await verifyChannel.messages.fetch({ limit: 50 });
-            const userVerifyMessage = messages.find(msg => {
-                if (msg.author.id !== client.user.id) return false;
-                if (msg.embeds.length === 0) return false;
-                
-                const embed = msg.embeds[0];
-                return msg.content.includes(user.id) || 
-                       (embed.description && embed.description.includes(user.username)) ||
-                       (embed.title && embed.title.includes('MISI PERKENALAN'));
+            await userVerifyMessage.edit({ components: [enabledButtons] });
+            
+        } else {
+            console.log('❌ No message found for user:', user.username);
+            // ⚡ JIKA TIDAK DITEMUKAN, KIRIM MESSAGE BARU
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('✅ MISI SELESAI!')
+                .setDescription(`Hai ${user}! Kamu sudah menyelesaikan misi perkenalan!\n\nKlik tombol di bawah untuk lanjut ke rating.`)
+                .setFooter({ text: 'Lanjutkan verifikasi' });
+
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('next_verify')
+                        .setLabel('✅ NEXT VERIFY')
+                        .setStyle(ButtonStyle.Success)
+                );
+
+            await verifyChannel.send({ 
+                content: `${user}`,
+                embeds: [embed], 
+                components: [buttons] 
             });
-
-            if (userVerifyMessage) {
-                console.log(`📝 Found user verify message, enabling NEXT VERIFY...`);
-                
-                // ENABLE TOMBOL NEXT VERIFY DI VERIFY CHANNEL
-                const enabledButtons = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('see_mission')
-                            .setLabel('📝 LIHAT MISI')
-                            .setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder()
-                            .setLabel('🔗 KE GENERAL')
-                            .setStyle(ButtonStyle.Link)
-                            .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
-                        new ButtonBuilder()
-                            .setCustomId('next_verify')
-                            .setLabel('✅ NEXT VERIFY')
-                            .setStyle(ButtonStyle.Success)
-                            .setDisabled(false) // ✅ ENABLE!
-                    );
-
-                await userVerifyMessage.edit({
-                    components: [enabledButtons]
-                });
-                
-                console.log(`✅ NEXT VERIFY button enabled for ${user.username} in verify channel`);
-            } else {
-                console.log('❌ User verify message not found in verify channel');
-            }
-
-        } catch (error) {
-            console.error('❌ Enable next verify button error:', error);
         }
+
+    } catch (error) {
+        console.error('❌ Enable next verify button error:', error);
     }
+}
 
     // ========== NEXT VERIFY HANDLER ==========
-    async handleNextVerify(interaction) {
-        try {
-            const session = this.getUserSession(interaction.user.id);
-            
-            if (!session || session.step !== 'ready_for_rating') {
-                return await interaction.reply({
-                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.',
-                    flags: 64
-                });
-            }
-
-            await interaction.deferUpdate();
-            
-            // ⚡ LANGSUNG GANTI EMBED DI VERIFY CHANNEL - EDIT MESSAGE YANG SUDAH ADA
-            await this.editMissionToRating(interaction, session);
-            
-            // UPDATE SESSION
-            session.step = 'rating';
-            this.updateUserSession(interaction.user.id, session);
-
-        } catch (error) {
-            console.error('Next verify error:', error);
-            await interaction.editReply({
-                content: '❌ Gagal memproses next verify.',
-                components: []
+async handleNextVerify(interaction) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        
+        if (!session || session.step !== 'ready_for_rating') {
+            return await interaction.reply({
+                content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.',
+                flags: 64
             });
         }
+
+        await interaction.deferUpdate();
+        
+        // ⚡ EDIT EMBED YANG SUDAH ADA - DISMISS MESSAGE
+        const ratingEmbed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle(`⭐ LANJUTKAN VERIFIKASI - RATING`)
+            .setDescription(`Hai ${interaction.user.username}!\n\nVerifikasi Anda dilanjutkan ke step rating.\n**Misi perkenalan di #general SUDAH SELESAI!** ✅\n\nBeri rating pengalaman verifikasi:\n\n**Pesan Anda:** "${session.data.firstMessage}"`)
+            .setFooter({ text: 'Langkah terakhir sebelum role member!' });
+
+        const ratingButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('input_rating')
+                    .setLabel('🎯 INPUT RATING 1-100')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('give_feedback')
+                    .setLabel('💬 KASIH SARAN')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('faqs_rating')
+                    .setLabel('❓ TANYA FAQ')
+                    .setStyle(ButtonStyle.Secondary)
+            );
+
+        // ⚡ EDIT MESSAGE YANG SUDAH ADA - BUKAN KIRIM BARU
+        await interaction.editReply({ 
+            content: `${interaction.user}`,
+            embeds: [ratingEmbed], 
+            components: [ratingButtons] 
+        });
+        
+        console.log(`✅ Mission EDITED to rating for ${interaction.user.username}`);
+
+        // UPDATE SESSION
+        session.step = 'rating';
+        this.updateUserSession(interaction.user.id, session);
+
+    } catch (error) {
+        console.error('Next verify error:', error);
+        await interaction.editReply({
+            content: '❌ Gagal memproses next verify.',
+            components: []
+        });
     }
+}
 
     async editMissionToRating(interaction, session) {
         try {
