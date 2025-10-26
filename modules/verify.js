@@ -1,3 +1,6 @@
+// File: /workspace/modules/verify.js
+
+// PERBAIKAN SYNTAX: Const menjadi const
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, UserFlags } = require('discord.js');
 
 class VerifySystem {
@@ -93,7 +96,7 @@ class VerifySystem {
                     .setLabel('✅ VERIFY MY ACCOUNT')
                     .setStyle(ButtonStyle.Success)
             );
-        // PESAN UTAMA (NON-DISMISSIVE/NON-EPHEMERAL)
+        // PESAN UTAMA (Non-Dismissive)
         await channel.send({ embeds: [embed], components: [button] });
     }
 
@@ -217,7 +220,7 @@ class VerifySystem {
                         .setLabel('⭐ RATE SERVER')
                         .setStyle(ButtonStyle.Primary),
                     new ButtonBuilder()
-                        .setCustomId('faqs_skip') // <-- Button ini akan Ephemeral/Dismissive (Perlu diperhatikan di interactionCreate.js)
+                        .setCustomId('faqs_skip') // <-- Button ini akan Ephemeral/Dismissive 
                         .setLabel('❓ FAQS')
                         .setStyle(ButtonStyle.Secondary),
                     new ButtonBuilder()
@@ -290,7 +293,7 @@ class VerifySystem {
             const session = this.getUserSession(interaction.user.id);
             const generalChannel = await interaction.client.channels.fetch(this.config.generalChannelId);
 
-            // --- PERBAIKAN ERROR 'firstMessage' ---
+            // --- Fallback Check ---
             let firstMessageContent;
             
             if (session && session.step === 'ready_for_rating' && session.data.firstMessage) {
@@ -334,7 +337,7 @@ class VerifySystem {
                         .setLabel('💬 KASIH SARAN')
                         .setStyle(ButtonStyle.Secondary),
                     new ButtonBuilder()
-                        .setCustomId('faqs_rating') // <-- Button ini akan Ephemeral/Dismissive (Perlu diperhatikan di interactionCreate.js)
+                        .setCustomId('faqs_rating') // <-- Button ini akan Ephemeral/Dismissive 
                         .setLabel('❓ TANYA FAQ')
                         .setStyle(ButtonStyle.Secondary)
                 );
@@ -380,6 +383,7 @@ class VerifySystem {
         // EDIT REPLY AGAR TETAP TERLIHAT DI CHANNEL VERIFIKASI (Non-Dismissive)
         await interaction.editReply({ embeds: [embed], components: [button] });
         
+        this.userSessions.delete(interaction.user.id); // Hapus sesi setelah selesai
         this.updateUserSession(interaction.user.id, { step: 'completed' });
     }
     
@@ -422,7 +426,7 @@ class VerifySystem {
                 embeds: [new EmbedBuilder()
                     .setColor(0x5865F2)
                     .setTitle('📋 DETAIL MISI PERKENALAN')
-                    .setDescription(`**Apa yang harus dilakukan:**\n\n1. Buka channel <#${this.config.generalChannelId}>\n2. Kirim pesan perkenalan\n3. Bot akan otomatis mendeteksi\n4. Lanjut ke step rating\n\n**Contoh pesan:**\n\`\`\`Halo semuanya! 👋\nSaya ${interaction.user.username}, baru join nih!\nSenang bisa bergabung di BananaSkiee Community! 🚀\nSalam kenal ya! 😊\`\`\``)
+                    .setDescription(`**Apa yang harus dilakukan:**\n\n1. Buka channel <#${this.config.generalChannelId}>\n2. Kirim pesan perkenalan singkat\n3. Setelah terdeteksi, tombol NEXT VERIFY akan aktif\n\n**Contoh pesan:**\n\`\`\`Halo semuanya! 👋\nSaya ${interaction.user.username}, baru join nih!\nSenang bisa bergabung di BananaSkiee Community! 🚀\nSalam kenal ya! 😊\`\`\``)
                     .setFooter({ text: 'Pesan bebas, yang penting perkenalan diri' })
                 ]
             });
@@ -598,10 +602,7 @@ class VerifySystem {
                 // Panggil fungsi untuk mengaktifkan tombol Next Verify
                 await this.enableNextVerifyButton(verifyMessage);
                 
-                // Kirim notifikasi Ephemeral/Dismissive ke user (VIA DM)
-                await message.author.send({
-                    content: `✅ Misi perkenalan selesai terdeteksi di <#${generalChannelId}>! Silakan kembali ke channel verifikasi untuk melanjutkan.`,
-                }).catch(() => console.log(`Gagal DM ${message.author.username}`));
+                // *** PENTING: BLOK KIRIM DM SUDAH DIHAPUS DI SINI ***
             }
         }
     }
@@ -629,7 +630,7 @@ class VerifySystem {
                     .setDisabled(true), // Awalnya disabled
                 new ButtonBuilder()
                     .setCustomId('see_mission')
-                    .setLabel('❓ SEE MISSION') // <-- Button ini akan Ephemeral/Dismissive (Perlu diperhatikan di interactionCreate.js)
+                    .setLabel('❓ SEE MISSION') // <-- Button ini akan Ephemeral/Dismissive
                     .setStyle(ButtonStyle.Secondary)
             );
             
@@ -666,7 +667,7 @@ class VerifySystem {
             const success = await this.grantMemberAccess(interaction);
             
             if (success) {
-                // LOGGING HARUS BERHASIL (Non-Dismissive)
+                // LOGGING KE FORUM CHANNEL BERJALAN DI SINI
                 await this.logVerification(interaction);
                 
                 const embed = new EmbedBuilder()
@@ -718,7 +719,7 @@ class VerifySystem {
 
             // Membuat Post Forum (thread) dengan JUDUL NAMA USER
             const forumPost = await logChannel.threads.create({
-                // JUDUL THREAD = NAMA USER
+                // JUDUL THREAD = NAMA USER (Sesuai Permintaan)
                 name: `${user.username} - Verification Log`, 
                 message: { 
                     content: logContent,
@@ -730,12 +731,9 @@ class VerifySystem {
             console.error('❌ Logging error:', error);
         } 
     }
-    
-    // ... (sisanya fungsi helper sama seperti di kode Anda) ...
 
     // ========== LOG CONTENT GENERATOR ==========
     generateLogContent(user, member, session) { 
-        // ... (sisanya fungsi helper sama seperti di kode Anda) ...
         const timestamp = new Date().toLocaleString('id-ID'); 
         const accountAge = this.getAccountAge(user.createdAt); 
         
@@ -786,7 +784,7 @@ class VerifySystem {
 ├─ 📝 Original Message: "${session?.data?.firstMessage || 'N/A'}"
 ├─ 🔗 Message Link: N/A (Internal)
 ├─ 🕒 Timestamp: ${session?.data?.firstMessageTime ? new Date(session.data.firstMessageTime).toLocaleString('id-ID') : 'N/A'}
-├─ 📍 Channel: 「💬」ɢᴇɴᴇʀᴀʟ
+├─ 📍 Channel: 「💬」ɢᴇɴᴇʀᴀL
 ├─ ⏱️ Response Time: ${session?.data?.responseTime ? Math.round(session.data.responseTime / 1000) + ' detik' : 'N/A'}
 └─ 🔥 Engagement: First message detected
 
