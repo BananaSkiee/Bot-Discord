@@ -19,100 +19,87 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-      // ========== VERIFY SYSTEM HANDLERS ==========
-      // ✅ BUTTON INTERACTIONS
-      if (interaction.isButton()) {
-        const { customId } = interaction;
-        console.log(`🔘 Button clicked: ${customId}`);
+// ========== VERIFY SYSTEM HANDLERS ==========
+// ✅ BUTTON INTERACTIONS
+if (interaction.isButton()) {
+  const { customId } = interaction;
+  console.log(`🔘 Button clicked: ${customId}`);
 
-        // Verify Account Button
-        if (customId === 'verify_account') {
-          return await verifySystem.handleVerify(interaction);
-        }
-        
-        // Skip Verify Button
-        if (customId === 'skip_verify') {
-          return await verifySystem.handleSkipVerify(interaction);
-        }
-        
-        // Continue Verify Button
-        if (customId === 'continue_verify') {
-          return await verifySystem.handleContinueVerify(interaction);
-        }
-        
-        // Next Verify Button
-        if (customId === 'next_verify') {
-          return await verifySystem.handleNextVerify(interaction);
-        }
-        
-        // Auto Welcome Button
-        if (customId === 'auto_welcome') {
-          return await verifySystem.handleAutoWelcome(interaction);
-        }
+  // Verify Account Button
+  if (customId === 'verify_account') {
+    return await verifySystem.handleVerify(interaction);
+  }
+  
+  // Skip Verify Button
+  if (customId === 'skip_verify') {
+    return await verifySystem.handleSkipVerify(interaction);
+  }
+  
+  // Continue Verify Button
+  if (customId === 'continue_verify') {
+    return await verifySystem.handleContinueVerify(interaction);
+  }
+  
+  // Next Verify Button
+  if (customId === 'next_verify') {
+    return await verifySystem.handleNextVerify(interaction);
+  }
+  
+  // See Mission Button - ✅ INI YANG DITAMBAH
+  if (customId === 'see_mission') {
+    return await verifySystem.handleSeeMission(interaction);
+  }
+  
+  // Auto Welcome Button
+  if (customId === 'auto_welcome') {
+    return await verifySystem.handleAutoWelcome(interaction);
+  }
 
-        // Welcome Selection Buttons
-        if (customId.startsWith('welcome_')) {
-          return await verifySystem.handleWelcomeSelection(interaction);
-        }
-        
-        // Custom Message Button
-        if (customId === 'custom_message') {
-          return await verifySystem.handleCustomMessage(interaction);
-        }
-        
-        // Input Rating Button
-        if (customId === 'input_rating') {
-          return await verifySystem.handleInputRating(interaction);
-        }
-        
-        // Give Feedback Button
-        if (customId === 'give_feedback') {
-          return await verifySystem.handleGiveFeedback(interaction);
-        }
-        
-        // Next Final Button
-        if (customId === 'next_final') {
-          return await verifySystem.handleNextFinal(interaction);
-        }
-        
-        // Rate Server Button
-        if (customId === 'rate_server') {
-          return await verifySystem.handleInputRating(interaction);
-        }
-        
-        // FAQ Buttons
-        if (customId === 'faqs_skip' || customId === 'faqs_rating') {
-          return await verifySystem.handleFaqs(interaction);
-        }
-        
-        // Give Role Buttons
-        if (customId === 'give_role_skip' || customId === 'give_role_final') {
-          return await verifySystem.handleGiveRole(interaction);
-        }
-        
-        // Back to Verify Button
-        if (customId === 'back_to_verify') {
-          return await verifySystem.handleBackToVerify(interaction);
-        }
-      }
-
-      // ✅ MODAL SUBMIT INTERACTIONS
-      if (interaction.isModalSubmit()) {
-        const { customId } = interaction;
-        console.log(`📝 Modal submitted: ${customId}`);
-
-        if (customId === 'custom_message_modal') {
-          return await verifySystem.handleCustomMessageSubmit(interaction);
-        }
-        
-        if (customId === 'input_rating_modal') {
-          return await verifySystem.handleRatingSubmit(interaction);
-        }
-        
-        if (customId === 'give_feedback_modal') {
-          return await verifySystem.handleFeedbackSubmit(interaction);
-        }
-      }
+  // Welcome Selection Buttons
+  if (customId.startsWith('welcome_')) {
+    return await verifySystem.handleWelcomeSelection(interaction);
+  }
+  
+  // Custom Message Button
+  if (customId === 'custom_message') {
+    return await verifySystem.handleCustomMessage(interaction);
+  }
+  
+  // Input Rating Button
+  if (customId === 'input_rating') {
+    return await verifySystem.handleInputRating(interaction);
+  }
+  
+  // Give Feedback Button
+  if (customId === 'give_feedback') {
+    return await verifySystem.handleGiveFeedback(interaction);
+  }
+  
+  // Next Final Button
+  if (customId === 'next_final') {
+    return await verifySystem.handleNextFinal(interaction);
+  }
+  
+  // Rate Server Button
+  if (customId === 'rate_server') {
+    return await verifySystem.handleInputRating(interaction);
+  }
+  
+  // FAQ Buttons
+  if (customId === 'faqs_skip' || customId === 'faqs_rating') {
+    return await verifySystem.handleFaqs(interaction);
+  }
+  
+  // Give Role Buttons
+  if (customId === 'give_role_skip' || customId === 'give_role_final') {
+    return await verifySystem.handleGiveRole(interaction);
+  }
+  
+  // Back to Verify Button
+  if (customId === 'back_to_verify') {
+    return await verifySystem.handleBackToVerify(interaction);
+  }
+}
       
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
