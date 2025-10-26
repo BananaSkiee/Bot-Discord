@@ -147,7 +147,7 @@ async handleVerify(interaction) {
 
         this.verificationQueue.set(interaction.user.id, true);
 
-        // ⚡ DEFER SEBELUM PROSES LAMA
+        // ⚡ DEFER SEBELUM PROSES APAPUN
         await interaction.deferReply();
 
         if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
@@ -157,7 +157,7 @@ async handleVerify(interaction) {
             });
         }
 
-        // LANJUTKAN DENGAN PROSES VERIFIKASI...
+        // LANJUTKAN PROSES VERIFIKASI...
         for (let i = 0; i < this.verificationSteps.length; i++) {
             const step = this.verificationSteps[i];
             const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
@@ -175,15 +175,6 @@ async handleVerify(interaction) {
         if (error.code === 10062) {
             console.log('⚠️ Interaction expired');
             return;
-        }
-        
-        try {
-            await interaction.reply({
-                content: '❌ System error. Please try again later.',
-                flags: 64
-            });
-        } catch (e) {
-            console.error('Failed to send error message:', e);
         }
     }
 }
@@ -304,42 +295,60 @@ async handleContinueVerify(interaction) {
         
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
-            .setTitle('👋 MISI PERKENALAN')
-            .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
-            .setFooter({ text: 'Auto detect • No button needed' });
+            .setTitle('🏠 KUNJUNGI AREA SERVER')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
+            .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
 
-        const buttons = new ActionRowBuilder()
+        const linkButtons = new ActionRowBuilder()
             .addComponents(
                 new ButtonBuilder()
-                    .setCustomId('see_mission')
-                    .setLabel('📝 LIHAT MISI')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setLabel('🔗 KE GENERAL')
+                    .setLabel('🏠 SERVER GUIDE')
                     .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
+                new ButtonBuilder()
+                    .setLabel('📋 OPEN RULES')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
+                new ButtonBuilder()
+                    .setLabel('🎨 SELF ROLE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
             );
 
         await interaction.editReply({ 
             content: `${interaction.user}`,
             embeds: [embed], 
-            components: [buttons] 
+            components: [linkButtons] 
         });
 
         this.updateUserSession(interaction.user.id, { 
-            step: 'introduction_mission',
-            missionStartTime: Date.now()
+            step: 'server_exploration',
+            explorationStart: Date.now(),
+            visitedChannels: {
+                home: false,
+                rules: false,
+                customize: false
+            }
         });
+
+        // AUTO LANJUT SETELAH 30 DETIK
+        setTimeout(async () => {
+            try {
+                await this.autoProceedToMission(interaction);
+            } catch (error) {
+                console.error('Auto proceed error:', error);
+            }
+        }, 30000);
 
     } catch (error) {
         console.error('Continue verify error:', error);
         await interaction.editReply({
-            content: '❌ Failed to start introduction mission.',
+            content: '❌ Failed to start server exploration.',
             components: []
         });
     }
-} // ✅ PASTIKAN ADA KURUNG TUTUP YANG BENAR
-
+}
+    
 // ========== STATE TRACKING SYSTEM ==========
 async handleChannelVisit(interaction, channelType) {
     try {
