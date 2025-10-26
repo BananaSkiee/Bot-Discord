@@ -15,7 +15,7 @@ class VerifySystem {
         // PASTIKAN ID BERIKUT SUDAH BENAR
         this.config = {
             verifyChannelId: '1352823970054803509',
-            logChannelId: '1428789734993432676', // ID Forum Channel
+            logChannelId: '1428789734993432676', // ID Forum Channel (Log Verify)
             memberRoleId: '1352286235233620108',
             generalChannelId: '1352404526870560788',
             serverId: '1347233781391560837',
@@ -59,7 +59,8 @@ class VerifySystem {
             const channel = await client.channels.fetch(this.config.verifyChannelId);
             if (!channel) throw new Error('Verify channel not found');
             await this.cleanChannel(channel);
-            await this.sendVerifyMessage(channel);
+            // TIDAK DIMINTA MENGUBAH PESAN UTAMA
+            await this.sendVerifyMessage(channel); 
             console.log('✅ Premium Verify System initialized successfully');
         } catch (error) {
             console.error('❌ Verify system initialization failed:', error);
@@ -82,6 +83,7 @@ class VerifySystem {
         }
     }
 
+    // TIDAK DIMINTA MENGUBAH PESAN UTAMA VERIFY (NON-EPHEMERAL)
     async sendVerifyMessage(channel) {
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
@@ -505,6 +507,7 @@ class VerifySystem {
             
             if (isNaN(rating) || rating < 1 || rating > 100) {
                 // Perbaikan: Gagal parsing rating, edit reply utama.
+                // Menggunakan editReply pada deferReply NON-EPHEMERAL sebelumnya.
                 return await interaction.editReply({ content: '❌ Harap masukkan angka yang valid antara 1-100.', ephemeral: true });
             }
 
@@ -668,6 +671,7 @@ class VerifySystem {
             
             if (success) {
                 // LOGGING KE FORUM CHANNEL BERJALAN DI SINI
+                // TIDAK DIMINTA MENGUBAH LOGIC INI
                 await this.logVerification(interaction);
                 
                 const embed = new EmbedBuilder()
@@ -701,7 +705,7 @@ class VerifySystem {
         }
     }
 
-    // ========== LOGGING SYSTEM (KE FORUM CHANNEL) ========== 
+    // ========== LOGGING SYSTEM (KE FORUM CHANNEL) - TIDAK DIMINTA MENGUBAH ========== 
     async logVerification(interaction) {
         try {
             const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
@@ -732,7 +736,7 @@ class VerifySystem {
         } 
     }
 
-    // ========== LOG CONTENT GENERATOR ==========
+    // ========== LOG CONTENT GENERATOR - TIDAK DIMINTA MENGUBAH ==========
     generateLogContent(user, member, session) { 
         const timestamp = new Date().toLocaleString('id-ID'); 
         const accountAge = this.getAccountAge(user.createdAt); 
@@ -784,7 +788,7 @@ class VerifySystem {
 ├─ 📝 Original Message: "${session?.data?.firstMessage || 'N/A'}"
 ├─ 🔗 Message Link: N/A (Internal)
 ├─ 🕒 Timestamp: ${session?.data?.firstMessageTime ? new Date(session.data.firstMessageTime).toLocaleString('id-ID') : 'N/A'}
-├─ 📍 Channel: 「💬」ɢᴇɴᴇʀᴀL
+├─ 📍 Channel: 「💬」ɢᴇɴᴇRᴬL
 ├─ ⏱️ Response Time: ${session?.data?.responseTime ? Math.round(session.data.responseTime / 1000) + ' detik' : 'N/A'}
 └─ 🔥 Engagement: First message detected
 
