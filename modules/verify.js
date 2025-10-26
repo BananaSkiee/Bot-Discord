@@ -302,48 +302,214 @@ class VerifySystem {
         }
     }
 
-    async handleContinueVerify(interaction) {
-        try {
-            await interaction.deferUpdate();
+async handleContinueVerify(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🏠 KUNJUNGI AREA SERVER')
+            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
+            .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
+
+        const linkButtons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('🏠 SERVER GUIDE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
+                new ButtonBuilder()
+                    .setLabel('📋 OPEN RULES')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
+                new ButtonBuilder()
+                    .setLabel('🎨 SELF ROLE')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
+            );
+
+        await interaction.editReply({ 
+            content: `${interaction.user}`,
+            embeds: [embed], 
+            components: [linkButtons] 
+        });
+
+        this.updateUserSession(interaction.user.id, { 
+            step: 'server_exploration',
+            explorationStart: Date.now(),
+            visitedChannels: {
+                home: false,
+                rules: false,
+                customize: false
+            }
+        });
+
+        // AUTO LANJUT SETELAH 30 DETIK
+        setTimeout(async () => {
+            try {
+                await this.autoProceedToMission(interaction);
+            } catch (error) {
+                console.error('Auto proceed error:', error);
+            }
+        }, 30000);
+
+    } catch (error) {
+        console.error('Continue verify error:', error);
+        await interaction.editReply({
+            content: '❌ Failed to start server exploration.',
+            components: []
+        });
+    }
+}
+
+// ========== STATE TRACKING SYSTEM ==========
+async handleChannelVisit(interaction, channelType) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        if (session && session.step === 'server_exploration') {
+            session.visitedChannels[channelType] = true;
+            this.updateUserSession(interaction.user.id, session);
+
+            console.log(`✅ ${interaction.user.username} visited ${channelType}`);
+
+            // Check progress
+            const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
+            const totalChannels = Object.keys(session.visitedChannels).length;
             
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
-                .setFooter({ text: 'Auto detect • No button needed' });
+            if (visitedCount === totalChannels) {
+                // Semua channel sudah dikunjungi
+                await this.autoProceedToMission(interaction);
+            } else {
+                // Update button progress
+                await this.updateVisitProgress(interaction, visitedCount, totalChannels);
+            }
+        }
+    } catch (error) {
+        console.error('Channel visit tracking error:', error);
+    }
+}
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('see_mission')
-                        .setLabel('📝 LIHAT MISI')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setLabel('🔗 KE GENERAL')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
-                );
+async updateVisitProgress(interaction, visitedCount, totalChannels) {
+    try {
+        const progress = Math.round((visitedCount / totalChannels) * 100);
+        const progressText = `✅ ${visitedCount}/${totalChannels} channel dikunjungi (${progress}%)`;
+        
+        const trackingButton = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('track_visited')
+                    .setLabel(`📊 ${progressText}`)
+                    .setStyle(ButtonStyle.Secondary)
+                    .setEmoji('🎯')
+                    .setDisabled(visitedCount === totalChannels)
+            );
 
-            await interaction.editReply({ 
-                content: `${interaction.user}`,
-                embeds: [embed], 
-                components: [buttons] 
-            });
+        await interaction.message.edit({
+            components: [trackingButton]
+        });
 
-            this.updateUserSession(interaction.user.id, { 
-                step: 'introduction_mission',
-                missionStartTime: Date.now()
-            });
+        await interaction.deferUpdate();
 
-        } catch (error) {
-            console.error('Continue verify error:', error);
-            await interaction.editReply({
-                content: '❌ Failed to start introduction mission.',
-                components: []
+    } catch (error) {
+        console.error('Update progress error:', error);
+    }
+}
+
+async handleTrackVisited(interaction) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        if (!session || session.step !== 'server_exploration') {
+            return await interaction.reply({
+                content: '❌ Kamu belum memulai server exploration!',
+                flags: 64
             });
         }
-    }
 
+        const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
+        const totalChannels = Object.keys(session.visitedChannels).length;
+
+        if (visitedCount === totalChannels) {
+            await this.autoProceedToMission(interaction);
+        } else {
+            await interaction.reply({
+                content: `📊 Progress: ${visitedCount}/${totalChannels} channel sudah dikunjungi. Klik semua tombol link di atas dulu!`,
+                flags: 64
+            });
+        }
+
+    } catch (error) {
+        console.error('Track visited error:', error);
+        await interaction.reply({
+            content: '❌ Gagal memproses.',
+            flags: 64
+        });
+    }
+}
+
+async autoProceedToMission(interaction) {
+    try {
+        const session = this.getUserSession(interaction.user.id);
+        if (!session) return;
+
+        console.log(`🚀 Auto proceeding to mission for ${interaction.user.username}`);
+
+        const embed = new EmbedBuilder()
+            .setColor(0x00FF00)
+            .setTitle('👋 MISI PERKENALAN')
+            .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+            .setFooter({ text: 'Auto detect • No button needed' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('see_mission')
+                    .setLabel('📝 LIHAT MISI')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setLabel('🔗 KE GENERAL')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+            );
+
+        await interaction.editReply({ 
+            content: `${interaction.user}`,
+            embeds: [embed], 
+            components: [buttons] 
+        });
+
+        this.updateUserSession(interaction.user.id, { 
+            step: 'introduction_mission',
+            missionStartTime: Date.now()
+        });
+
+    } catch (error) {
+        console.error('❌ Auto proceed to mission error:', error);
+    }
+}
+
+// ========== MISSION BUTTON HANDLERS ==========
+async handleSeeMission(interaction) {
+    try {
+        await interaction.deferUpdate();
+        
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('📋 DETAIL MISI PERKENALAN')
+            .setDescription(`**Apa yang harus dilakukan:**\n\n1. Buka channel <#${this.config.generalChannelId}>\n2. Kirim pesan perkenalan\n3. Bot akan otomatis mendeteksi\n4. Lanjut ke step rating\n\n**Contoh pesan:**\n\`\`\`Halo semuanya! 👋\nSaya ${interaction.user.username}, baru join nih!\nSenang bisa bergabung di BananaSkiee Community! 🚀\nSalam kenal ya! 😊\`\`\``)
+            .setFooter({ text: 'Pesan bebas, yang penting perkenalan diri' });
+
+        await interaction.editReply({ 
+            embeds: [embed]
+        });
+
+    } catch (error) {
+        console.error('See mission error:', error);
+        await interaction.editReply({
+            content: '❌ Gagal menampilkan detail misi.',
+            components: []
+        });
+    }
+}
     // ========== MESSAGE DETECTION SYSTEM ==========
     async detectFirstMessage(message) {
         try {
