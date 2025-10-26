@@ -1,4 +1,4 @@
-Const fs = require("fs");
+const fs = require("fs");
 const path = require("path");
 const { ROLES, guildId } = require("../config");
 const { EmbedBuilder } = require("discord.js");
