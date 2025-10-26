@@ -918,46 +918,8 @@ async handleRatingSubmit(interaction) {
             flags: 64
         });
     }
-        }
-
-            const session = this.getUserSession(interaction.user.id);
-            if (session) {
-                session.data = session.data || {};
-                session.data.rating = rating;
-                session.data.ratingCategory = this.getRatingCategory(rating);
-                session.data.ratingTime = Date.now();
-                this.updateUserSession(interaction.user.id, session);
-            }
-
-            const resultEmbed = new EmbedBuilder()
-                .setColor(this.getRatingColor(rating))
-                .setTitle(`⭐ TERIMA KASIH ATAS RATING ${rating}/100!`)
-                .setDescription(`**Kategori: ${this.getRatingCategory(rating)}** ${this.getRatingEmoji(rating)}\n\n📊 Data Referensi:\n• Rating Anda: ${rating}/100\n• Rata-rata member: ${this.getAverageRating(rating)}/100\n• ${this.getSatisfactionRate(rating)}% member merasa puas`)
-                .setFooter({ text: 'Feedback sangat berarti bagi kami' });
-
-            const resultButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('next_final')
-                        .setLabel('🚀 LANJUT FINAL')
-                        .setStyle(ButtonStyle.Primary)
-                );
-
-            await interaction.reply({
-                embeds: [resultEmbed],
-                components: [resultButtons],
-                flags: 64
-            });
-
-        } catch (error) {
-            console.error('Rating submit error:', error);
-            await interaction.reply({
-                content: '❌ Failed to process rating.',
-                flags: 64
-            });
-        }
-    }
-
+}
+    
     async handleGiveFeedback(interaction) {
         try {
             const modal = new ModalBuilder()
