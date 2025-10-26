@@ -285,8 +285,6 @@ class VerifySystem {
         } 
     }
     
-    // ... (handleChannelVisit, updateVisitProgress, detectFirstMessage, enableNextVerifyButton diabaikan di sini karena umumnya diimplementasikan di event messageCreate)
-    
     async handleNextVerify(interaction) {
         try {
             const session = this.getUserSession(interaction.user.id);
@@ -395,31 +393,8 @@ class VerifySystem {
 
     // ========== BUTTON HANDLERS - DISMISSIVE (Ephemeral/Modal) ==========
 
-    async handleTrackVisited(interaction) {
-        try {
-            const session = this.getUserSession(interaction.user.id);
-            if (!session || session.step !== 'server_exploration') {
-                // PESAN INI EPHEMERAL/DISMISS
-                return await interaction.reply({ content: '❌ Kamu belum memulai server exploration!', ephemeral: true });
-            }
-            const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
-            const totalChannels = Object.keys(session.visitedChannels).length;
-            
-            if (visitedCount === totalChannels) {
-                // Jika sudah komplit, edit pesan utama (Non-Dismissive)
-                await this.autoProceedToMission(interaction.message);
-                // Dan beri konfirmasi Ephemeral (Dismissive)
-                await interaction.reply({ content: '✅ Eksplorasi server selesai. Lanjut ke misi perkenalan!', ephemeral: true });
-            } else {
-                // PESAN INI EPHEMERAL/DISMISS
-                await interaction.reply({ content: `📊 Progress: ${visitedCount}/${totalChannels} channel sudah dikunjungi. Klik semua tombol link di atas dulu!`, ephemeral: true });
-            }
-        } catch (error) {
-            console.error('Track visited error:', error);
-            await interaction.reply({ content: '❌ Gagal memproses.', ephemeral: true });
-        } 
-    }
-    
+    // handleTrackVisited diabaikan karena tidak ada di interactionCreate.js Anda.
+
     async handleSeeMission(interaction) {
         try {
             // PESAN INI EPHEMERAL/DISMISS
@@ -567,9 +542,101 @@ class VerifySystem {
             await interaction.editReply({ content: '❌ Failed to process feedback.', ephemeral: true });
         } 
     }
+    
+    // ========== DETECT MESSAGE & AUTO PROCEED (Dipanggil dari messageCreate.js) ==========
+    async detectFirstMessage(message) {
+        const userId = message.author.id;
+        const generalChannelId = this.config.generalChannelId;
+        const session = this.getUserSession(userId);
 
-    // ... (autoProceedToMission)
+        // Hanya proses jika:
+        // 1. Sedang dalam langkah 'mission' atau 'server_exploration'
+        // 2. Pesan ada di channel general
+        // 3. Pesan belum pernah terdeteksi sebelumnya
+        if (session && 
+            (session.step === 'server_exploration' || session.step === 'mission') &&
+            message.channel.id === generalChannelId &&
+            !session.data.firstMessage) {
+            
+            // Mencari pesan verifikasi terakhir yang bisa diedit di channel verify
+            const verifyChannel = await message.client.channels.fetch(this.config.verifyChannelId);
+            if (!verifyChannel) return;
+            
+            const messages = await verifyChannel.messages.fetch({ limit: 10 });
+            const verifyMessage = messages.find(m => m.mentions.has(userId)); // Mencari pesan yang mention user
+            
+            if (verifyMessage) {
+                // Simpan data pesan pertama
+                session.data.firstMessage = message.content.substring(0, 100); // Ambil 100 karakter pertama
+                session.data.firstMessageTime = Date.now();
+                session.data.responseTime = Date.now() - session.explorationStart;
+                session.step = 'ready_for_rating';
+                this.updateUserSession(userId, session);
+                
+                // Panggil fungsi untuk mengaktifkan tombol Next Verify
+                await this.enableNextVerifyButton(verifyMessage);
+                
+                // Kirim notifikasi Ephemeral/Dismissive ke user (VIA DM)
+                await message.author.send({
+                    content: `✅ Misi perkenalan selesai terdeteksi di <#${generalChannelId}>! Silakan kembali ke channel verifikasi untuk melanjutkan.`,
+                }).catch(() => console.log(`Gagal DM ${message.author.username}`));
+            }
+        }
+    }
+    
+    async autoProceedToMission(message) {
+        // Fungsi ini dipanggil setelah 30 detik (setTimeout) dari handleContinueVerify
+        const userId = message.mentions.users.first()?.id;
+        if (!userId) return;
 
+        const session = this.getUserSession(userId);
+        if (!session || session.step !== 'server_exploration') return;
+
+        const embed = new EmbedBuilder()
+            .setColor(0xFFA500)
+            .setTitle('🎯 MISI PERKENALAN DI CHANNEL GENERAL')
+            .setDescription(`Selamat datang, ${message.mentions.users.first().username}!\n\n**LANGKAH SELANJUTNYA:**\n\n1. Kunjungi <#${this.config.generalChannelId}>\n2. Kirim pesan perkenalan singkat\n3. Setelah terdeteksi, tombol **NEXT VERIFY** akan aktif di sini!\n\n*Atau* klik **[❓ SEE MISSION]** untuk detail misi.`)
+            .setFooter({ text: 'Kami akan otomatis mendeteksi pesan pertama Anda!' });
+
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('next_verify')
+                    .setLabel('➡️ NEXT VERIFY')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(true), // Awalnya disabled
+                new ButtonBuilder()
+                    .setCustomId('see_mission')
+                    .setLabel('❓ SEE MISSION') // Dismissive
+                    .setStyle(ButtonStyle.Secondary)
+            );
+            
+        // Edit pesan yang sudah ada (Non-Dismissive)
+        await message.edit({ embeds: [embed], components: [buttons] });
+        this.updateUserSession(userId, { step: 'mission', explorationEnd: Date.now() });
+    }
+    
+    async enableNextVerifyButton(message) {
+        // Fungsi ini dipanggil dari detectFirstMessage untuk mengaktifkan tombol
+        const components = message.components.map(row => {
+            if (row.components.some(c => c.customId === 'next_verify')) {
+                const newRow = new ActionRowBuilder();
+                row.components.forEach(component => {
+                    const newComponent = ButtonBuilder.from(component.toJSON()); // Gunakan .toJSON() untuk duplikasi
+                    if (newComponent.data.custom_id === 'next_verify') {
+                        newComponent.setDisabled(false).setStyle(ButtonStyle.Primary);
+                    }
+                    newRow.addComponents(newComponent);
+                });
+                return newRow;
+            }
+            return row;
+        });
+        
+        // Memastikan tombol `next_verify` berwarna Primary (biru) saat aktif
+        await message.edit({ components: components });
+    }
+    
     // ========== ROLE MANAGEMENT & LOGGING (NON-DISMISSIVE) ==========
     async handleGiveRole(interaction) {
         try {
@@ -612,7 +679,7 @@ class VerifySystem {
         }
     }
 
-    // ========== LOGGING SYSTEM (KE FORUM CHANNEL - FIX RangeError) ========== 
+    // ========== LOGGING SYSTEM (KE FORUM CHANNEL) ========== 
     async logVerification(interaction) {
         try {
             const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
@@ -626,7 +693,6 @@ class VerifySystem {
             const user = interaction.user;
             const member = interaction.member;
             
-            // Log content harus dibuat di sini
             const logContent = this.generateLogContent(user, member, session);
 
             // Membuat Post Forum (thread) (NON-DISMISSIVE/PERMANENT)
@@ -639,17 +705,15 @@ class VerifySystem {
 
             console.log(`📋 Verification forum post created: ${forumPost.id} - ${user.username}`);
         } catch (error) {
-            // Jika error log tidak bisa dikirim, bot tidak akan gagal total
             console.error('❌ Logging error:', error);
         } 
     }
 
-    // ========== LOG CONTENT GENERATOR (FIX RangeError: EarlySupporter) ==========
+    // ========== LOG CONTENT GENERATOR ==========
     generateLogContent(user, member, session) { 
         const timestamp = new Date().toLocaleString('id-ID'); 
         const accountAge = this.getAccountAge(user.createdAt); 
         
-        // FIX: Menggunakan UserFlags.EarlySupporter yang diimpor, jika error, fallback.
         let earlySupporterStatus = '❌';
         try {
             if (user.flags && user.flags.has(UserFlags.EarlySupporter)) {
@@ -748,7 +812,7 @@ class VerifySystem {
     // ========== HELPER FUNCTIONS ==========
     getAccountAge(accountCreationDate) { const created = new Date(accountCreationDate); const now = new Date(); const diffTime = Math.abs(now - created); return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); }
     getTotalDuration(session) { if (!session?.createdAt) return 'N/A'; const duration = Date.now() - session.createdAt; const minutes = Math.floor(duration / 60000); const seconds = Math.floor((duration % 60000) / 1000); return `${minutes} menit ${seconds} detik`; }
-    getCompletedSteps(session) { if (!session) return '0/8'; const steps = ['verified', 'introduction_mission', 'ready_for_rating', 'rating', 'completed']; const currentStep = steps.indexOf(session.step); return currentStep >= 0 ? `${currentStep + 1}/8` : 'N/A'; }
+    getCompletedSteps(session) { if (!session) return '0/8'; const steps = ['verified', 'server_exploration', 'mission', 'ready_for_rating', 'rating', 'completed']; const currentStep = steps.indexOf(session.step); return currentStep >= 0 ? `${currentStep + 1}/8` : 'N/A'; }
     getEngagementScore(session) { let score = 50; if (session?.data?.rating) score += (session.data.rating - 50) / 2; if (session?.data?.feedback) score += 10; if (session?.data?.firstMessage) score += 15; return Math.min(Math.round(score), 95); }
     getEngagementLevel(session) { const score = this.getEngagementScore(session); if (score >= 80) return 'High Engagement'; if (score >= 60) return 'Medium Engagement'; return 'Low Engagement'; }
     getRetentionMonths(session) { const engagement = this.getEngagementScore(session); return Math.round((engagement / 100) * 12); }
@@ -782,23 +846,12 @@ class VerifySystem {
 
     // UTILITY
     delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-    // MODAL SUBMIT HANDLER
-    async handleModalSubmit(interaction) {
-        try {
-            const { customId } = interaction;
-            
-            if (customId === 'input_rating_modal') return await this.handleRatingSubmit(interaction);
-            if (customId === 'give_feedback_modal') return await this.handleFeedbackSubmit(interaction);
-            
-            // Default reply untuk modal yang tidak terhandle
-            await interaction.reply({ content: '❌ Modal tidak dikenal.', ephemeral: true });
-        } catch (error) {
-            console.error('Modal submit error:', error);
-            // Semua pesan error dijadikan ephemeral
-            await interaction.reply({ content: '❌ Gagal memproses input.', ephemeral: true });
-        }
-    } 
+    
+    // handleCustomMessage dan handleCustomMessageSubmit diabaikan karena tidak ada di interactionCreate Anda.
+    async handleAutoWelcome() {}
+    async handleWelcomeSelection() {}
+    async handleCustomMessage() {}
+    async handleCustomMessageSubmit() {} 
 }
 
 module.exports = VerifySystem;
