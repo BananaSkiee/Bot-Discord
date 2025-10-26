@@ -984,37 +984,33 @@ async handleRatingSubmit(interaction) {
         }
     }
 
-    async handleFeedbackSubmit(interaction) {
-        try {
-            const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
-            
-            if (feedbackContent) {
-                const session = this.getUserSession(interaction.user.id);
-                if (session) {
-                    session.data.feedback = feedbackContent;
-                    session.data.feedbackTime = Date.now();
-                    this.updateUserSession(interaction.user.id, session);
-                }
+async handleFeedbackSubmit(interaction) {
+    try {
+        const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
+        
+        // ⚡ EDIT MESSAGE YANG ADA
+        await interaction.editReply({
+            content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.',
+            components: []
+        });
 
-                await interaction.reply({
-                    content: '✅ Terima kasih atas feedbacknya!',
-                    flags: 64
-                });
-            } else {
-                await interaction.reply({
-                    content: '⚠️ Feedback dilewati.',
-                    flags: 64
-                });
+        if (feedbackContent) {
+            const session = this.getUserSession(interaction.user.id);
+            if (session) {
+                session.data.feedback = feedbackContent;
+                session.data.feedbackTime = Date.now();
+                this.updateUserSession(interaction.user.id, session);
             }
-
-        } catch (error) {
-            console.error('Feedback submit error:', error);
-            await interaction.reply({
-                content: '❌ Failed to process feedback.',
-                flags: 64
-            });
         }
+
+    } catch (error) {
+        console.error('Feedback submit error:', error);
+        await interaction.reply({
+            content: '❌ Failed to process feedback.',
+            flags: 64
+        });
     }
+}
 
     async handleNextFinal(interaction) {
         try {
