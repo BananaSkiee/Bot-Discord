@@ -898,8 +898,8 @@ async handleInputRating(interaction) {
 
 async handleGiveFeedback(interaction) {
     try {
-        // ⚡ DEFER SEBELUM SHOW MODAL
-        await interaction.deferReply({ flags: 64 });
+        // ❌ HAPUS BARIS INI - TIDAK PERLU deferReply SEBELUM MODAL
+        // await interaction.deferReply({ flags: 64 });
         
         const modal = new ModalBuilder()
             .setCustomId('give_feedback_modal')
