@@ -869,16 +869,73 @@ async handleNextVerify(interaction) {
         }
     }
 
-    // ========== RATING SYSTEM ==========
+// ========== RATING SYSTEM ==========
+async handleInputRating(interaction) {
+    try {
+        const modal = new ModalBuilder()
+            .setCustomId('input_rating_modal')
+            .setTitle('🎯 Beri Rating 1-100');
+
+        const ratingInput = new TextInputBuilder()
+            .setCustomId('rating_value')
+            .setLabel('Masukkan angka antara 1-100:')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(3)
+            .setPlaceholder('Contoh: 85');
+
+        modal.addComponents(new ActionRowBuilder().addComponents(ratingInput));
+        await interaction.showModal(modal);
+
+    } catch (error) {
+        console.error('Input rating error:', error);
+        await interaction.reply({
+            content: '❌ Failed to open rating modal.',
+            flags: 64
+        });
+    }
+}
+
+async handleGiveFeedback(interaction) {
+    try {
+        // ⚡ DEFER SEBELUM SHOW MODAL
+        await interaction.deferReply({ flags: 64 });
+        
+        const modal = new ModalBuilder()
+            .setCustomId('give_feedback_modal')
+            .setTitle('💬 Feedback & Saran');
+
+        const feedbackInput = new TextInputBuilder()
+            .setCustomId('feedback_content')
+            .setLabel('Beri kami masukan (opsional):')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(1000)
+            .setPlaceholder('1. Apa yang paling Anda sukai?\n2. Apa yang bisa ditingkatkan?\n3. Saran untuk server ke depan?');
+
+        modal.addComponents(new ActionRowBuilder().addComponents(feedbackInput));
+        await interaction.showModal(modal);
+
+    } catch (error) {
+        console.error('Give feedback error:', error);
+        await interaction.reply({
+            content: '❌ Failed to open feedback modal.',
+            flags: 64
+        });
+    }
+}
+
 async handleRatingSubmit(interaction) {
     try {
+        // ⚡ DEFER SEBELUM PROSES
+        await interaction.deferReply();
+        
         const ratingValue = interaction.fields.getTextInputValue('rating_value');
         const rating = parseInt(ratingValue);
         
         if (isNaN(rating) || rating < 1 || rating > 100) {
-            return await interaction.reply({
-                content: '❌ Harap masukkan angka yang valid antara 1-100.',
-                flags: 64
+            return await interaction.editReply({
+                content: '❌ Harap masukkan angka yang valid antara 1-100.'
             });
         }
 
@@ -919,43 +976,14 @@ async handleRatingSubmit(interaction) {
         });
     }
 }
-    
-    async handleGiveFeedback(interaction) {
-        try {
-            const modal = new ModalBuilder()
-                .setCustomId('give_feedback_modal')
-                .setTitle('💬 Feedback & Saran');
-
-            const feedbackInput = new TextInputBuilder()
-                .setCustomId('feedback_content')
-                .setLabel('Beri kami masukan (opsional):')
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(false)
-                .setMaxLength(1000)
-                .setPlaceholder('1. Apa yang paling Anda sukai?\n2. Apa yang bisa ditingkatkan?\n3. Saran untuk server ke depan?');
-
-            modal.addComponents(new ActionRowBuilder().addComponents(feedbackInput));
-            await interaction.showModal(modal);
-
-        } catch (error) {
-            console.error('Give feedback error:', error);
-            await interaction.reply({
-                content: '❌ Failed to open feedback modal.',
-                flags: 64
-            });
-        }
-    }
 
 async handleFeedbackSubmit(interaction) {
     try {
+        // ⚡ DEFER SEBELUM PROSES
+        await interaction.deferReply();
+        
         const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
         
-        // ⚡ EDIT MESSAGE YANG ADA
-        await interaction.editReply({
-            content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.',
-            components: []
-        });
-
         if (feedbackContent) {
             const session = this.getUserSession(interaction.user.id);
             if (session) {
@@ -965,6 +993,12 @@ async handleFeedbackSubmit(interaction) {
             }
         }
 
+        // ⚡ EDIT MESSAGE YANG ADA
+        await interaction.editReply({
+            content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.',
+            components: []
+        });
+
     } catch (error) {
         console.error('Feedback submit error:', error);
         await interaction.reply({
@@ -973,7 +1007,7 @@ async handleFeedbackSubmit(interaction) {
         });
     }
 }
-
+    
     async handleNextFinal(interaction) {
         try {
             await interaction.deferUpdate();
