@@ -1143,30 +1143,30 @@ async handleFeedbackSubmit(interaction) {
     }
 
     // ========== LOGGING SYSTEM ==========
-    async logVerification(interaction) {
-        try {
-            const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
-            if (!logChannel) return;
+async logVerification(interaction) {
+    try {
+        const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
+        if (!logChannel) return;
 
-            const session = this.getUserSession(interaction.user.id);
-            const user = interaction.user;
-            const member = interaction.member;
+        const session = this.getUserSession(interaction.user.id);
+        const user = interaction.user;
+        const member = interaction.member;
 
-            const logContent = this.generateLogContent(user, member, session);
-            
-            // Create forum post
-            const forumPost = await logChannel.threads.create({
-                name: `Verification Log - ${user.username}`,
-                message: { content: logContent },
-                appliedTags: ['verification', 'new-member', 'completed']
-            });
+        const logContent = this.generateLogContent(user, member, session);
+        
+        // Create forum post dengan judul yang lebih spesifik
+        const forumPost = await logChannel.threads.create({
+            name: `Verification Complete - ${user.username} (${user.id})`,
+            message: { content: logContent },
+            appliedTags: ['verification-complete', 'new-member'] // Sesuaikan tags
+        });
 
-            console.log(`📋 Verification log created: ${forumPost.id}`);
+        console.log(`📋 Verification forum post created: ${forumPost.id} - ${user.username}`);
 
-        } catch (error) {
-            console.error('Logging error:', error);
-        }
+    } catch (error) {
+        console.error('Logging error:', error);
     }
+}
 
     generateLogContent(user, member, session) {
         const timestamp = new Date().toLocaleString('id-ID');
@@ -1441,7 +1441,7 @@ async handleFeedbackSubmit(interaction) {
             }
         }
     }
-
+        
     async handleModalSubmit(interaction) {
         try {
             const { customId } = interaction;
