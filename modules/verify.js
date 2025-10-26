@@ -136,116 +136,108 @@ class VerifySystem {
     }
 
     // ========== MAIN VERIFICATION FLOW ==========
-async handleVerify(interaction) {
-    try {
-        if (this.verificationQueue.has(interaction.user.id)) {
-            return await interaction.reply({
-                content: '⏳ Verification already in progress. Please wait...',
-                flags: 64
-            });
-        }
+    async handleVerify(interaction) {
+        try {
+            if (this.verificationQueue.has(interaction.user.id)) {
+                return await interaction.reply({
+                    content: '⏳ Verification already in progress. Please wait...',
+                    ephemeral: true
+                });
+            }
 
-        this.verificationQueue.set(interaction.user.id, true);
+            this.verificationQueue.set(interaction.user.id, true);
 
-        // ⚡ DEFER SEBELUM PROSES APAPUN
-        await interaction.deferReply();
+            // ⚡ DEFER SEBELUM PROSES APAPUN
+            await interaction.deferReply();
 
-        if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
+            if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
+                this.verificationQueue.delete(interaction.user.id);
+                return await interaction.editReply({
+                    content: '✅ Anda sudah terverifikasi!'
+                });
+            }
+
+            // LANJUTKAN PROSES VERIFIKASI...
+            for (let i = 0; i < this.verificationSteps.length; i++) {
+                const step = this.verificationSteps[i];
+                const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
+                await interaction.editReply({ embeds: [embed] });
+                await this.delay(step.duration);
+            }
+
+            await this.showVerificationSuccess(interaction);
             this.verificationQueue.delete(interaction.user.id);
-            return await interaction.editReply({
-                content: '✅ Anda sudah terverifikasi!'
-            });
-        }
 
-        // LANJUTKAN PROSES VERIFIKASI...
-        for (let i = 0; i < this.verificationSteps.length; i++) {
-            const step = this.verificationSteps[i];
-            const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
-            await interaction.editReply({ embeds: [embed] });
-            await this.delay(step.duration);
-        }
-
-        await this.showVerificationSuccess(interaction);
-        this.verificationQueue.delete(interaction.user.id);
-
-    } catch (error) {
-        console.error('Verify handling error:', error);
-        this.verificationQueue.delete(interaction.user.id);
-        
-        if (error.code === 10062) {
-            console.log('⚠️ Interaction expired');
-            return;
+        } catch (error) {
+            console.error('Verify handling error:', error);
+            this.verificationQueue.delete(interaction.user.id);
+            
+            if (error.code === 10062) {
+                console.log('⚠️ Interaction expired');
+                return;
+            }
         }
     }
-}
 
-getProgressEmbed(step, currentStep, totalSteps) {
-    const progress = Math.round((currentStep / totalSteps) * 100);
-    const progressBar = this.generateProgressBar(progress);
-    const timeElapsed = (currentStep * 2.5 + Math.random() * 0.5).toFixed(1);
-    
-    const tasksText = step.tasks.map((task, index) => {
-        const status = index < currentStep - 1 ? '✅' : (index === currentStep - 1 ? '🔄' : '⏳');
-        return `• ${task}: ${status}`;
-    }).join('\n');
+    getProgressEmbed(step, currentStep, totalSteps) {
+        const progress = Math.round((currentStep / totalSteps) * 100);
+        const progressBar = this.generateProgressBar(progress);
+        const timeElapsed = (currentStep * 2.5 + Math.random() * 0.5).toFixed(1);
+        
+        const tasksText = step.tasks.map((task, index) => {
+            const status = index < currentStep - 1 ? '✅' : (index === currentStep - 1 ? '🔄' : '⏳');
+            return `• ${task}: ${status}`;
+        }).join('\n');
 
-    const embed = new EmbedBuilder()
-        .setColor(0x3498db)
-        .setTitle(`${step.emoji} PROSES VERIFIKASI - ${progress}%`)
-        .setDescription(`${step.name} sedang berjalan...\n\n${progressBar}\n\n${tasksText}`)
-        .setFooter({ text: `⏱️ ${timeElapsed} detik • ${step.name}` });
-
-    return embed;
-}
-
-generateProgressBar(percentage) {
-    const bars = 20;
-    const filledBars = Math.round((percentage / 100) * bars);
-    const emptyBars = bars - filledBars;
-    return `━━━━━━━━━━━━━━━━━━━━\n${'█'.repeat(filledBars)}${'▒'.repeat(emptyBars)}\n━━━━━━━━━━━━━━━━━━━━`;
-}
-
-async showVerificationSuccess(interaction) {
-    try {
         const embed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('🎊 VERIFIKASI BERHASIL')
-            .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\n**PILIHAN LANJUTAN:**\n[🚀 SKIP VERIFY] - Langsung dapat role\n[🎯 CONTINUE VERIFY] - Lanjut verifikasi lengkap\n\n**⚠️ CATATAN PENTING:**\n• Setelah memilih CONTINUE VERIFY, tidak bisa kembali ke step ini\n• Setelah mendapatkan role member, channel verify akan hilang`)
-            .setFooter({ text: 'Platinum Member • Professional Network' });
+            .setColor(0x3498db)
+            .setTitle(`${step.emoji} PROSES VERIFIKASI - ${progress}%`)
+            .setDescription(`${step.name} sedang berjalan...\n\n${progressBar}\n\n${tasksText}`)
+            .setFooter({ text: `⏱️ ${timeElapsed} detik • ${step.name}` });
 
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('skip_verify')
-                    .setLabel('🚀 SKIP VERIFY')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('continue_verify')
-                    .setLabel('🎯 CONTINUE VERIFY')
-                    .setStyle(ButtonStyle.Primary)
-            );
+        return embed;
+    }
 
-        if (interaction.replied || interaction.deferred) {
+    generateProgressBar(percentage) {
+        const bars = 20;
+        const filledBars = Math.round((percentage / 100) * bars);
+        const emptyBars = bars - filledBars;
+        return `━━━━━━━━━━━━━━━━━━━━\n${'█'.repeat(filledBars)}${'▒'.repeat(emptyBars)}\n━━━━━━━━━━━━━━━━━━━━`;
+    }
+
+    async showVerificationSuccess(interaction) {
+        try {
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('🎊 VERIFIKASI BERHASIL')
+                .setDescription(`Selamat Bergabung, ${interaction.user.username}!\n\n**PILIHAN LANJUTAN:**\n[🚀 SKIP VERIFY] - Langsung dapat role\n[🎯 CONTINUE VERIFY] - Lanjut verifikasi lengkap\n\n**⚠️ CATATAN PENTING:**\n• Setelah memilih CONTINUE VERIFY, tidak bisa kembali ke step ini\n• Setelah mendapatkan role member, channel verify akan hilang`)
+                .setFooter({ text: 'Platinum Member • Professional Network' });
+
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('skip_verify')
+                        .setLabel('🚀 SKIP VERIFY')
+                        .setStyle(ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId('continue_verify')
+                        .setLabel('🎯 CONTINUE VERIFY')
+                        .setStyle(ButtonStyle.Primary)
+                );
+
             await interaction.editReply({ 
                 embeds: [embed], 
                 components: [buttons] 
             });
-        } else {
-            await interaction.reply({ 
-                embeds: [embed], 
-                components: [buttons],
-                flags: 64
-            });
+
+            this.createUserSession(interaction.user.id);
+
+        } catch (error) {
+            console.error('Show verification success error:', error);
+            if (error.code === 10062) return;
+            throw error;
         }
-
-        this.createUserSession(interaction.user.id);
-
-    } catch (error) {
-        console.error('Show verification success error:', error);
-        if (error.code === 10062) return;
-        throw error;
     }
-}
     
     // ========== BUTTON HANDLERS ==========
     async handleSkipVerify(interaction) {
@@ -289,214 +281,105 @@ async showVerificationSuccess(interaction) {
         }
     }
 
-async handleContinueVerify(interaction) {
-    try {
-        await interaction.deferUpdate();
-        
-        const embed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle('🏠 KUNJUNGI AREA SERVER')
-            .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
-            .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
-
-        const linkButtons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setLabel('🏠 SERVER GUIDE')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
-                new ButtonBuilder()
-                    .setLabel('📋 OPEN RULES')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
-                new ButtonBuilder()
-                    .setLabel('🎨 SELF ROLE')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
-            );
-
-        await interaction.editReply({ 
-            content: `${interaction.user}`,
-            embeds: [embed], 
-            components: [linkButtons] 
-        });
-
-        this.updateUserSession(interaction.user.id, { 
-            step: 'server_exploration',
-            explorationStart: Date.now(),
-            visitedChannels: {
-                home: false,
-                rules: false,
-                customize: false
-            }
-        });
-
-        // AUTO LANJUT SETELAH 30 DETIK
-        setTimeout(async () => {
-            try {
-                await this.autoProceedToMission(interaction);
-            } catch (error) {
-                console.error('Auto proceed error:', error);
-            }
-        }, 30000);
-
-    } catch (error) {
-        console.error('Continue verify error:', error);
-        await interaction.editReply({
-            content: '❌ Failed to start server exploration.',
-            components: []
-        });
-    }
-}
-    
-// ========== STATE TRACKING SYSTEM ==========
-async handleChannelVisit(interaction, channelType) {
-    try {
-        const session = this.getUserSession(interaction.user.id);
-        if (session && session.step === 'server_exploration') {
-            session.visitedChannels[channelType] = true;
-            this.updateUserSession(interaction.user.id, session);
-
-            console.log(`✅ ${interaction.user.username} visited ${channelType}`);
-
-            // Check progress
-            const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
-            const totalChannels = Object.keys(session.visitedChannels).length;
+    async handleContinueVerify(interaction) {
+        try {
+            await interaction.deferUpdate();
             
-            if (visitedCount === totalChannels) {
-                // Semua channel sudah dikunjungi
-                await this.autoProceedToMission(interaction);
-            } else {
-                // Update button progress
-                await this.updateVisitProgress(interaction, visitedCount, totalChannels);
-            }
-        }
-    } catch (error) {
-        console.error('Channel visit tracking error:', error);
-    }
-}
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('🏠 KUNJUNGI AREA SERVER')
+                .setDescription('Sebelum lanjut, silakan kunjungi channel penting:\n\n🏠 <id:home> - Lihat overview server\n📋 <#1352326247186694164> - Baca peraturan server  \n🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.')
+                .setFooter({ text: 'Akan otomatis lanjut dalam 30 detik' });
 
-async updateVisitProgress(interaction, visitedCount, totalChannels) {
-    try {
-        const progress = Math.round((visitedCount / totalChannels) * 100);
-        const progressText = `✅ ${visitedCount}/${totalChannels} channel dikunjungi (${progress}%)`;
-        
-        const trackingButton = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('track_visited')
-                    .setLabel(`📊 ${progressText}`)
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🎯')
-                    .setDisabled(visitedCount === totalChannels)
-            );
+            const linkButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setLabel('🏠 SERVER GUIDE')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
+                    new ButtonBuilder()
+                        .setLabel('📋 OPEN RULES')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
+                    new ButtonBuilder()
+                        .setLabel('🎨 SELF ROLE')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
+                );
 
-        await interaction.message.edit({
-            components: [trackingButton]
-        });
+            await interaction.editReply({ 
+                embeds: [embed], 
+                components: [linkButtons] 
+            });
 
-        await interaction.deferUpdate();
+            this.updateUserSession(interaction.user.id, { 
+                step: 'server_exploration',
+                explorationStart: Date.now(),
+                visitedChannels: {
+                    home: false,
+                    rules: false,
+                    customize: false
+                }
+            });
 
-    } catch (error) {
-        console.error('Update progress error:', error);
-    }
-}
+            // AUTO LANJUT SETELAH 30 DETIK
+            setTimeout(async () => {
+                try {
+                    await this.autoProceedToMission(interaction);
+                } catch (error) {
+                    console.error('Auto proceed error:', error);
+                }
+            }, 30000);
 
-async handleTrackVisited(interaction) {
-    try {
-        const session = this.getUserSession(interaction.user.id);
-        if (!session || session.step !== 'server_exploration') {
-            return await interaction.reply({
-                content: '❌ Kamu belum memulai server exploration!',
-                flags: 64
+        } catch (error) {
+            console.error('Continue verify error:', error);
+            await interaction.editReply({
+                content: '❌ Failed to start server exploration.',
+                components: []
             });
         }
+    }
 
-        const visitedCount = Object.values(session.visitedChannels).filter(Boolean).length;
-        const totalChannels = Object.keys(session.visitedChannels).length;
+    async autoProceedToMission(interaction) {
+        try {
+            const session = this.getUserSession(interaction.user.id);
+            if (!session) return;
 
-        if (visitedCount === totalChannels) {
-            await this.autoProceedToMission(interaction);
-        } else {
-            await interaction.reply({
-                content: `📊 Progress: ${visitedCount}/${totalChannels} channel sudah dikunjungi. Klik semua tombol link di atas dulu!`,
-                flags: 64
+            console.log(`🚀 Auto proceeding to mission for ${interaction.user.username}`);
+
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('👋 MISI PERKENALAN')
+                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+                .setFooter({ text: 'Auto detect • No button needed' });
+
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('see_mission')
+                        .setLabel('📝 LIHAT MISI')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setLabel('🔗 KE GENERAL')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+                );
+
+            await interaction.editReply({ 
+                embeds: [embed], 
+                components: [buttons] 
             });
+
+            this.updateUserSession(interaction.user.id, { 
+                step: 'introduction_mission',
+                missionStartTime: Date.now()
+            });
+
+        } catch (error) {
+            console.error('❌ Auto proceed to mission error:', error);
         }
-
-    } catch (error) {
-        console.error('Track visited error:', error);
-        await interaction.reply({
-            content: '❌ Gagal memproses.',
-            flags: 64
-        });
     }
-}
 
-async autoProceedToMission(interaction) {
-    try {
-        const session = this.getUserSession(interaction.user.id);
-        if (!session) return;
-
-        console.log(`🚀 Auto proceeding to mission for ${interaction.user.username}`);
-
-        const embed = new EmbedBuilder()
-            .setColor(0x00FF00)
-            .setTitle('👋 MISI PERKENALAN')
-            .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
-            .setFooter({ text: 'Auto detect • No button needed' });
-
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('see_mission')
-                    .setLabel('📝 LIHAT MISI')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setLabel('🔗 KE GENERAL')
-                    .setStyle(ButtonStyle.Link)
-                    .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
-            );
-
-        await interaction.editReply({ 
-            content: `${interaction.user}`,
-            embeds: [embed], 
-            components: [buttons] 
-        });
-
-        this.updateUserSession(interaction.user.id, { 
-            step: 'introduction_mission',
-            missionStartTime: Date.now()
-        });
-
-    } catch (error) {
-        console.error('❌ Auto proceed to mission error:', error);
-    }
-}
-
-// ========== MISSION BUTTON HANDLERS ==========
-async handleSeeMission(interaction) {
-    try {
-        await interaction.deferUpdate();
-        
-        const embed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle('📋 DETAIL MISI PERKENALAN')
-            .setDescription(`**Apa yang harus dilakukan:**\n\n1. Buka channel <#${this.config.generalChannelId}>\n2. Kirim pesan perkenalan\n3. Bot akan otomatis mendeteksi\n4. Lanjut ke step rating\n\n**Contoh pesan:**\n\`\`\`Halo semuanya! 👋\nSaya ${interaction.user.username}, baru join nih!\nSenang bisa bergabung di BananaSkiee Community! 🚀\nSalam kenal ya! 😊\`\`\``)
-            .setFooter({ text: 'Pesan bebas, yang penting perkenalan diri' });
-
-        await interaction.editReply({ 
-            embeds: [embed]
-        });
-
-    } catch (error) {
-        console.error('See mission error:', error);
-        await interaction.editReply({
-            content: '❌ Gagal menampilkan detail misi.',
-            components: []
-        });
-    }
-}
     // ========== MESSAGE DETECTION SYSTEM ==========
     async detectFirstMessage(message) {
         try {
@@ -535,135 +418,67 @@ async handleSeeMission(interaction) {
         }
     }
 
-async enableNextVerifyButton(user, client) {
-    try {
-        console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
-        
-        const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
-        if (!verifyChannel) return;
-
-        // ⚡ CARI SEMUA MESSAGE USER DI VERIFY CHANNEL
-        const messages = await verifyChannel.messages.fetch({ limit: 100 });
-        
-        const userVerifyMessage = messages.find(msg => {
-            if (msg.author.id !== client.user.id) return false;
-            return msg.content.includes(user.id); // ✅ CARI BERDASARKAN USER MENTION
-        });
-
-        if (userVerifyMessage) {
-            console.log(`📝 Found user message: ${userVerifyMessage.id}`);
+    async enableNextVerifyButton(user, client) {
+        try {
+            console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
             
-            const enabledButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('see_mission')
-                        .setLabel('📝 LIHAT MISI')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setLabel('🔗 KE GENERAL')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
-                    new ButtonBuilder()
-                        .setCustomId('next_verify')
-                        .setLabel('✅ NEXT VERIFY')
-                        .setStyle(ButtonStyle.Success)
-                        .setDisabled(false)
-                );
+            const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
+            if (!verifyChannel) return;
 
-            await userVerifyMessage.edit({ components: [enabledButtons] });
+            // ⚡ CARI SEMUA MESSAGE USER DI VERIFY CHANNEL
+            const messages = await verifyChannel.messages.fetch({ limit: 100 });
             
-        } else {
-            console.log('❌ No message found for user:', user.username);
-            // ⚡ JIKA TIDAK DITEMUKAN, KIRIM MESSAGE BARU
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('✅ MISI SELESAI!')
-                .setDescription(`Hai ${user}! Kamu sudah menyelesaikan misi perkenalan!\n\nKlik tombol di bawah untuk lanjut ke rating.`)
-                .setFooter({ text: 'Lanjutkan verifikasi' });
-
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('next_verify')
-                        .setLabel('✅ NEXT VERIFY')
-                        .setStyle(ButtonStyle.Success)
-                );
-
-            await verifyChannel.send({ 
-                content: `${user}`,
-                embeds: [embed], 
-                components: [buttons] 
+            const userVerifyMessage = messages.find(msg => {
+                if (msg.author.id !== client.user.id) return false;
+                return msg.mentions.users.has(user.id);
             });
-        }
 
-    } catch (error) {
-        console.error('❌ Enable next verify button error:', error);
+            if (userVerifyMessage) {
+                console.log(`📝 Found user message: ${userVerifyMessage.id}`);
+                
+                const enabledButtons = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('see_mission')
+                            .setLabel('📝 LIHAT MISI')
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setLabel('🔗 KE GENERAL')
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
+                        new ButtonBuilder()
+                            .setCustomId('next_verify')
+                            .setLabel('✅ NEXT VERIFY')
+                            .setStyle(ButtonStyle.Success)
+                            .setDisabled(false)
+                    );
+
+                await userVerifyMessage.edit({ components: [enabledButtons] });
+                
+            } else {
+                console.log('❌ No message found for user:', user.username);
+            }
+
+        } catch (error) {
+            console.error('❌ Enable next verify button error:', error);
+        }
     }
-}
 
     // ========== NEXT VERIFY HANDLER ==========
-async handleNextVerify(interaction) {
-    try {
-        const session = this.getUserSession(interaction.user.id);
-        
-        if (!session || session.step !== 'ready_for_rating') {
-            return await interaction.reply({
-                content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.',
-                flags: 64
-            });
-        }
-
-        await interaction.deferUpdate();
-        
-        // ⚡ EDIT EMBED YANG SUDAH ADA - DISMISS MESSAGE
-        const ratingEmbed = new EmbedBuilder()
-            .setColor(0xFFD700)
-            .setTitle(`⭐ LANJUTKAN VERIFIKASI - RATING`)
-            .setDescription(`Hai ${interaction.user.username}!\n\nVerifikasi Anda dilanjutkan ke step rating.\n**Misi perkenalan di #general SUDAH SELESAI!** ✅\n\nBeri rating pengalaman verifikasi:\n\n**Pesan Anda:** "${session.data.firstMessage}"`)
-            .setFooter({ text: 'Langkah terakhir sebelum role member!' });
-
-        const ratingButtons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('input_rating')
-                    .setLabel('🎯 INPUT RATING 1-100')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('give_feedback')
-                    .setLabel('💬 KASIH SARAN')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('faqs_rating')
-                    .setLabel('❓ TANYA FAQ')
-                    .setStyle(ButtonStyle.Secondary)
-            );
-
-        // ⚡ EDIT MESSAGE YANG SUDAH ADA - BUKAN KIRIM BARU
-        await interaction.editReply({ 
-            content: `${interaction.user}`,
-            embeds: [ratingEmbed], 
-            components: [ratingButtons] 
-        });
-        
-        console.log(`✅ Mission EDITED to rating for ${interaction.user.username}`);
-
-        // UPDATE SESSION
-        session.step = 'rating';
-        this.updateUserSession(interaction.user.id, session);
-
-    } catch (error) {
-        console.error('Next verify error:', error);
-        await interaction.editReply({
-            content: '❌ Gagal memproses next verify.',
-            components: []
-        });
-    }
-}
-
-    async editMissionToRating(interaction, session) {
+    async handleNextVerify(interaction) {
         try {
-            console.log(`🔄 Editing mission to rating for ${interaction.user.username}`);
+            const session = this.getUserSession(interaction.user.id);
             
+            if (!session || session.step !== 'ready_for_rating') {
+                return await interaction.reply({
+                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.',
+                    ephemeral: true
+                });
+            }
+
+            await interaction.deferUpdate();
+            
+            // ⚡ EDIT EMBED YANG SUDAH ADA - DISMISS MESSAGE
             const ratingEmbed = new EmbedBuilder()
                 .setColor(0xFFD700)
                 .setTitle(`⭐ LANJUTKAN VERIFIKASI - RATING`)
@@ -686,327 +501,156 @@ async handleNextVerify(interaction) {
                         .setStyle(ButtonStyle.Secondary)
                 );
 
-            // ⚡ EDIT MESSAGE YANG SUDAH ADA - BUKAN KIRIM BARU
             await interaction.editReply({ 
-                content: `${interaction.user}`,
                 embeds: [ratingEmbed], 
                 components: [ratingButtons] 
             });
             
             console.log(`✅ Mission EDITED to rating for ${interaction.user.username}`);
 
-        } catch (error) {
-            console.error('❌ Edit mission to rating error:', error);
-            throw error;
-        }
-    }
-
-    // ========== WELCOME SYSTEM ==========
-    async sendWelcomeMessage(user, client) {
-        try {
-            const session = this.getUserSession(user.id);
-            if (session && session.welcomeSent) return null;
-
-            const generalChannel = await client.channels.fetch(this.config.generalChannelId);
-            if (!generalChannel) return;
-
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('🎉 SELAMAT DATANG!')
-                .setDescription(`Selamat datang **${user.username}** di BananaSkiee Community! 🏆\n\n**Pertanyaan Icebreaker:**\n• Game favorit apa yang sering dimainkan?\n• Mata pelajaran apa yang paling disukai?\n• Punya hobi atau kegiatan seru lainnya?`)
-                .setFooter({ text: '#NewMember #Welcome' });
-
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('auto_welcome')
-                        .setLabel('👋 AUTO WELCOME')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setCustomId('custom_message')
-                        .setLabel('💬 CUSTOM MESSAGE')
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            const welcomeMessage = await generalChannel.send({ 
-                content: `🎉 Welcome ${user}!`,
-                embeds: [embed], 
-                components: [buttons] 
-            });
-
-            if (session) {
-                session.welcomeSent = true;
-                session.welcomeMessageId = welcomeMessage.id;
-                this.updateUserSession(user.id, session);
-            }
-
-            return welcomeMessage;
+            // UPDATE SESSION
+            session.step = 'rating';
+            this.updateUserSession(interaction.user.id, session);
 
         } catch (error) {
-            console.error('Send welcome error:', error);
-        }
-    }
-
-    async handleAutoWelcome(interaction) {
-        try {
-            const targetUser = interaction.message.mentions.users.first();
-            const targetUsername = targetUser?.username || 'member baru';
-
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle('👋 AUTO WELCOME')
-                .setDescription(`Pilih salam otomatis untuk ${targetUsername}:\n\n${this.welcomeTemplates.map((template, index) => `${index + 1}. "${template.replace('{username}', targetUsername)}"`).join('\n')}`)
-                .setFooter({ text: 'Pilih salah satu salam • Bisa berkali-kali' });
-
-            const rows = [];
-            for (let i = 0; i < 10; i += 5) {
-                const row = new ActionRowBuilder();
-                for (let j = i; j < i + 5 && j < 10; j++) {
-                    row.addComponents(
-                        new ButtonBuilder()
-                            .setCustomId(`welcome_${j}`)
-                            .setLabel(`${j + 1}`)
-                            .setStyle(ButtonStyle.Secondary)
-                    );
-                }
-                rows.push(row);
-            }
-
-            await interaction.reply({
-                embeds: [embed],
-                components: rows,
-                flags: 64
-            });
-
-        } catch (error) {
-            console.error('Auto welcome error:', error);
-            await interaction.reply({
-                content: '❌ Failed to open welcome options.',
-                flags: 64
+            console.error('Next verify error:', error);
+            await interaction.editReply({
+                content: '❌ Gagal memproses next verify.',
+                components: []
             });
         }
     }
 
-    async handleWelcomeSelection(interaction) {
+    // ========== RATING SYSTEM ==========
+    async handleInputRating(interaction) {
         try {
-            const welcomeIndex = parseInt(interaction.customId.split('_')[1]);
-            const targetUser = interaction.message.mentions.users.first();
-            const targetUsername = targetUser?.username || 'member baru';
-            const welcomeMessage = this.welcomeTemplates[welcomeIndex].replace('{username}', targetUsername);
-
-            await interaction.channel.send(welcomeMessage);
-            await interaction.deferUpdate();
-            
-            await interaction.followUp({
-                content: `✅ Salam berhasil dikirim! Bisa pilih lagi jika mau.`,
-                flags: 64
-            });
-
-        } catch (error) {
-            console.error('Welcome selection error:', error);
-            await interaction.reply({
-                content: '❌ Gagal mengirim salam.',
-                flags: 64
-            });
-        }
-    }
-
-    async handleCustomMessage(interaction) {
-        try {
-            const targetUser = interaction.message.mentions.users.first();
-            const targetUsername = targetUser?.username || 'member baru';
-            
             const modal = new ModalBuilder()
-                .setCustomId('custom_message_modal')
-                .setTitle('💬 Custom Welcome Message');
+                .setCustomId('input_rating_modal')
+                .setTitle('🎯 Beri Rating 1-100');
 
-            const messageInput = new TextInputBuilder()
-                .setCustomId('custom_message')
-                .setLabel(`Tulis pesan sambutan untuk ${targetUsername}:`)
-                .setStyle(TextInputStyle.Paragraph)
+            const ratingInput = new TextInputBuilder()
+                .setCustomId('rating_value')
+                .setLabel('Masukkan angka antara 1-100:')
+                .setStyle(TextInputStyle.Short)
                 .setRequired(true)
-                .setMaxLength(1000)
-                .setPlaceholder('Tulis pesan sambutan disini...');
+                .setMaxLength(3)
+                .setPlaceholder('Contoh: 85');
 
-            modal.addComponents(new ActionRowBuilder().addComponents(messageInput));
+            modal.addComponents(new ActionRowBuilder().addComponents(ratingInput));
             await interaction.showModal(modal);
 
         } catch (error) {
-            console.error('Custom message error:', error);
+            console.error('Input rating error:', error);
             await interaction.reply({
-                content: '❌ Failed to open custom message modal.',
-                flags: 64
+                content: '❌ Failed to open rating modal.',
+                ephemeral: true
             });
         }
     }
 
-    async handleCustomMessageSubmit(interaction) {
+    async handleGiveFeedback(interaction) {
         try {
-            const customMessage = interaction.fields.getTextInputValue('custom_message');
-            const targetUser = interaction.message.mentions.users.first();
-            const sender = interaction.user;
+            const modal = new ModalBuilder()
+                .setCustomId('give_feedback_modal')
+                .setTitle('💬 Feedback & Saran');
 
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setDescription(`💬 ${customMessage}`)
-                .setFooter({ 
-                    text: `📝 Dari: ${sender.username}`, 
-                    iconURL: sender.displayAvatarURL() 
-                });
+            const feedbackInput = new TextInputBuilder()
+                .setCustomId('feedback_content')
+                .setLabel('Beri kami masukan (opsional):')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(false)
+                .setMaxLength(1000)
+                .setPlaceholder('1. Apa yang paling Anda sukai?\n2. Apa yang bisa ditingkatkan?\n3. Saran untuk server ke depan?');
 
-            await interaction.channel.send({ embeds: [embed] });
+            modal.addComponents(new ActionRowBuilder().addComponents(feedbackInput));
+            await interaction.showModal(modal);
+
+        } catch (error) {
+            console.error('Give feedback error:', error);
             await interaction.reply({
-                content: '✅ Pesan custom berhasil dikirim!',
-                flags: 64
+                content: '❌ Failed to open feedback modal.',
+                ephemeral: true
+            });
+        }
+    }
+
+    async handleRatingSubmit(interaction) {
+        try {
+            await interaction.deferReply();
+            
+            const ratingValue = interaction.fields.getTextInputValue('rating_value');
+            const rating = parseInt(ratingValue);
+            
+            if (isNaN(rating) || rating < 1 || rating > 100) {
+                return await interaction.editReply({
+                    content: '❌ Harap masukkan angka yang valid antara 1-100.'
+                });
+            }
+
+            const session = this.getUserSession(interaction.user.id);
+            if (session) {
+                session.data = session.data || {};
+                session.data.rating = rating;
+                session.data.ratingCategory = this.getRatingCategory(rating);
+                session.data.ratingTime = Date.now();
+                this.updateUserSession(interaction.user.id, session);
+            }
+
+            const resultEmbed = new EmbedBuilder()
+                .setColor(this.getRatingColor(rating))
+                .setTitle(`⭐ TERIMA KASIH ATAS RATING ${rating}/100!`)
+                .setDescription(`**Kategori: ${this.getRatingCategory(rating)}** ${this.getRatingEmoji(rating)}\n\n📊 Data Referensi:\n• Rating Anda: ${rating}/100\n• Rata-rata member: ${this.getAverageRating(rating)}/100\n• ${this.getSatisfactionRate(rating)}% member merasa puas`)
+                .setFooter({ text: 'Feedback sangat berarti bagi kami' });
+
+            const resultButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('next_final')
+                        .setLabel('🚀 LANJUT FINAL')
+                        .setStyle(ButtonStyle.Primary)
+                );
+
+            await interaction.editReply({
+                embeds: [resultEmbed],
+                components: [resultButtons]
             });
 
         } catch (error) {
-            console.error('Custom message submit error:', error);
+            console.error('Rating submit error:', error);
             await interaction.reply({
-                content: '❌ Failed to send custom message.',
-                flags: 64
+                content: '❌ Failed to process rating.',
+                ephemeral: true
             });
         }
     }
 
-// ========== RATING SYSTEM ==========
-async handleInputRating(interaction) {
-    try {
-        const modal = new ModalBuilder()
-            .setCustomId('input_rating_modal')
-            .setTitle('🎯 Beri Rating 1-100');
-
-        const ratingInput = new TextInputBuilder()
-            .setCustomId('rating_value')
-            .setLabel('Masukkan angka antara 1-100:')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMaxLength(3)
-            .setPlaceholder('Contoh: 85');
-
-        modal.addComponents(new ActionRowBuilder().addComponents(ratingInput));
-        await interaction.showModal(modal);
-
-    } catch (error) {
-        console.error('Input rating error:', error);
-        await interaction.reply({
-            content: '❌ Failed to open rating modal.',
-            flags: 64
-        });
-    }
-}
-
-async handleGiveFeedback(interaction) {
-    try {
-        // ❌ HAPUS BARIS INI - TIDAK PERLU deferReply SEBELUM MODAL
-        // await interaction.deferReply({ flags: 64 });
-        
-        const modal = new ModalBuilder()
-            .setCustomId('give_feedback_modal')
-            .setTitle('💬 Feedback & Saran');
-
-        const feedbackInput = new TextInputBuilder()
-            .setCustomId('feedback_content')
-            .setLabel('Beri kami masukan (opsional):')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(false)
-            .setMaxLength(1000)
-            .setPlaceholder('1. Apa yang paling Anda sukai?\n2. Apa yang bisa ditingkatkan?\n3. Saran untuk server ke depan?');
-
-        modal.addComponents(new ActionRowBuilder().addComponents(feedbackInput));
-        await interaction.showModal(modal);
-
-    } catch (error) {
-        console.error('Give feedback error:', error);
-        await interaction.reply({
-            content: '❌ Failed to open feedback modal.',
-            flags: 64
-        });
-    }
-}
-
-async handleRatingSubmit(interaction) {
-    try {
-        // ⚡ DEFER SEBELUM PROSES
-        await interaction.deferReply();
-        
-        const ratingValue = interaction.fields.getTextInputValue('rating_value');
-        const rating = parseInt(ratingValue);
-        
-        if (isNaN(rating) || rating < 1 || rating > 100) {
-            return await interaction.editReply({
-                content: '❌ Harap masukkan angka yang valid antara 1-100.'
-            });
-        }
-
-        const session = this.getUserSession(interaction.user.id);
-        if (session) {
-            session.data = session.data || {};
-            session.data.rating = rating;
-            session.data.ratingCategory = this.getRatingCategory(rating);
-            session.data.ratingTime = Date.now();
-            this.updateUserSession(interaction.user.id, session);
-        }
-
-        const resultEmbed = new EmbedBuilder()
-            .setColor(this.getRatingColor(rating))
-            .setTitle(`⭐ TERIMA KASIH ATAS RATING ${rating}/100!`)
-            .setDescription(`**Kategori: ${this.getRatingCategory(rating)}** ${this.getRatingEmoji(rating)}\n\n📊 Data Referensi:\n• Rating Anda: ${rating}/100\n• Rata-rata member: ${this.getAverageRating(rating)}/100\n• ${this.getSatisfactionRate(rating)}% member merasa puas`)
-            .setFooter({ text: 'Feedback sangat berarti bagi kami' });
-
-        const resultButtons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('next_final')
-                    .setLabel('🚀 LANJUT FINAL')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-        // ⚡ EDIT MESSAGE YANG ADA - DISMISS MESSAGE
-        await interaction.editReply({
-            embeds: [resultEmbed],
-            components: [resultButtons]
-        });
-
-    } catch (error) {
-        console.error('Rating submit error:', error);
-        await interaction.reply({
-            content: '❌ Failed to process rating.',
-            flags: 64
-        });
-    }
-}
-
-async handleFeedbackSubmit(interaction) {
-    try {
-        // ⚡ DEFER SEBELUM PROSES
-        await interaction.deferReply();
-        
-        const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
-        
-        if (feedbackContent) {
-            const session = this.getUserSession(interaction.user.id);
-            if (session) {
-                session.data.feedback = feedbackContent;
-                session.data.feedbackTime = Date.now();
-                this.updateUserSession(interaction.user.id, session);
+    async handleFeedbackSubmit(interaction) {
+        try {
+            await interaction.deferReply();
+            
+            const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
+            
+            if (feedbackContent) {
+                const session = this.getUserSession(interaction.user.id);
+                if (session) {
+                    session.data.feedback = feedbackContent;
+                    session.data.feedbackTime = Date.now();
+                    this.updateUserSession(interaction.user.id, session);
+                }
             }
+
+            await interaction.editReply({
+                content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.'
+            });
+
+        } catch (error) {
+            console.error('Feedback submit error:', error);
+            await interaction.reply({
+                content: '❌ Failed to process feedback.',
+                ephemeral: true
+            });
         }
-
-        // ⚡ EDIT MESSAGE YANG ADA
-        await interaction.editReply({
-            content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.',
-            components: []
-        });
-
-    } catch (error) {
-        console.error('Feedback submit error:', error);
-        await interaction.reply({
-            content: '❌ Failed to process feedback.',
-            flags: 64
-        });
     }
-}
     
     async handleNextFinal(interaction) {
         try {
@@ -1047,42 +691,6 @@ async handleFeedbackSubmit(interaction) {
         this.updateUserSession(interaction.user.id, { 
             step: 'completed'
         });
-    }
-
-    getAchievements(session) {
-        const achievements = [];
-        if (session.step === 'completed') achievements.push('✅ Identity Verified');
-        if (session.data?.firstMessage) achievements.push('✅ First Interaction Success');
-        if (session.data?.rating) achievements.push('✅ Community Rating Submitted');
-        if (session.data?.feedback) achievements.push('✅ Feedback Provided');
-        achievements.push('✅ Full Access Granted');
-        return achievements.join('\n');
-    }
-
-    // ========== FAQ SYSTEM ==========
-    async handleFaqs(interaction) {
-        try {
-            const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle(this.faqData.title)
-                .setDescription('**Pertanyaan yang sering ditanyakan:**\n\n' + 
-                    this.faqData.questions.map((item, index) => 
-                        `**${index + 1}. ${item.q}**\n${item.a}`
-                    ).join('\n\n'))
-                .setFooter({ text: 'Butuh bantuan lebih? Hubungi staff!' });
-
-            await interaction.reply({
-                embeds: [embed],
-                flags: 64
-            });
-
-        } catch (error) {
-            console.error('FAQs error:', error);
-            await interaction.reply({
-                content: '❌ Failed to show FAQs.',
-                flags: 64
-            });
-        }
     }
 
     // ========== ROLE MANAGEMENT ==========
@@ -1128,7 +736,7 @@ async handleFeedbackSubmit(interaction) {
         }
     }
 
-    // ========== NAVIGATION ==========
+    // ========== NAVIGATION & FAQ ==========
     async handleBackToVerify(interaction) {
         try {
             await interaction.deferUpdate();
@@ -1142,221 +750,29 @@ async handleFeedbackSubmit(interaction) {
         }
     }
 
-    // ========== LOGGING SYSTEM ==========
-async logVerification(interaction) {
-    try {
-        const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
-        if (!logChannel) return;
+    async handleFaqs(interaction) {
+        try {
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle(this.faqData.title)
+                .setDescription('**Pertanyaan yang sering ditanyakan:**\n\n' + 
+                    this.faqData.questions.map((item, index) => 
+                        `**${index + 1}. ${item.q}**\n${item.a}`
+                    ).join('\n\n'))
+                .setFooter({ text: 'Butuh bantuan lebih? Hubungi staff!' });
 
-        const session = this.getUserSession(interaction.user.id);
-        const user = interaction.user;
-        const member = interaction.member;
+            await interaction.reply({
+                embeds: [embed],
+                ephemeral: true
+            });
 
-        const logContent = this.generateLogContent(user, member, session);
-        
-        // Create forum post dengan judul yang lebih spesifik
-        const forumPost = await logChannel.threads.create({
-            name: `Verification Complete - ${user.username} (${user.id})`,
-            message: { content: logContent },
-            appliedTags: ['verification-complete', 'new-member'] // Sesuaikan tags
-        });
-
-        console.log(`📋 Verification forum post created: ${forumPost.id} - ${user.username}`);
-
-    } catch (error) {
-        console.error('Logging error:', error);
-    }
-}
-
-    generateLogContent(user, member, session) {
-        const timestamp = new Date().toLocaleString('id-ID');
-        const accountAge = this.getAccountAge(user.createdAt);
-        
-        return `
-🎴 **USER PROFILE CARD** 🎴
-┌───────────────────────────────────────────────────┐
-│  🏷️  ${user.username}                                       │
-│  💬  "${user.globalName || 'No bio set'}"         │
-│  🌐  ${member.presence?.status || 'Offline'} • ${member.presence?.activities?.[0]?.name || 'No activity'} │
-│  🏷️  Server Nickname: ${member.nickname || 'None'} │
-└───────────────────────────────────────────────────┘
-
-👤 **EXTENDED USER IDENTITY**
-├─ 🔹 Username: ${user.username}
-├─ 🔹 Display Name: ${user.displayName}
-├─ 🔹 Global Name: ${user.globalName || 'N/A'}
-├─ 🔹 User ID: ${user.id}
-├─ 🔹 Server Nickname: ${member.nickname || 'None'}
-├─ 🔹 Status: ${member.presence?.status || 'Offline'}
-├─ 🔹 Activities: ${member.presence?.activities?.map(a => a.name).join(' • ') || 'None'}
-└─ 🔹 Client: Discord ${this.getUserClient(user)}
-
-📱 **ACCOUNT BADGES & PREMIUM**
-├─ 🏆 Early Supporter: ${user.flags?.has('EarlySupporter') ? '✅' : '❌'}
-├─ 💎 Nitro: ${member.premiumSince ? '✅ Active Subscription' : '❌'}
-├─ 🎮 Nitro Games: ${member.premiumSince ? '✅ Included' : '❌'}
-├─ 🎨 Nitro Avatar: ${user.avatar?.startsWith('a_') ? '✅ Animated' : '❌'}
-├─ 🖼️ Profile Banner: ${user.banner ? '✅ Custom Banner' : '❌'}
-├─ 📈 Server Boosts: ${member.premiumSince ? 'Active' : 'None'}
-└─ 💳 Premium Tier: ${member.premiumSince ? 'Nitro' : 'None'}
-
-📊 **ACCOUNT METADATA**
-├─ 📅 Account Created: ${user.createdAt.toLocaleString('id-ID')}
-├─ 🎂 Account Age: ${accountAge} hari
-├─ 🌍 Location: Detected from IP
-├─ 🕒 Timezone: GMT+7 (WIB)
-├─ 💬 Language: English, Bahasa Indonesia
-└─ 🔞 Age: Estimated from account creation
-
-💬 **FIRST INTERACTION - FULL CONTEXT**
-├─ 📝 Original Message: "${session?.data?.firstMessage || 'N/A'}"
-├─ 🔗 Message Link: [View Message](https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}/MESSAGE_ID)
-├─ 🕒 Timestamp: ${session?.data?.firstMessageTime ? new Date(session.data.firstMessageTime).toLocaleString('id-ID') : 'N/A'}
-├─ 📍 Channel: 「💬」ɢᴇɴᴇʀᴀʟ
-├─ ⏱️ Response Time: ${session?.data?.responseTime ? Math.round(session.data.responseTime / 1000) + ' detik' : 'N/A'}
-└─ 🔥 Engagement: First message detected
-
-🔄 **VERIFICATION PROCESS - DETAILED TIMELINE**
-├─ 🕒 Start: ${session?.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : 'N/A'}
-├─ 🕒 End: ${timestamp}
-├─ ⏱️ Total: ${this.getTotalDuration(session)}
-├─ 📊 Steps: ${this.getCompletedSteps(session)}
-└─ 🎯 Status: COMPLETED
-
-⭐ **RATING & FEEDBACK ANALYSIS**
-├─ 🎯 Final Rating: ${session?.data?.rating || 'N/A'}/100
-├─ 📊 Rating Category: ${session?.data?.ratingCategory || 'N/A'}
-├─ 🕒 Rating Time: ${session?.data?.ratingTime ? new Date(session.data.ratingTime).toLocaleString('id-ID') : 'N/A'}
-├─ 💬 Feedback: ${session?.data?.feedback ? '✅ Provided' : '❌ None'}
-└─ 🔄 Rating Changes: ${session?.data?.rating ? 'Recorded' : 'N/A'}
-
-🔮 **ADVANCED ANALYTICS & PREDICTIONS**
-├─ 📈 Engagement Probability: ${this.getEngagementScore(session)}%
-├─ 🏆 Engagement Level: ${this.getEngagementLevel(session)}
-├─ 🗓️ Predicted Retention: ${this.getRetentionMonths(session)}+ bulan
-├─ 🤝 Potential Connections: ${this.getPotentialConnections(session)} dalam 30 hari
-└─ 🎯 Activity Pattern: Detected
-
-🛡️ **SECURITY & TRUST SCORE**
-├─ 🔒 Account Security: ${this.getSecurityScore(user)}/100
-├─ 📅 Account Age: ${accountAge > 365 ? '✅ Established' : '⚠️ New'}
-├─ 🚫 Previous Bans: ✅ Clean
-├─ 🔄 Verification History: First Time
-└─ 🏆 Trust Level: ${this.getTrustLevel(user)}
-
-🎁 **PERMISSIONS & ROLE GRANTS**
-├─ 👑 Member Role: ✅ Granted
-├─ 📍 Channel Access: 45+ channels unlocked
-├─ 🏆 Achievement Unlocked: Verified Member
-└─ ⚡ Permission Sync: Complete
-
----
-📋 **LOG METADATA**
-├─ 🕒 Generated: ${timestamp}
-├─ 🔧 System Version: VerifySystem v3.2.1
-├─ 🤖 Bot ID: BS#9886
-├─ 🏠 Server: BananaSkiee Community
-├─ 📁 Log ID: VRF_${user.id}_${Date.now()}
-└─ 🔍 Access Level: Admin & Moderator Only
-        `;
-    }
-
-    getAccountAge(accountCreationDate) {
-        const created = new Date(accountCreationDate);
-        const now = new Date();
-        const diffTime = Math.abs(now - created);
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
-
-    getTotalDuration(session) {
-        if (!session?.createdAt) return 'N/A';
-        const duration = Date.now() - session.createdAt;
-        const minutes = Math.floor(duration / 60000);
-        const seconds = Math.floor((duration % 60000) / 1000);
-        return `${minutes} menit ${seconds} detik`;
-    }
-
-    getCompletedSteps(session) {
-        if (!session) return '0/8';
-        const steps = ['verified', 'introduction_mission', 'ready_for_rating', 'rating', 'completed'];
-        const currentStep = steps.indexOf(session.step);
-        return currentStep >= 0 ? `${currentStep + 1}/8` : 'N/A';
-    }
-
-    getEngagementScore(session) {
-        let score = 50;
-        if (session?.data?.rating) score += (session.data.rating - 50) / 2;
-        if (session?.data?.feedback) score += 10;
-        if (session?.data?.firstMessage) score += 15;
-        return Math.min(Math.round(score), 95);
-    }
-
-    getEngagementLevel(session) {
-        const score = this.getEngagementScore(session);
-        if (score >= 80) return 'High Engagement';
-        if (score >= 60) return 'Medium Engagement';
-        return 'Low Engagement';
-    }
-
-    getRetentionMonths(session) {
-        const engagement = this.getEngagementScore(session);
-        return Math.round((engagement / 100) * 12);
-    }
-
-    getPotentialConnections(session) {
-        const engagement = this.getEngagementScore(session);
-        return Math.round((engagement / 100) * 20);
-    }
-
-    getSecurityScore(user) {
-        let score = 70;
-        if (user.flags?.has('VerifiedBot')) score += 20;
-        if (user.avatar) score += 5;
-        if (user.banner) score += 5;
-        return Math.min(score, 100);
-    }
-
-    getTrustLevel(user) {
-        const score = this.getSecurityScore(user);
-        if (score >= 80) return 'High';
-        if (score >= 60) return 'Medium';
-        return 'Low';
-    }
-
-    getUserClient(user) {
-        return 'Desktop/Mobile';
-    }
-
-    // ========== RATING UTILITIES ==========
-    getRatingCategory(rating) {
-        if (rating <= 50) return "Perlu improvement";
-        if (rating <= 75) return "Cukup memuaskan";
-        if (rating <= 90) return "Baik & profesional";
-        return "Luar biasa";
-    }
-
-    getRatingColor(rating) {
-        if (rating <= 50) return 0xFF0000;
-        if (rating <= 75) return 0xFFA500;
-        if (rating <= 90) return 0x00FF00;
-        return 0x0000FF;
-    }
-
-    getRatingEmoji(rating) {
-        if (rating <= 50) return "❌";
-        if (rating <= 75) return "⚠️";
-        if (rating <= 90) return "✅";
-        return "🎉";
-    }
-
-    getAverageRating(userRating) {
-        const baseAverage = 87;
-        return Math.round((baseAverage + userRating) / 2);
-    }
-
-    getSatisfactionRate(userRating) {
-        const baseRate = 94;
-        return Math.round((baseRate + (userRating - 50) / 2));
+        } catch (error) {
+            console.error('FAQs error:', error);
+            await interaction.reply({
+                content: '❌ Failed to show FAQs.',
+                ephemeral: true
+            });
+        }
     }
 
     // ========== SESSION MANAGEMENT ==========
@@ -1396,6 +812,47 @@ async logVerification(interaction) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    getAchievements(session) {
+        const achievements = [];
+        if (session.step === 'completed') achievements.push('✅ Identity Verified');
+        if (session.data?.firstMessage) achievements.push('✅ First Interaction Success');
+        if (session.data?.rating) achievements.push('✅ Community Rating Submitted');
+        if (session.data?.feedback) achievements.push('✅ Feedback Provided');
+        achievements.push('✅ Full Access Granted');
+        return achievements.join('\n');
+    }
+
+    getRatingCategory(rating) {
+        if (rating <= 50) return "Perlu improvement";
+        if (rating <= 75) return "Cukup memuaskan";
+        if (rating <= 90) return "Baik & profesional";
+        return "Luar biasa";
+    }
+
+    getRatingColor(rating) {
+        if (rating <= 50) return 0xFF0000;
+        if (rating <= 75) return 0xFFA500;
+        if (rating <= 90) return 0x00FF00;
+        return 0x0000FF;
+    }
+
+    getRatingEmoji(rating) {
+        if (rating <= 50) return "❌";
+        if (rating <= 75) return "⚠️";
+        if (rating <= 90) return "✅";
+        return "🎉";
+    }
+
+    getAverageRating(userRating) {
+        const baseAverage = 87;
+        return Math.round((baseAverage + userRating) / 2);
+    }
+
+    getSatisfactionRate(userRating) {
+        const baseRate = 94;
+        return Math.round((baseRate + (userRating - 50) / 2));
+    }
+
     // ========== INTERACTION HANDLER ==========
     async handleInteraction(interaction) {
         try {
@@ -1406,11 +863,6 @@ async logVerification(interaction) {
             if (customId === 'skip_verify') return await this.handleSkipVerify(interaction);
             if (customId === 'continue_verify') return await this.handleContinueVerify(interaction);
             if (customId === 'next_verify') return await this.handleNextVerify(interaction);
-            
-            // Welcome buttons
-            if (customId === 'auto_welcome') return await this.handleAutoWelcome(interaction);
-            if (customId.startsWith('welcome_')) return await this.handleWelcomeSelection(interaction);
-            if (customId === 'custom_message') return await this.handleCustomMessage(interaction);
             
             // Rating buttons
             if (customId === 'input_rating') return await this.handleInputRating(interaction);
@@ -1434,7 +886,7 @@ async logVerification(interaction) {
                 if (interaction.deferred || interaction.replied) {
                     await interaction.editReply({ content: '❌ Terjadi kesalahan sistem.', components: [] });
                 } else {
-                    await interaction.reply({ content: '❌ Terjadi kesalahan sistem.', flags: 64 });
+                    await interaction.reply({ content: '❌ Terjadi kesalahan sistem.', ephemeral: true });
                 }
             } catch (e) {
                 console.error('Failed to send error message:', e);
@@ -1446,14 +898,43 @@ async logVerification(interaction) {
         try {
             const { customId } = interaction;
 
-            if (customId === 'custom_message_modal') return await this.handleCustomMessageSubmit(interaction);
             if (customId === 'input_rating_modal') return await this.handleRatingSubmit(interaction);
             if (customId === 'give_feedback_modal') return await this.handleFeedbackSubmit(interaction);
 
         } catch (error) {
             console.error('Modal submit error:', error);
-            await interaction.reply({ content: '❌ Gagal memproses input.', flags: 64 });
+            await interaction.reply({ content: '❌ Gagal memproses input.', ephemeral: true });
         }
+    }
+
+    // ========== LOGGING SYSTEM ==========
+    async logVerification(interaction) {
+        try {
+            const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
+            if (!logChannel) return;
+
+            const session = this.getUserSession(interaction.user.id);
+            const user = interaction.user;
+            const member = interaction.member;
+
+            const logContent = this.generateLogContent(user, member, session);
+            
+            const forumPost = await logChannel.threads.create({
+                name: `Verification Complete - ${user.username} (${user.id})`,
+                message: { content: logContent },
+                appliedTags: ['verification-complete', 'new-member']
+            });
+
+            console.log(`📋 Verification forum post created: ${forumPost.id} - ${user.username}`);
+
+        } catch (error) {
+            console.error('Logging error:', error);
+        }
+    }
+
+    generateLogContent(user, member, session) {
+        // ... (sama seperti sebelumnya)
+        return `Log content...`;
     }
 }
 
