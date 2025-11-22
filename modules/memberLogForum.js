@@ -11,7 +11,6 @@ const ROLE_TAGS_MAP = {
 };
 const ROLE_VERIFY_ID = '1352286235233620108'; 
 const NEUTRAL_COLOR = 0x2C2F33; 
-const THREAD_NAME_PREFIX = 'Log - ';
 
 // --- FUNGSI PEMBANTU ---
 
@@ -58,16 +57,17 @@ function getMemberPresenceInfo(member) {
 
     let statusDisplay;
     switch (status) {
-        case 'online': statusDisplay = '🟢 Online'; break;
-        case 'idle': statusDisplay = '🌙 Idle / Away'; break;
-        case 'dnd': statusDisplay = '⛔ Do Not Disturb'; break;
-        default: statusDisplay = '⚫ Offline / Tersembunyi'; break;
+        case 'online': statusDisplay = '🟢 ONLINE'; break;
+        case 'idle': statusDisplay = '🌙 IDLE'; break;
+        case 'dnd': statusDisplay = '⛔ DND'; break;
+        default: statusDisplay = '⚫ OFFLINE'; break;
     }
     
+    // Cek Client/Device
     const devices = [];
-    if (clientStatus.desktop) devices.push('🖥️ PC/Desktop');
-    if (clientStatus.mobile) devices.push('📱 Mobile/HP');
-    if (clientStatus.web) devices.push('🌐 Web Browser');
+    if (clientStatus.desktop) devices.push('🖥️ PC');
+    if (clientStatus.mobile) devices.push('📱 Mobile');
+    if (clientStatus.web) devices.push('🌐 Web');
     
     const clientDisplay = devices.length > 0 ? devices.join(', ') : 'Tidak Terdeteksi';
 
@@ -76,151 +76,146 @@ function getMemberPresenceInfo(member) {
 
 /**
  * Membuat Embed profesional TINGKAT DEWA untuk entri log.
- * @param {import('discord.js').GuildMember} member - Objek member yang terlibat.
- * @param {('JOIN'|'LEAVE'|'RE_ENTRY'|'CMD_SIM'|'FIRST_MESSAGE'|'ROLE_UPDATE')} type - Tipe event.
- * @param {object} extraData - Data tambahan seperti invite, message, role changes, dll.
- * @returns {EmbedBuilder}
+ * Menggunakan DESCRIPTION untuk layout KARTU SIMETRIS.
  */
 async function createLogEntryEmbed(member, type, extraData = {}) {
-    let title, emoji, description;
+    let title, emoji, descriptionText;
     
-    // 1. Tentukan Judul Log
     switch (type) {
-        case 'JOIN':
-            title = '🟢 MEMBER BERGABUNG (AUDIT AWAL)';
-            emoji = '🚪';
-            description = `Subjek terdeteksi memasuki server secara nyata. Data Audit Log Dibuat.`;
-            break;
-        case 'LEAVE':
-            title = '🔴 MEMBER KELUAR';
-            emoji = '🚶';
-            description = `Subjek meninggalkan server. Log diarsipkan.`;
-            break;
-        case 'RE_ENTRY':
-            title = '🚨 MEMBER MASUK KEMBALI (RE-ENTRY)';
-            emoji = '♻️';
-            description = `Subjek terdeteksi masuk kembali. Peran Re-entry ditambahkan.`;
-            break;
-        case 'FIRST_MESSAGE':
-            title = '💬 PESAN PERTAMA DICATAT';
-            emoji = '📝';
-            description = `Pesan pertama subjek di server ini telah dicatat.`;
-            break;
-        case 'ROLE_UPDATE':
-            title = '💼 PERUBAHAN PERAN (ROLE UPDATE)';
-            emoji = '🔄';
-            description = `Peran (Role) member diubah oleh Moderator/Sistem.`;
-            break;
-        case 'CMD_SIM':
-            title = `⚙️ SIMULASI LOG (Command: ${extraData.command})`;
-            emoji = '🧪';
-            description = `Log ini dicatat melalui perintah simulasi oleh Administrator.`;
-            break;
-        default:
-            title = 'ℹ️ LOG UMUM';
-            emoji = '📄';
-            description = 'Aktivitas member dicatat.';
+        case 'JOIN': title = '🟢 MEMBER BERGABUNG (AUDIT AWAL)'; emoji = '🚪'; descriptionText = `Subjek terdeteksi memasuki server secara nyata.`; break;
+        case 'LEAVE': title = '🔴 MEMBER KELUAR'; emoji = '🚶'; descriptionText = `Subjek meninggalkan server. Log diarsipkan.`; break;
+        case 'RE_ENTRY': title = '🚨 MEMBER MASUK KEMBALI (RE-ENTRY)'; emoji = '♻️'; descriptionText = `Subjek terdeteksi masuk kembali. Peran Re-entry ditambahkan.`; break;
+        case 'FIRST_MESSAGE': title = '💬 PESAN PERTAMA DICATAT'; emoji = '📝'; descriptionText = `Pesan pertama subjek di server ini telah dicatat.`; break;
+        case 'ROLE_UPDATE': title = '💼 PERUBAHAN PERAN (ROLE UPDATE)'; emoji = '🔄'; descriptionText = `Peran (Role) member diubah oleh Moderator/Sistem.`; break;
+        case 'MESSAGE_DELETE': title = '🗑️ LOG PESAN DIHAPUS'; emoji = '❌'; descriptionText = `Pesan yang dikirim oleh member ini telah dihapus oleh pengirim atau moderator.`; break;
+        case 'CMD_SIM': title = `⚙️ SIMULASI LOG`; emoji = '🧪'; descriptionText = `Log ini dicatat melalui perintah simulasi oleh Administrator.`; break;
+        default: title = 'ℹ️ LOG UMUM'; emoji = '📄'; descriptionText = 'Aktivitas member dicatat.';
     }
 
-    // 2. Ambil semua data
-    const user = member.user;
-    await user.fetch().catch(() => null); 
-    await member.fetch().catch(() => null); 
+    // --- 1. AMBIL DATA DENGAN KECEPATAN MAKSIMAL (Promise.all) ---
+    const [user, membersCollection] = await Promise.all([
+        member.user.fetch().catch(() => member.user), // Fetch user data (Nitro, Banner)
+        member.guild.members.fetch().catch(() => new Collection()), // Fetch ALL members (for Join Position, THE BOTTLENECK)
+        member.fetch().catch(() => member), // Fetch member data (ensure up-to-date presence/roles)
+    ]);
     
+    // --- 2. PRE-PROSES DATA ---
     const tags = getMemberTags(member);
     const presenceInfo = getMemberPresenceInfo(member);
     const rolesCount = member.roles.cache.size - 1; 
     
-    // Kalkulasi Waktu & Usia Akun
     const joinedTimestamp = member.joinedTimestamp;
     const createTimestamp = user.createdTimestamp;
-    const accountAgeMs = Date.now() - createTimestamp;
-    const accountAgeDays = Math.floor(accountAgeMs / (1000 * 60 * 60 * 24));
+    const accountAgeDays = Math.floor((Date.now() - createTimestamp) / (1000 * 60 * 60 * 24));
 
-    // Posisi Bergabung (Perlu fetch member untuk sorting)
-    const members = await member.guild.members.fetch().catch(() => new Collection());
-    const sortedMembers = members.sort((a, b) => a.joinedTimestamp - b.joinedTimestamp);
+    const sortedMembers = membersCollection.sort((a, b) => a.joinedTimestamp - b.joinedTimestamp);
     const joinPosition = sortedMembers.map(m => m.id).indexOf(member.id) + 1;
     
-    // Data Nitro & Profile Aesthetics
     const nitroStatus = user.premiumType > 0 ? `✨ Nitro Tipe ${user.premiumType}` : '❌ Non-Nitro';
     const accentColor = user.hexAccentColor ? user.hexAccentColor : NEUTRAL_COLOR;
     const bannerURL = user.bannerURL({ size: 1024, extension: 'png' });
     
-    // Data First Message (Jika ada)
-    const firstMessageInfo = extraData.firstMessage ? 
-        `[Pesan Pertama](${extraData.firstMessage.url}) di ${extraData.firstMessage.channel.toString()}\n\`\`\`\n${extraData.firstMessage.content.substring(0, 150)}\n...\n\`\`\``
-        : 'Belum terdeteksi atau ini bukan log pesan pertama.';
-
-    // Data Invite Tracking (Jika ada)
+    // Data Invite Tracking
     const inviteInfo = extraData.invite ? 
-        `**Link Invite:** \`${extraData.invite.code}\`\n**Pengundang:** ${extraData.invite.inviter || 'Sistem'}`
-        : 'Tidak terdeteksi (Join langsung / Fitur tidak aktif)';
+        `**Link:** \`${extraData.invite.code}\` | **Pengundang:** ${extraData.invite.inviter || 'Sistem'}`
+        : 'Tidak terdeteksi / Join Langsung';
 
+    // Role List (Filtered, separated by |)
+    const roleList = rolesCount > 0 
+        ? member.roles.cache.filter(r => r.id !== member.guild.id).map(r => r.toString()).join(' | ') 
+        : '*Tidak ada role khusus.*';
 
+    // --- 3. BUAT STRUKTUR DESCRIPTION (SIMETRIS & RAPI) ---
+    let mainDescription = 
+`**[LOG AUDIT]** ${descriptionText}
+---
+**🔑 KUNCI TRANSAKSI**
+\`\`\`
+ID: ${member.id}
+CODE: ${generateUniqueAuditCode()}
+\`\`\`
+
+**👤 DATA IDENTITAS & AKUN**
+\`\`\`
+Nama Tampilan : ${member.user.globalName || member.user.username}
+User Tag      : ${member.user.tag}
+Status Nitro  : ${nitroStatus}
+Usia Akun     : ${accountAgeDays} Hari (${time(new Date(createTimestamp), 'D')})
+Bot Status    : ${user.bot ? '✅ Ya' : '❌ Tidak'}
+Accent Color  : ${user.hexAccentColor || 'Default'}
+\`\`\`
+
+**📈 STATUS KEANGGOTAAN SERVER**
+\`\`\`
+Posisi Gabung : Anggota ke-${joinPosition} dari ${member.guild.memberCount} Total
+Waktu Gabung  : ${time(new Date(joinedTimestamp), 'f')}
+Invite Sumber : ${inviteInfo}
+Status Aktif  : ${presenceInfo.statusDisplay} (${presenceInfo.clientDisplay})
+Tag Khusus    : ${tags.gender} | ${tags.verification} | ${tags.reEntry}
+\`\`\`
+
+**💬 AKTIVITAS & RIWAYAT CHAT**
+> **Semua Role (${rolesCount}):** ${roleList}
+`;
+
+    // --- 4. DATA KHUSUS BERDASARKAN TIPE LOG ---
+    
+    if (type === 'FIRST_MESSAGE' && extraData.firstMessage) {
+        const { url, content, channel, timeSent } = extraData.firstMessage;
+        
+        mainDescription += `
+**\n📝 DETAIL PESAN PERTAMA**
+> **Dikirim:** ${time(new Date(timeSent), 'f')}
+> **Channel:** ${channel.toString()}
+> **Link:** [Lihat Pesan](${url})
+> **Konten Pesan:**
+\`\`\`
+${content.substring(0, 500) || 'Konten Tidak Tersedia/Hanya Lampiran'}
+\`\`\`
+`;
+    }
+
+    if (type === 'ROLE_UPDATE' && extraData.roleChanges) {
+        const { added, removed } = extraData.roleChanges;
+        let roleChangesDetail = '';
+
+        if (added.length > 0) {
+            roleChangesDetail += `\n**➕ DITAMBAHKAN (${added.length})**\n> ${added.join('\n> ')}`;
+        }
+        if (removed.length > 0) {
+            roleChangesDetail += `\n**➖ DICABUT (${removed.length})**\n> ${removed.join('\n> ')}`;
+        }
+
+        mainDescription += `\n**\n🔄 DETAIL PERUBAHAN PERAN**${roleChangesDetail}`;
+    }
+
+    if (type === 'MESSAGE_DELETE' && extraData.deletedMessage) {
+        const { content, channel, timeDeleted } = extraData.deletedMessage;
+        
+        mainDescription += `
+**\n🗑️ DETAIL PESAN DIHAPUS**
+> **Channel:** ${channel.toString()}
+> **Waktu Hapus Dicatat:** ${time(new Date(timeDeleted), 'f')}
+> **Konten Pesan:**
+\`\`\`
+${content.substring(0, 1000) || 'Konten Tidak Tersedia/Hanya Lampiran'}
+\`\`\`
+`;
+    }
+
+    // --- 5. BANGUN EMBED AKHIR ---
     const embed = new EmbedBuilder()
         .setTitle(`${emoji} ${title}`)
         .setColor(accentColor) 
         .setAuthor({
-            name: `${member.user.tag} | Audit Code: ${generateUniqueAuditCode()}`,
+            name: `${member.user.tag} | ${new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB`,
             iconURL: member.user.displayAvatarURL(),
         })
         .setThumbnail(member.user.displayAvatarURL())
-        .setDescription(`**[KONTEKS TRANSAKSI]** ${description}`)
+        .setDescription(mainDescription)
         .setImage(bannerURL || null) 
-        .addFields(
-            // --- BAGIAN I: IDENTITAS & SERVER ---
-            { name: '🔑 Kunci Audit ID', value: `\`${member.id}\``, inline: true },
-            { name: '🌐 Keanggotaan Server', value: `Anggota ke-\`${joinPosition}\` dari \`${member.guild.memberCount}\`.`, inline: true },
-            { name: '🤖 Status Bot', value: user.bot ? '✅ Ya' : '❌ Tidak', inline: true },
-
-            // --- BAGIAN II: PROFILE & PRESENCE ---
-            { name: '⚡ Status Nitro', value: nitroStatus, inline: true },
-            { name: '💻 Status Aktif', value: presenceInfo.statusDisplay, inline: true },
-            { name: '📱 Klien/Perangkat', value: presenceInfo.clientDisplay, inline: true },
-            { name: '🖼️ Warna Border/Accent', value: user.hexAccentColor ? `\`${user.hexAccentColor}\`` : 'Default', inline: true },
-            { name: 'Lokasi/IP (Fungsi Terlarang)', value: '[Tidak Dapat Diambil API Discord]', inline: true },
-            { name: 'Deskripsi Custom', value: '[Tidak Dapat Diambil API Discord]', inline: true },
-
-            // --- BAGIAN III: WAKTU & RIWAYAT ---
-            { name: '🗓 Akun Dibuat (Usia)', value: `${time(new Date(createTimestamp), 'f')} (**${accountAgeDays} Hari**)`, inline: true },
-            { name: '📥 Bergabung Server', value: time(new Date(joinedTimestamp), 'f'), inline: true },
-            { name: '⏱ Waktu Aksi Log', value: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), inline: true },
-
-            // --- BAGIAN IV: ROLE & TAGGING ---
-            { name: '⭐ Gender Tag', value: tags.gender, inline: true },
-            { name: '✅ Verifikasi Status', value: tags.verification, inline: true },
-            { name: '⚠️ Re-entry Tag', value: tags.reEntry, inline: true },
-            { name: `🛡️ Role Diberikan (${rolesCount})`, value: rolesCount > 0 ? member.roles.cache.filter(r => r.id !== member.guild.id).map(r => r.toString()).join(' | ') : 'Tidak ada role selain @everyone.', inline: false },
-        );
-    
-    // --- Tambahkan data khusus ROLE_UPDATE di bagian akhir ---
-    if (type === 'ROLE_UPDATE' && extraData.roleChanges) {
-        const { added, removed } = extraData.roleChanges;
-        if (added.length > 0) {
-            embed.addFields({ 
-                name: `➕ Role Ditambahkan (${added.length})`, 
-                value: added.join(', '), 
-                inline: false 
-            });
-        }
-        if (removed.length > 0) {
-            embed.addFields({ 
-                name: `➖ Role Dicabut (${removed.length})`, 
-                value: removed.join(', '), 
-                inline: false 
-            });
-        }
-    } else {
-        // --- BAGIAN V: LOG KHUSUS (Invite & Message) (Hanya jika bukan ROLE_UPDATE) ---
-        embed.addFields(
-            { name: '🔗 Sumber Undangan (Invite)', value: inviteInfo, inline: false },
-            { name: '💬 Log Pesan Pertama', value: firstMessageInfo, inline: false },
-        );
-    }
-
-    embed.setFooter({ text: `Audit Log Persisten V5 - Log Peran Ditambahkan.`, iconURL: member.guild.iconURL() })
-    embed.setTimestamp();
+        .setFooter({ text: `Audit Log V7 | Menangkap Delete Message.`, iconURL: member.guild.iconURL() })
+        .setTimestamp();
     
     return embed;
 }
@@ -235,7 +230,6 @@ async function findOrCreateMemberLogThread(guild, member) {
         return null;
     }
     
-    // Gunakan Username [ID] saat ini sebagai kunci pencarian
     const threadKey = `${member.user.username} [${member.id}]`;
     let thread = null;
 
@@ -275,13 +269,12 @@ async function findOrCreateMemberLogThread(guild, member) {
 }
 
 /**
- * Fungsi utama untuk log aksi member (JOIN, LEAVE, RE-ENTRY, CMD_SIM, ROLE_UPDATE).
+ * Fungsi utama untuk log aksi member.
  */
 async function logMemberAction(member, type, extraData = {}) {
     if (!member || !member.guild) return;
     
-    // Tentukan apakah ini log yang perlu dikirim (semua kecuali JOIN event nyata)
-    const shouldSendNewLog = (type !== 'JOIN') || (type === 'CMD_SIM') || (type === 'ROLE_UPDATE');
+    const shouldSendNewLog = (type !== 'JOIN') || (type === 'CMD_SIM') || (type === 'ROLE_UPDATE') || (type === 'MESSAGE_DELETE');
 
     const thread = await findOrCreateMemberLogThread(member.guild, member);
     if (!thread) return;
@@ -294,7 +287,6 @@ async function logMemberAction(member, type, extraData = {}) {
         else logType = 'CMD';
     }
 
-    // --- Penanganan Aksi Role/Arsip ---
     if (logType === 'RE_ENTRY') {
         member.roles.add(ROLE_REENTRY_ID)
             .catch(err => console.error(`❌ ROLE: Gagal menambahkan role Re-entry: ${err.message}`));
@@ -304,7 +296,6 @@ async function logMemberAction(member, type, extraData = {}) {
         await thread.setArchived(true, `Member keluar server.`).catch(console.error);
     }
     
-    // Kirim Log Entry ke Thread jika diperlukan
     if (shouldSendNewLog) { 
         const logEmbed = await createLogEntryEmbed(member, logType, extraData);
         await thread.send({ 
@@ -326,11 +317,15 @@ async function logFirstMessage(message) {
     const thread = await findOrCreateMemberLogThread(member.guild, member);
     if (!thread) return;
 
+    // Pastikan konten pesan tersedia
+    const messageContent = message.content || '[Konten tidak tersedia atau hanya lampiran]';
+
     const extraData = {
         firstMessage: {
             url: message.url,
-            content: message.content,
-            channel: message.channel
+            content: messageContent,
+            channel: message.channel,
+            timeSent: message.createdTimestamp // Waktu pesan dikirim
         }
     };
 
