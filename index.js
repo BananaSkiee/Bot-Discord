@@ -13,8 +13,7 @@ const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
-const { updateMemberLog } = require("./modules/memberLogForum"); // <-- BARIS DIPERBARUI
-const { createPOVEmbed } = require("./modules/storyPOV"); // <-- BARIS BARU: Import logika POV
+const { logMemberAction, createLogEntryEmbed } = require("./modules/memberLogForum"); // <-- Import fungsi log utama
 
 const client = new Client({
   intents: [
@@ -126,41 +125,48 @@ client.on("messageCreate", async (message) => {
   const member = message.member;
   const content = message.content.toLowerCase();
   
-  // --- COMMAND LOGGING & POV ---
+  // --- COMMAND SIMULASI LOG: !1, !2, !3 ---
   if (content === "!1" || content === "!2" || content === "!3") {
+      // Hanya Owner/Admin yang bisa menggunakan command simulasi
       const isOwnerOrAdmin = member?.permissions.has("ADMINISTRATOR") || member?.guild.ownerId === member.id;
       
       if (!isOwnerOrAdmin) {
-          return message.reply({ content: "❌ Perintah ini hanya bisa digunakan oleh Administrator/Owner.", ephemeral: true });
+          return message.reply({ content: "❌ Perintah simulasi ini hanya bisa digunakan oleh Administrator/Owner.", ephemeral: true });
       }
       
-      // 1. Kirim balasan ke channel chat (untuk POV interaktif)
-      const povEmbed = createPOVEmbed(content.substring(1));
-      await message.channel.send({ 
-          content: `**${member.user.tag}** memicu perubahan POV: \`${content}\``,
-          embeds: [povEmbed] 
-      }).catch(err => console.error("❌ Gagal mengirim pesan POV:", err.message));
-      
-      // 2. Catat aksi di Forum Log Persisten
-      await updateMemberLog(client, member, 'POV', content);
+      let logType;
+      let logTypeText;
+      if (content === '!1') { logType = 'JOIN'; logTypeText = 'Simulasi: Member Bergabung'; }
+      else if (content === '!2') { logType = 'LEAVE'; logTypeText = 'Simulasi: Member Keluar'; }
+      else if (content === '!3') { logType = 'RE_ENTRY'; logTypeText = 'Simulasi: Member Masuk Kembali'; }
 
+      // 1. Catat aksi di Forum Log Persisten
+      await logMemberAction(member, 'CMD_SIM', content); 
+
+      // 2. Kirim balasan ke channel chat (untuk konfirmasi)
+      const confirmationEmbed = createLogEntryEmbed(member, logType, content);
+      await message.channel.send({ 
+          content: `**[KONFIRMASI]** ${member.user.tag} memicu simulasi: ${logTypeText}`,
+          embeds: [confirmationEmbed] 
+      }).catch(err => console.error("❌ Gagal mengirim konfirmasi simulasi:", err.message));
+      
       // 3. Hapus pesan perintah
       if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan perintah:", err));
       return;
   }
 });
 
-// 🚀 Auto Greeting ketika user join
+// 🚀 Log ketika user join (Event nyata)
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
-  // Panggil fungsi log member join ke Forum
-  updateMemberLog(client, member, 'JOIN'); 
+  // Log event Join nyata ke Forum
+  await logMemberAction(member, 'JOIN'); 
 });
 
-// 🚪 Log ketika user leave
+// 🚪 Log ketika user leave (Event nyata)
 client.on("guildMemberRemove", async (member) => {
-    // Panggil fungsi log member leave ke Forum
-    updateMemberLog(client, member, 'LEAVE'); 
+    // Log event Leave nyata ke Forum
+    await logMemberAction(member, 'LEAVE'); 
 });
 
 
