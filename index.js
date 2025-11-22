@@ -88,7 +88,6 @@ fs.readdirSync("./events").forEach((file) => {
 });
 
 srvName(client);
-startAutoAnimation(client);
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
