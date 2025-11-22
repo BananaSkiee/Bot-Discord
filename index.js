@@ -1,5 +1,5 @@
 require("dotenv").config();
-require("./modules/globalLogger"); // ini aja yang baru
+require("./modules/globalLogger"); 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
@@ -13,7 +13,8 @@ const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
-const { logMemberJoin } = require("./modules/memberLogForum"); // <-- BARIS BARU
+const { updateMemberLog } = require("./modules/memberLogForum"); // <-- BARIS DIPERBARUI
+const { createPOVEmbed } = require("./modules/storyPOV"); // <-- BARIS BARU: Import logika POV
 
 const client = new Client({
   intents: [
@@ -89,7 +90,6 @@ fs.readdirSync("./events").forEach((file) => {
 });
 
 srvName(client);
-// Baris startAutoAnimation(client); DIHAPUS dari sini
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
@@ -116,18 +116,37 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// 📌 Sticky Message Handler
+// 📌 Sticky Message Handler & Custom Commands
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
+  
   stickyHandler(client, message);
   invitesTracker(client);
   
-  // 🧪 COMMAND TESTING BARU: !1 (Untuk uji coba log member join)
-  // Hanya Owner/Admin yang bisa menggunakan command ini
-  if (message.content === "!1" && message.member?.permissions.has("ADMINISTRATOR")) {
-      await logMemberJoin(client, message.member);
-      await message.react('✅').catch(err => console.error("❌ Gagal react:", err));
-      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan:", err));
+  const member = message.member;
+  const content = message.content.toLowerCase();
+  
+  // --- COMMAND LOGGING & POV ---
+  if (content === "!1" || content === "!2" || content === "!3") {
+      const isOwnerOrAdmin = member?.permissions.has("ADMINISTRATOR") || member?.guild.ownerId === member.id;
+      
+      if (!isOwnerOrAdmin) {
+          return message.reply({ content: "❌ Perintah ini hanya bisa digunakan oleh Administrator/Owner.", ephemeral: true });
+      }
+      
+      // 1. Kirim balasan ke channel chat (untuk POV interaktif)
+      const povEmbed = createPOVEmbed(content.substring(1));
+      await message.channel.send({ 
+          content: `**${member.user.tag}** memicu perubahan POV: \`${content}\``,
+          embeds: [povEmbed] 
+      }).catch(err => console.error("❌ Gagal mengirim pesan POV:", err.message));
+      
+      // 2. Catat aksi di Forum Log Persisten
+      await updateMemberLog(client, member, 'POV', content);
+
+      // 3. Hapus pesan perintah
+      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan perintah:", err));
+      return;
   }
 });
 
@@ -135,8 +154,15 @@ client.on("messageCreate", async (message) => {
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
   // Panggil fungsi log member join ke Forum
-  logMemberJoin(client, member); // <-- BARIS BARU
+  updateMemberLog(client, member, 'JOIN'); 
 });
+
+// 🚪 Log ketika user leave
+client.on("guildMemberRemove", async (member) => {
+    // Panggil fungsi log member leave ke Forum
+    updateMemberLog(client, member, 'LEAVE'); 
+});
+
 
 // ⏱ Update waktu di voice channel tiap 30 detik
 setInterval(() => {
