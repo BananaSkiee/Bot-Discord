@@ -1,5 +1,5 @@
 require("dotenv").config();
-require("./modules/globalLogger"); 
+require("./modules/globalLogger"); // ini aja yang baru
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
@@ -13,7 +13,6 @@ const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
-const { logMemberAction, createLogEntryEmbed } = require("./modules/memberLogForum"); // <-- Import fungsi log utama
 
 const client = new Client({
   intents: [
@@ -115,60 +114,17 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// 📌 Sticky Message Handler & Custom Commands
+// 📌 Sticky Message Handler
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-  
   stickyHandler(client, message);
   invitesTracker(client);
-  
-  const member = message.member;
-  const content = message.content.toLowerCase();
-  
-  // --- COMMAND SIMULASI LOG: !1, !2, !3 ---
-  if (content === "!1" || content === "!2" || content === "!3") {
-      // Hanya Owner/Admin yang bisa menggunakan command simulasi
-      const isOwnerOrAdmin = member?.permissions.has("ADMINISTRATOR") || member?.guild.ownerId === member.id;
-      
-      if (!isOwnerOrAdmin) {
-          return message.reply({ content: "❌ Perintah simulasi ini hanya bisa digunakan oleh Administrator/Owner.", ephemeral: true });
-      }
-      
-      let logType;
-      let logTypeText;
-      if (content === '!1') { logType = 'JOIN'; logTypeText = 'Simulasi: Member Bergabung'; }
-      else if (content === '!2') { logType = 'LEAVE'; logTypeText = 'Simulasi: Member Keluar'; }
-      else if (content === '!3') { logType = 'RE_ENTRY'; logTypeText = 'Simulasi: Member Masuk Kembali'; }
-
-      // 1. Catat aksi di Forum Log Persisten
-      await logMemberAction(member, 'CMD_SIM', content); 
-
-      // 2. Kirim balasan ke channel chat (untuk konfirmasi)
-      const confirmationEmbed = createLogEntryEmbed(member, logType, content);
-      await message.channel.send({ 
-          content: `**[KONFIRMASI]** ${member.user.tag} memicu simulasi: ${logTypeText}`,
-          embeds: [confirmationEmbed] 
-      }).catch(err => console.error("❌ Gagal mengirim konfirmasi simulasi:", err.message));
-      
-      // 3. Hapus pesan perintah
-      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan perintah:", err));
-      return;
-  }
 });
 
-// 🚀 Log ketika user join (Event nyata)
+// 🚀 Auto Greeting ketika user join
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
-  // Log event Join nyata ke Forum
-  await logMemberAction(member, 'JOIN'); 
 });
-
-// 🚪 Log ketika user leave (Event nyata)
-client.on("guildMemberRemove", async (member) => {
-    // Log event Leave nyata ke Forum
-    await logMemberAction(member, 'LEAVE'); 
-});
-
 
 // ⏱ Update waktu di voice channel tiap 30 detik
 setInterval(() => {
@@ -206,4 +162,4 @@ process.on('SIGTERM', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
-}); 
+});
