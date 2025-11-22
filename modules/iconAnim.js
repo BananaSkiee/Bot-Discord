@@ -25,18 +25,32 @@ async function updateIcon(guild) {
     console.log(`✅ Icon server diubah ke: ${icons[currentIndex]}`);
     currentIndex = (currentIndex + 1) % icons.length;
   } catch (err) {
+    // Error 50035 (Invalid Form Body) atau 40003 (Rate Limit) sering terjadi
     console.error("❌ Gagal ubah icon:", err.message);
   }
 }
 
 async function startAutoAnimation(client) {
+  // Hanya jalankan jika ada icon dan belum berjalan
   if (isRunning || icons.length === 0) return;
   isRunning = true;
 
   try {
-    const guild = client.guilds.cache.first(); // Atau gunakan client.guilds.fetch("ID_GUILD")
+    // 💡 KRITIS: Dapatkan ID Guild dari environment variable
+    const guildId = process.env.GUILD_ID; 
+
+    if (!guildId) {
+        console.error("❌ GUILD_ID tidak ditemukan di environment variable. Animasi dihentikan.");
+        isRunning = false;
+        return;
+    }
+    
+    // Dapatkan Guild yang spesifik menggunakan ID
+    const guild = client.guilds.cache.get(guildId); 
+    
     if (!guild) {
-      console.error("❌ Guild tidak ditemukan.");
+      console.error(`❌ Guild dengan ID ${guildId} tidak ditemukan dalam cache.`);
+      isRunning = false;
       return;
     }
 
@@ -45,6 +59,7 @@ async function startAutoAnimation(client) {
     console.log("▶️ Auto animation icon dimulai...");
   } catch (err) {
     console.error("❌ Gagal start auto animation:", err.message);
+    isRunning = false;
   }
 }
 
