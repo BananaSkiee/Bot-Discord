@@ -19,11 +19,11 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences, // PENTING: Untuk status online/dnd/mobile
+    GatewayIntentBits.GuildPresences, 
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildInvites, // PENTING: Untuk Invite Tracker
+    GatewayIntentBits.GuildInvites, 
   ],
 });
 
@@ -32,9 +32,9 @@ require('./modules/autoSafeRename')(client);
 
 client.commands = new Collection();
 
-// --- CACHE KHUSUS UNTUK LOG (Penting untuk menghindari duplikasi log/rate limit) ---
+// --- CACHE KHUSUS UNTUK LOG ---
 const inviteCache = new Collection();
-const firstMessageCache = new Collection(); // Untuk melacak ID member yang sudah mengirim pesan pertama
+const firstMessageCache = new Collection(); 
 
 // 🌐 Web server (Koyeb)
 const app = express();
@@ -97,7 +97,7 @@ client.on("messageCreate", async (message) => {
   
   // --- A. LOG PESAN PERTAMA ---
   if (!firstMessageCache.has(member.id)) {
-    // Catat pesan pertama, lalu masukkan ke cache agar tidak dicatat lagi
+    // Catat pesan pertama, lalu masukkan ke cache
     await logFirstMessage(message); 
     firstMessageCache.set(member.id, true);
   }
@@ -129,6 +129,33 @@ client.on("messageCreate", async (message) => {
       return;
   }
 });
+
+// 🔄 LOG: Perubahan Role (Penting!)
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    // Cek apakah yang berubah HANYA role
+    const oldRoles = oldMember.roles.cache;
+    const newRoles = newMember.roles.cache;
+
+    if (oldRoles.size === newRoles.size) return; // Tidak ada perubahan jumlah role
+
+    const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
+    const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+
+    // Jika ada penambahan atau pencabutan role
+    if (addedRoles.size > 0 || removedRoles.size > 0) {
+        
+        const added = addedRoles.map(r => r.toString());
+        const removed = removedRoles.map(r => r.toString());
+
+        console.log(`✅ LOG ROLE: ${newMember.user.tag} - Ditambah: ${added.join(', ')} | Dicabut: ${removed.join(', ')}`);
+
+        // Log aksi ke Forum
+        await logMemberAction(newMember, 'ROLE_UPDATE', {
+            roleChanges: { added, removed }
+        });
+    }
+});
+
 
 // 💾 Invite Tracker (Pre-cache semua invite)
 client.on('ready', async () => {
