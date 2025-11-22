@@ -1,5 +1,5 @@
 require("dotenv").config();
-require("./modules/globalLogger"); // ini aja yang baru
+require("./modules/globalLogger"); 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
@@ -13,7 +13,7 @@ const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
-const { logMemberJoin } = require("./modules/memberLogForum"); // <-- BARIS BARU
+const { logMemberAction, createLogEntryEmbed } = require("./modules/memberLogForum"); // <-- Import fungsi log utama
 
 const client = new Client({
   intents: [
@@ -89,7 +89,6 @@ fs.readdirSync("./events").forEach((file) => {
 });
 
 srvName(client);
-// Baris startAutoAnimation(client); DIHAPUS dari sini
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
@@ -116,27 +115,60 @@ client.on("interactionCreate", async (interaction) => {
   }
 });
 
-// 📌 Sticky Message Handler
+// 📌 Sticky Message Handler & Custom Commands
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
+  
   stickyHandler(client, message);
   invitesTracker(client);
   
-  // 🧪 COMMAND TESTING BARU: !1 (Untuk uji coba log member join)
-  // Hanya Owner/Admin yang bisa menggunakan command ini
-  if (message.content === "!1" && message.member?.permissions.has("ADMINISTRATOR")) {
-      await logMemberJoin(client, message.member);
-      await message.react('✅').catch(err => console.error("❌ Gagal react:", err));
-      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan:", err));
+  const member = message.member;
+  const content = message.content.toLowerCase();
+  
+  // --- COMMAND SIMULASI LOG: !1, !2, !3 ---
+  if (content === "!1" || content === "!2" || content === "!3") {
+      // Hanya Owner/Admin yang bisa menggunakan command simulasi
+      const isOwnerOrAdmin = member?.permissions.has("ADMINISTRATOR") || member?.guild.ownerId === member.id;
+      
+      if (!isOwnerOrAdmin) {
+          return message.reply({ content: "❌ Perintah simulasi ini hanya bisa digunakan oleh Administrator/Owner.", ephemeral: true });
+      }
+      
+      let logType;
+      let logTypeText;
+      if (content === '!1') { logType = 'JOIN'; logTypeText = 'Simulasi: Member Bergabung'; }
+      else if (content === '!2') { logType = 'LEAVE'; logTypeText = 'Simulasi: Member Keluar'; }
+      else if (content === '!3') { logType = 'RE_ENTRY'; logTypeText = 'Simulasi: Member Masuk Kembali'; }
+
+      // 1. Catat aksi di Forum Log Persisten
+      await logMemberAction(member, 'CMD_SIM', content); 
+
+      // 2. Kirim balasan ke channel chat (untuk konfirmasi)
+      const confirmationEmbed = createLogEntryEmbed(member, logType, content);
+      await message.channel.send({ 
+          content: `**[KONFIRMASI]** ${member.user.tag} memicu simulasi: ${logTypeText}`,
+          embeds: [confirmationEmbed] 
+      }).catch(err => console.error("❌ Gagal mengirim konfirmasi simulasi:", err.message));
+      
+      // 3. Hapus pesan perintah
+      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan perintah:", err));
+      return;
   }
 });
 
-// 🚀 Auto Greeting ketika user join
+// 🚀 Log ketika user join (Event nyata)
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
-  // Panggil fungsi log member join ke Forum
-  logMemberJoin(client, member); // <-- BARIS BARU
+  // Log event Join nyata ke Forum
+  await logMemberAction(member, 'JOIN'); 
 });
+
+// 🚪 Log ketika user leave (Event nyata)
+client.on("guildMemberRemove", async (member) => {
+    // Log event Leave nyata ke Forum
+    await logMemberAction(member, 'LEAVE'); 
+});
+
 
 // ⏱ Update waktu di voice channel tiap 30 detik
 setInterval(() => {
