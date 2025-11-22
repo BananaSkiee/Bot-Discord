@@ -11,6 +11,7 @@ const ROLE_TAGS_MAP = {
 };
 const ROLE_VERIFY_ID = '1352286235233620108'; 
 const NEUTRAL_COLOR = 0x2C2F33; 
+const THREAD_NAME_PREFIX = 'Log - ';
 
 // --- FUNGSI PEMBANTU ---
 
@@ -29,7 +30,6 @@ function getMemberTags(member) {
     let genderTag = '⚫ Belum Terset';
     let verifyTag = '❌ Non Verify';
     
-    // Tag Re-entry (menggunakan cache karena role bisa saja terhapus)
     let reEntryTag = member.roles.cache.has(ROLE_REENTRY_ID) 
         ? '⚠️ Re-entry Tag Aktif' 
         : '🟢 Tag Re-entry Nonaktif';
@@ -64,7 +64,6 @@ function getMemberPresenceInfo(member) {
         default: statusDisplay = '⚫ Offline / Tersembunyi'; break;
     }
     
-    // Cek Client/Device
     const devices = [];
     if (clientStatus.desktop) devices.push('🖥️ PC/Desktop');
     if (clientStatus.mobile) devices.push('📱 Mobile/HP');
@@ -78,8 +77,8 @@ function getMemberPresenceInfo(member) {
 /**
  * Membuat Embed profesional TINGKAT DEWA untuk entri log.
  * @param {import('discord.js').GuildMember} member - Objek member yang terlibat.
- * @param {('JOIN'|'LEAVE'|'RE_ENTRY'|'CMD_SIM'|'FIRST_MESSAGE')} type - Tipe event.
- * @param {object} extraData - Data tambahan seperti invite, message, dll.
+ * @param {('JOIN'|'LEAVE'|'RE_ENTRY'|'CMD_SIM'|'FIRST_MESSAGE'|'ROLE_UPDATE')} type - Tipe event.
+ * @param {object} extraData - Data tambahan seperti invite, message, role changes, dll.
  * @returns {EmbedBuilder}
  */
 async function createLogEntryEmbed(member, type, extraData = {}) {
@@ -90,7 +89,7 @@ async function createLogEntryEmbed(member, type, extraData = {}) {
         case 'JOIN':
             title = '🟢 MEMBER BERGABUNG (AUDIT AWAL)';
             emoji = '🚪';
-            description = `Subjek terdeteksi memasuki server. Data Audit Log Dibuat.`;
+            description = `Subjek terdeteksi memasuki server secara nyata. Data Audit Log Dibuat.`;
             break;
         case 'LEAVE':
             title = '🔴 MEMBER KELUAR';
@@ -107,6 +106,11 @@ async function createLogEntryEmbed(member, type, extraData = {}) {
             emoji = '📝';
             description = `Pesan pertama subjek di server ini telah dicatat.`;
             break;
+        case 'ROLE_UPDATE':
+            title = '💼 PERUBAHAN PERAN (ROLE UPDATE)';
+            emoji = '🔄';
+            description = `Peran (Role) member diubah oleh Moderator/Sistem.`;
+            break;
         case 'CMD_SIM':
             title = `⚙️ SIMULASI LOG (Command: ${extraData.command})`;
             emoji = '🧪';
@@ -120,8 +124,8 @@ async function createLogEntryEmbed(member, type, extraData = {}) {
 
     // 2. Ambil semua data
     const user = member.user;
-    await user.fetch().catch(() => null); // Ambil data user lengkap (termasuk banner/nitro)
-    await member.fetch().catch(() => null); // Ambil data member lengkap (termasuk presence)
+    await user.fetch().catch(() => null); 
+    await member.fetch().catch(() => null); 
     
     const tags = getMemberTags(member);
     const presenceInfo = getMemberPresenceInfo(member);
@@ -156,14 +160,14 @@ async function createLogEntryEmbed(member, type, extraData = {}) {
 
     const embed = new EmbedBuilder()
         .setTitle(`${emoji} ${title}`)
-        .setColor(accentColor) // Menggunakan warna custom member/netral
+        .setColor(accentColor) 
         .setAuthor({
             name: `${member.user.tag} | Audit Code: ${generateUniqueAuditCode()}`,
             iconURL: member.user.displayAvatarURL(),
         })
         .setThumbnail(member.user.displayAvatarURL())
         .setDescription(`**[KONTEKS TRANSAKSI]** ${description}`)
-        .setImage(bannerURL || null) // Banner profile (Header)
+        .setImage(bannerURL || null) 
         .addFields(
             // --- BAGIAN I: IDENTITAS & SERVER ---
             { name: '🔑 Kunci Audit ID', value: `\`${member.id}\``, inline: true },
@@ -188,13 +192,35 @@ async function createLogEntryEmbed(member, type, extraData = {}) {
             { name: '✅ Verifikasi Status', value: tags.verification, inline: true },
             { name: '⚠️ Re-entry Tag', value: tags.reEntry, inline: true },
             { name: `🛡️ Role Diberikan (${rolesCount})`, value: rolesCount > 0 ? member.roles.cache.filter(r => r.id !== member.guild.id).map(r => r.toString()).join(' | ') : 'Tidak ada role selain @everyone.', inline: false },
-
-            // --- BAGIAN V: LOG KHUSUS (Invite & Message) ---
+        );
+    
+    // --- Tambahkan data khusus ROLE_UPDATE di bagian akhir ---
+    if (type === 'ROLE_UPDATE' && extraData.roleChanges) {
+        const { added, removed } = extraData.roleChanges;
+        if (added.length > 0) {
+            embed.addFields({ 
+                name: `➕ Role Ditambahkan (${added.length})`, 
+                value: added.join(', '), 
+                inline: false 
+            });
+        }
+        if (removed.length > 0) {
+            embed.addFields({ 
+                name: `➖ Role Dicabut (${removed.length})`, 
+                value: removed.join(', '), 
+                inline: false 
+            });
+        }
+    } else {
+        // --- BAGIAN V: LOG KHUSUS (Invite & Message) (Hanya jika bukan ROLE_UPDATE) ---
+        embed.addFields(
             { name: '🔗 Sumber Undangan (Invite)', value: inviteInfo, inline: false },
             { name: '💬 Log Pesan Pertama', value: firstMessageInfo, inline: false },
-        )
-        .setFooter({ text: `Audit Log Persisten V4 - KELENGKAPAN MAKSIMUM.`, iconURL: member.guild.iconURL() })
-        .setTimestamp();
+        );
+    }
+
+    embed.setFooter({ text: `Audit Log Persisten V5 - Log Peran Ditambahkan.`, iconURL: member.guild.iconURL() })
+    embed.setTimestamp();
     
     return embed;
 }
@@ -213,14 +239,13 @@ async function findOrCreateMemberLogThread(guild, member) {
     const threadKey = `${member.user.username} [${member.id}]`;
     let thread = null;
 
-    // Cari thread berdasarkan nama/kunci
     const [active, archived] = await Promise.all([
         forumChannel.threads.fetchActive().catch(() => ({ threads: new Collection() })),
         forumChannel.threads.fetchArchived().catch(() => ({ threads: new Collection() }))
     ]);
 
     const allThreads = new Collection().concat(active.threads, archived.threads);
-    thread = allThreads.find(t => t.name.includes(member.id)); // Paling aman cari by ID
+    thread = allThreads.find(t => t.name.includes(member.id)); 
 
     if (thread) {
         if (thread.archived) {
@@ -231,7 +256,6 @@ async function findOrCreateMemberLogThread(guild, member) {
 
     // Jika thread baru dibuat (Hanya terjadi pada JOIN nyata)
     try {
-        // Log JOIN pertama di sini
         const initialEmbed = await createLogEntryEmbed(member, 'JOIN'); 
         thread = await forumChannel.threads.create({
             name: threadKey, 
@@ -251,22 +275,22 @@ async function findOrCreateMemberLogThread(guild, member) {
 }
 
 /**
- * Fungsi utama untuk log aksi member (JOIN, LEAVE, RE-ENTRY, CMD_SIM).
+ * Fungsi utama untuk log aksi member (JOIN, LEAVE, RE-ENTRY, CMD_SIM, ROLE_UPDATE).
  */
 async function logMemberAction(member, type, extraData = {}) {
     if (!member || !member.guild) return;
     
     // Tentukan apakah ini log yang perlu dikirim (semua kecuali JOIN event nyata)
-    const shouldSendNewLog = (type !== 'JOIN') || (type === 'CMD_SIM');
+    const shouldSendNewLog = (type !== 'JOIN') || (type === 'CMD_SIM') || (type === 'ROLE_UPDATE');
 
     const thread = await findOrCreateMemberLogThread(member.guild, member);
     if (!thread) return;
 
     let logType = type;
     if (type === 'CMD_SIM' && extraData.command) {
-        if (extraData.command === '!1') logType = 'JOIN'; // !1 = Simulasi Join
-        else if (extraData.command === '!2') logType = 'LEAVE'; // !2 = Simulasi Leave
-        else if (extraData.command === '!3') logType = 'RE_ENTRY'; // !3 = Simulasi Re-entry
+        if (extraData.command === '!1') logType = 'JOIN'; 
+        else if (extraData.command === '!2') logType = 'LEAVE'; 
+        else if (extraData.command === '!3') logType = 'RE_ENTRY'; 
         else logType = 'CMD';
     }
 
@@ -302,7 +326,6 @@ async function logFirstMessage(message) {
     const thread = await findOrCreateMemberLogThread(member.guild, member);
     if (!thread) return;
 
-    // Tambahkan link pesan ke extraData
     const extraData = {
         firstMessage: {
             url: message.url,
@@ -321,7 +344,7 @@ async function logFirstMessage(message) {
 
 module.exports = {
     logMemberAction,
-    logFirstMessage, // Export fungsi ini
+    logFirstMessage, 
     FORUM_CHANNEL_ID,
     createLogEntryEmbed 
 };
