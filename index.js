@@ -13,6 +13,7 @@ const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
+const { logMemberJoin } = require("./modules/memberLogForum"); // <-- BARIS BARU
 
 const client = new Client({
   intents: [
@@ -88,6 +89,7 @@ fs.readdirSync("./events").forEach((file) => {
 });
 
 srvName(client);
+// Baris startAutoAnimation(client); DIHAPUS dari sini
 
 // 🟩 Slash Commands + 🟦 Button Handler
 client.on("interactionCreate", async (interaction) => {
@@ -119,11 +121,21 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   stickyHandler(client, message);
   invitesTracker(client);
+  
+  // 🧪 COMMAND TESTING BARU: !1 (Untuk uji coba log member join)
+  // Hanya Owner/Admin yang bisa menggunakan command ini
+  if (message.content === "!1" && message.member?.permissions.has("ADMINISTRATOR")) {
+      await logMemberJoin(client, message.member);
+      await message.react('✅').catch(err => console.error("❌ Gagal react:", err));
+      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan:", err));
+  }
 });
 
 // 🚀 Auto Greeting ketika user join
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
+  // Panggil fungsi log member join ke Forum
+  logMemberJoin(client, member); // <-- BARIS BARU
 });
 
 // ⏱ Update waktu di voice channel tiap 30 detik
@@ -162,4 +174,4 @@ process.on('SIGTERM', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
-});
+}); 
