@@ -1,5 +1,3 @@
-const updateOnline = require("../modules/online");
-
 module.exports = {
   name: "presenceUpdate",
   async execute(_, newPresence, client) {
