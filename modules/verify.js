@@ -86,7 +86,7 @@ class VerifySystem {
         }
     }
 
-    // PESAN UTAMA VERIFY (NON-EPHEMERAL)
+    // PESAN UTAMA VERIFY (NON-EPHEMERAL - Sesuai Permintaan)
     async sendVerifyMessage(channel) {
         const embed = new EmbedBuilder()
             .setColor(0x5865F2)
@@ -105,11 +105,11 @@ class VerifySystem {
         await channel.send({ embeds: [embed], components: [button] });
     }
 
-    // ========== MAIN VERIFICATION FLOW ========== 
+    // ========== MAIN VERIFICATION FLOW (DISMISSIVE) ========== 
     async handleVerify(interaction) {
         try {
             if (this.verificationQueue.has(interaction.user.id)) {
-                // ⚡ DISMISS MESSAGE - Ephemeral reply
+                // ⚡ DISMISSIVE (Ephemeral Reply)
                 return await interaction.reply({
                     content: '⏳ Verification already in progress. Please wait...',
                     flags: MessageFlags.Ephemeral
@@ -118,18 +118,20 @@ class VerifySystem {
 
             this.verificationQueue.set(interaction.user.id, true);
             
-            // ⚡ DISMISS MESSAGE - Defer untuk edit message yang sama
-            await interaction.deferReply(); 
+            // ⚡ DISMISSIVE (Defer Reply - Membuat pesan balasan inisial)
+            await interaction.deferReply({ 
+                ephemeral: true // Pastikan balasan defer bersifat ephemeral
+            }); 
 
             if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
                 this.verificationQueue.delete(interaction.user.id);
-                // ⚡ DISMISS MESSAGE - Edit reply yang sama
+                // ⚡ DISMISSIVE (Edit Reply yang sama)
                 return await interaction.editReply({ 
                     content: '✅ Anda sudah terverifikasi!',
                 }); 
             }
 
-            // ⚡ DISMISS MESSAGE - Progress bars di message yang sama
+            // ⚡ DISMISSIVE (Progress bars di pesan yang sama)
             for (let i = 0; i < this.verificationSteps.length; i++) {
                 const step = this.verificationSteps[i];
                 const embed = this.getProgressEmbed(step, i + 1, this.verificationSteps.length);
@@ -144,7 +146,7 @@ class VerifySystem {
             this.verificationQueue.delete(interaction.user.id);
             if (error.code === 10062) return;
             
-            // ⚡ DISMISS MESSAGE - Error message
+            // ⚡ DISMISSIVE (Error message)
             if (!interaction.replied && !interaction.deferred) {
                  await interaction.reply({ 
                      content: '❌ Terjadi kesalahan saat verifikasi.', 
@@ -159,6 +161,7 @@ class VerifySystem {
         } 
     }
 
+    // ... (getProgressEmbed dan generateProgressBar tetap sama) ...
     getProgressEmbed(step, currentStep, totalSteps) {
         const progress = Math.round((currentStep / totalSteps) * 100);
         const progressBar = this.generateProgressBar(progress);
@@ -205,8 +208,11 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
             
-            // ⚡ DISMISS MESSAGE - Edit reply yang sama
-            await interaction.editReply({ embeds: [embed], components: [buttons] });
+            // ⚡ DISMISSIVE (Edit reply yang sama)
+            await interaction.editReply({ 
+                embeds: [embed], 
+                components: [buttons] 
+            });
             this.createUserSession(interaction.user.id);
         } catch (error) {
             console.error('Show verification success error:', error);
@@ -215,10 +221,10 @@ class VerifySystem {
         } 
     }
 
-    // ========== BUTTON HANDLERS - DISMISS MESSAGE (Edit Message) ==========
+    // ========== BUTTON HANDLERS - DISMISSIVE (Edit Message) ==========
     async handleSkipVerify(interaction) {
         try {
-            // ⚡ DISMISS MESSAGE - Defer update untuk edit message yang sama
+            // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
             
             const embed = new EmbedBuilder()
@@ -247,7 +253,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Secondary)
                 );
             
-            // ⚡ DISMISS MESSAGE - Edit reply yang sama
+            // ⚡ DISMISSIVE (Edit reply yang sama)
             await interaction.editReply({ embeds: [embed], components: [buttons] });
         } catch (error) {
             console.error('Skip verify error:', error);
@@ -260,7 +266,7 @@ class VerifySystem {
 
     async handleContinueVerify(interaction) {
         try {
-            // ⚡ DISMISS MESSAGE - Defer update untuk edit message yang sama
+            // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
 
             const embed = new EmbedBuilder()
@@ -285,7 +291,7 @@ class VerifySystem {
                         .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
                 );
             
-            // ⚡ DISMISS MESSAGE - Edit reply yang sama
+            // ⚡ DISMISSIVE (Edit reply yang sama)
             await interaction.editReply({ 
                 content: `${interaction.user}`, 
                 embeds: [embed], 
@@ -298,7 +304,7 @@ class VerifySystem {
                 visitedChannels: { home: false, rules: false, customize: false } 
             });
 
-            // AUTO LANJUT SETELAH 30 DETIK - akan edit message yang sama
+            // AUTO LANJUT SETELAH 30 DETIK - akan edit message yang sama (DISMISSIVE)
             setTimeout(async () => {
                 try {
                     await this.autoProceedToMission(interaction);
@@ -338,7 +344,7 @@ class VerifySystem {
                         .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
                 );
 
-            // ⚡ DISMISS MESSAGE - Edit reply yang sama
+            // ⚡ DISMISSIVE (Edit reply yang sama)
             await interaction.editReply({ 
                 embeds: [embed], 
                 components: [buttons] 
@@ -359,14 +365,14 @@ class VerifySystem {
             const session = this.getUserSession(interaction.user.id);
             
             if (!session || session.step !== 'ready_for_rating') {
-                // ⚡ DISMISS MESSAGE - Ephemeral reply
+                // ⚡ DISMISSIVE (Ephemeral Reply)
                 return await interaction.reply({ 
                     content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.', 
                     flags: MessageFlags.Ephemeral
                 }); 
             }
             
-            // ⚡ DISMISS MESSAGE - Defer update untuk edit message yang sama
+            // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate(); 
             
             const ratingEmbed = new EmbedBuilder()
@@ -391,7 +397,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Secondary)
                 );
 
-            // ⚡ DISMISS MESSAGE - Edit message yang sama
+            // ⚡ DISMISSIVE (Edit message yang sama)
             await interaction.editReply({ 
                 embeds: [ratingEmbed], 
                 components: [ratingButtons] 
@@ -400,7 +406,7 @@ class VerifySystem {
             this.updateUserSession(interaction.user.id, { step: 'rating' });
         } catch (error) {
             console.error('Next verify error:', error);
-            // ⚡ DISMISS MESSAGE - Error handling
+            // ⚡ DISMISSIVE (Error handling)
             if (interaction.deferred) {
                 await interaction.editReply({ 
                     content: '❌ Gagal memproses next verify.', 
@@ -416,7 +422,7 @@ class VerifySystem {
     }
 
     async handleNextFinal(interaction) {
-        // ⚡ DISMISS MESSAGE - Defer update untuk edit message yang sama
+        // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
         await interaction.deferUpdate();
         await this.showFinalCompletion(interaction);
     }
@@ -439,7 +445,7 @@ class VerifySystem {
                     .setStyle(ButtonStyle.Success)
             );
         
-        // ⚡ DISMISS MESSAGE - Edit reply yang sama
+        // ⚡ DISMISSIVE (Edit reply yang sama)
         await interaction.editReply({ 
             embeds: [embed], 
             components: [button] 
@@ -451,7 +457,7 @@ class VerifySystem {
     
     async handleBackToVerify(interaction) {
         try {
-            // ⚡ DISMISS MESSAGE - Defer update untuk edit message yang sama
+            // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
 
             const embed = new EmbedBuilder()
@@ -472,7 +478,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
             
-            // ⚡ DISMISS MESSAGE - Edit reply yang sama
+            // ⚡ DISMISSIVE (Edit reply yang sama)
             await interaction.editReply({ 
                 embeds: [embed], 
                 components: [buttons] 
@@ -486,10 +492,10 @@ class VerifySystem {
         }
     }
 
-    // ========== EPHEMERAL HANDLERS (Tetap ephemeral) ==========
+    // ========== EPHEMERAL HANDLERS (Tetap ephemeral / private) ==========
     async handleSeeMission(interaction) {
         try {
-            // ❌ BUKAN DISMISS MESSAGE - Tetap ephemeral
+            // ⚡ EPHEMERAL (Balasan hanya untuk user)
             await interaction.reply({ 
                 flags: MessageFlags.Ephemeral,
                 embeds: [new EmbedBuilder()
@@ -516,7 +522,7 @@ class VerifySystem {
                 .setDescription('**Pertanyaan yang sering ditanyakan:**\n\n' + this.faqData.questions.map((item, index) => `**${index + 1}. ${item.q}**\n${item.a}`).join('\n\n'))
                 .setFooter({ text: 'Butuh bantuan lebih? Hubungi staff!' });
             
-            // ❌ BUKAN DISMISS MESSAGE - Tetap ephemeral
+            // ⚡ EPHEMERAL (Balasan hanya untuk user)
             await interaction.reply({ 
                 embeds: [embed], 
                 flags: MessageFlags.Ephemeral 
@@ -530,7 +536,7 @@ class VerifySystem {
         }
     }
 
-    // ========== MODAL HANDLERS (Tetap seperti semula) ==========
+    // ========== MODAL HANDLERS (Tidak menghasilkan pesan, hanya menampilkan modal) ==========
     async handleInputRating(interaction) {
         const modal = new ModalBuilder()
             .setCustomId('input_rating_modal')
@@ -569,11 +575,13 @@ class VerifySystem {
         await interaction.showModal(modal);
     }
     
-    // ========== MODAL SUBMIT HANDLERS ==========
+    // ========== MODAL SUBMIT HANDLERS (DISMISSIVE) ==========
     async handleRatingSubmit(interaction) {
         try {
-            // ⚡ DISMISS MESSAGE - Defer untuk edit message utama
-            await interaction.deferReply(); 
+            // ⚡ DISMISSIVE (Defer untuk edit message utama - ephemeral)
+            await interaction.deferReply({ 
+                ephemeral: true 
+            }); 
 
             const ratingValue = interaction.fields.getTextInputValue('rating_value');
             const rating = parseInt(ratingValue);
@@ -608,7 +616,7 @@ class VerifySystem {
                         .setStyle(ButtonStyle.Primary)
                 );
             
-            // ⚡ DISMISS MESSAGE - Edit message yang sama
+            // ⚡ DISMISSIVE (Edit message yang sama)
             await interaction.editReply({ 
                 embeds: [resultEmbed], 
                 components: [resultButtons] 
@@ -624,7 +632,7 @@ class VerifySystem {
 
     async handleFeedbackSubmit(interaction) {
         try {
-            // ⚡ DISMISS MESSAGE - Defer ephemeral untuk konfirmasi
+            // ⚡ DISMISSIVE (Defer ephemeral untuk konfirmasi)
             await interaction.deferReply({ 
                 flags: MessageFlags.Ephemeral 
             });
@@ -640,7 +648,7 @@ class VerifySystem {
                 }
             }
 
-            // ⚡ DISMISS MESSAGE - Edit ephemeral reply
+            // ⚡ DISMISSIVE (Edit ephemeral reply)
             await interaction.editReply({ 
                 content: feedbackContent ? '✅ Terima kasih atas feedbacknya!' : '⚠️ Feedback dilewati.', 
                 components: [] 
@@ -655,6 +663,7 @@ class VerifySystem {
     }
 
     // ========== MESSAGE DETECTION & AUTO PROCEED ==========
+    // Fungsi ini tetap sama, hanya memicu update di channel verifikasi
     async detectFirstMessage(message) {
         try {
             console.log(`🔍 Checking message from ${message.author.username} in ${message.channel.name}`);
@@ -684,7 +693,7 @@ class VerifySystem {
             
             this.updateUserSession(userId, session);
 
-            // ⚡ ENABLE TOMBOL NEXT VERIFY DI VERIFY CHANNEL
+            // ⚡ ENABLE TOMBOL NEXT VERIFY DI VERIFY CHANNEL (mengedit pesan bot)
             await this.enableNextVerifyButton(message.author, message.client);
 
         } catch (error) {
@@ -692,6 +701,7 @@ class VerifySystem {
         }
     }
 
+    // ... (enableNextVerifyButton tetap sama, karena hanya mengedit pesan bot) ...
     async enableNextVerifyButton(user, client) {
         try {
             console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
@@ -702,6 +712,7 @@ class VerifySystem {
             // ⚡ CARI SEMUA MESSAGE USER DI VERIFY CHANNEL
             const messages = await verifyChannel.messages.fetch({ limit: 100 });
             
+            // Mencari pesan bot yang menyebut user (balasan interaksi ephemeral)
             const userVerifyMessage = messages.find(msg => {
                 if (msg.author.id !== client.user.id) return false;
                 return msg.mentions.users.has(user.id);
@@ -727,6 +738,7 @@ class VerifySystem {
                             .setDisabled(false)
                     );
 
+                // Ini adalah edit pesan bot (Bukan ephemeral, karena pesan bot yang diedit)
                 await userVerifyMessage.edit({ components: [enabledButtons] });
                 
             } else {
@@ -738,10 +750,10 @@ class VerifySystem {
         }
     }
 
-    // ========== ROLE MANAGEMENT ==========
+    // ========== ROLE MANAGEMENT (DISMISSIVE) ==========
     async handleGiveRole(interaction) {
         try {
-            // ⚡ DISMISS MESSAGE - Defer update untuk edit message yang sama
+            // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
             
             const success = await this.grantMemberAccess(interaction);
@@ -756,7 +768,7 @@ class VerifySystem {
                     .setDescription(`Role member telah diberikan kepada ${interaction.user.username}!\n\nChannel verify sekarang tersembunyi untuk Anda.`)
                     .setFooter({ text: 'Welcome to BananaSkiee Community!' });
                 
-                // ⚡ DISMISS MESSAGE - Edit reply yang sama
+                // ⚡ DISMISSIVE (Edit reply yang sama)
                 await interaction.editReply({ 
                     embeds: [embed], 
                     components: [] 
@@ -773,6 +785,7 @@ class VerifySystem {
         }
     }
     
+    // ... (grantMemberAccess, logVerification, generateLogContent, dan Helper Functions tetap sama) ...
     async grantMemberAccess(interaction) {
         try {
             const member = interaction.member;
