@@ -3,6 +3,5 @@ module.exports = {
   async execute(_, newPresence, client) {
     const guild = newPresence.guild;
     if (!guild) return;
-    await updateOnline(guild);
   },
 };
