@@ -27,7 +27,6 @@ const client = new Client({
 });
 
 require('./modules/rateLimiter')(client);     
-require('./modules/autoSafeRename')(client);  
 
 client.commands = new Collection();
 
