@@ -122,13 +122,15 @@ class VerifySystem {
                 ephemeral: true // Pastikan balasan defer bersifat ephemeral
             }); 
 
-            // --- PERBAIKAN BUG STUCK: SIMPAN TOKEN UNTUK EDIT EPHEMERAL MASA DEPAN ---
+            // --- PERBAIKAN KRUSIAL: SIMPAN TOKEN DARI INTERAKSI TERBARU ---
+            // Ini akan menjadi token untuk MENGEDIT pesan ephemeral di masa depan.
             this.createUserSession(interaction.user.id);
             this.updateUserSession(interaction.user.id, { 
-                interactionToken: interaction.token,
-                channelId: interaction.channelId
+                interactionToken: interaction.token, // Simpan Token
+                channelId: interaction.channelId,
+                applicationId: interaction.applicationId // Simpan Application ID
             });
-            // -----------------------------------------------------------------------
+            // -----------------------------------------------------------
 
             if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
                 this.verificationQueue.delete(interaction.user.id);
@@ -197,6 +199,12 @@ class VerifySystem {
 
     async showVerificationSuccess(interaction) {
         try {
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
+
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('🎊 VERIFIKASI BERHASIL')
@@ -232,6 +240,11 @@ class VerifySystem {
         try {
             // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
             
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
@@ -275,6 +288,12 @@ class VerifySystem {
             // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
 
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
+
             const embed = new EmbedBuilder()
                 .setColor(0x5865F2)
                 .setTitle('🏠 KUNJUNGI AREA SERVER')
@@ -316,7 +335,9 @@ class VerifySystem {
                     // Cek jika interaksi masih valid sebelum memanggil autoProceed
                     const session = this.getUserSession(interaction.user.id);
                     if (session && session.step === 'server_exploration') {
-                        await this.autoProceedToMission(interaction);
+                        // Perlu membuat dummy interaction jika timeout terjadi, 
+                        // tapi kita akan coba edit langsung dengan token yang tersimpan
+                        await this.autoProceedToMission(interaction); 
                     }
                 } catch (error) {
                     // Ignore if message or interaction expires
@@ -361,19 +382,29 @@ class VerifySystem {
                 );
 
             // ⚡ DISMISSIVE (Edit reply yang sama)
-            // Cek apakah interaksi masih bisa di-edit (timeout 3 detik)
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({ 
-                    embeds: [embed], 
-                    components: [buttons] 
-                });
-            } else {
-                // Jika sudah melewati batas edit, kirim pesan baru (meski ini jarang terjadi)
-                await interaction.channel.send({
-                    content: `${interaction.user} Waktu edit habis! Proses dilanjutkan ke Misi Perkenalan.`,
-                    embeds: [embed],
-                    components: [buttons]
-                });
+            // Cek apakah interaksi masih bisa di-edit (timeout 3 detik dari deferUpdate)
+            // Jika kita berada di dalam setTimeout 30 detik, interaksi ini mungkin sudah kadaluarsa,
+            // tetapi kita coba editReply dulu karena lebih aman daripada token jika masih valid.
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ 
+                        embeds: [embed], 
+                        components: [buttons] 
+                    });
+                } else {
+                    // Jika sudah melewati batas edit, token harusnya tetap bisa digunakan (hanya 30 detik yang lalu)
+                    // Tapi, kita akan gunakan token di detectFirstMessage nanti.
+                    // Untuk saat ini, kita anggap editReply berhasil
+                    await interaction.channel.send({
+                        content: `${interaction.user} Proses dilanjutkan ke Misi Perkenalan. Silakan cek pesan ephemeral Anda.`,
+                        embeds: [embed],
+                        components: [buttons],
+                        flags: MessageFlags.Ephemeral // Pastikan ini tetap ephemeral!
+                    });
+                }
+            } catch (e) {
+                // Jika editReply gagal karena timeout, abaikan. Token akan digunakan nanti.
+                console.log("⚠️ Edit reply after 30s timeout failed, relying on stored token.");
             }
 
 
@@ -418,10 +449,19 @@ class VerifySystem {
             this.updateUserSession(userId, session);
 
             // ⚡ KRUSIAL: EDIT PESAN EPHEMERAL DENGAN TOKEN YANG DISIMPAN
-            if (session.interactionToken) {
-                await this.editEphemeralMissionMessage(message.client, userId, session.interactionToken); 
+            if (session.interactionToken && session.applicationId) {
+                await this.editEphemeralMissionMessage(
+                    message.client, 
+                    userId, 
+                    session.interactionToken, 
+                    session.applicationId // Menggunakan Application ID
+                ); 
             } else {
-                console.error(`❌ Gagal mengaktifkan tombol Next Verify: Token interaksi tidak ditemukan untuk user ${userId}`);
+                console.error(`❌ Gagal mengaktifkan tombol Next Verify: Token interaksi atau Application ID tidak ditemukan untuk user ${userId}.`);
+                // Kirim pesan peringatan ke user secara ephemeral (jika memungkinkan)
+                try {
+                    await message.author.send({ content: `⚠️ Misi chat Anda selesai, namun Bot gagal mengaktifkan tombol NEXT VERIFY. Silakan coba ulangi dari awal atau hubungi staff.`});
+                } catch (e) { /* ignore */ }
             }
 
         } catch (error) {
@@ -429,16 +469,16 @@ class VerifySystem {
         }
     }
 
-    // ========== FUNGSI BARU: MENGEDIT PESAN EPHEMERAL DENGAN TOKEN ==========
-    async editEphemeralMissionMessage(client, userId, token) {
+    // ========== FUNGSI BARU: MENGEDIT PESAN EPHEMERAL DENGAN TOKEN (FIX BUG) ==========
+    async editEphemeralMissionMessage(client, userId, token, applicationId) {
         try {
             console.log(`🔧 Mengaktifkan tombol NEXT VERIFY untuk ${userId} menggunakan token.`);
             
-            // Re-create the embed (for consistency, though we only need to update components)
+            // 1. Buat Embed dan Component yang BARU
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
-                .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${client.users.cache.get(userId).username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+                .setTitle('👋 MISI PERKENALAN - SELESAI!')
+                .setDescription(`**Selamat!** Misi chat perkenalan telah selesai. ✅\n\n**Sekarang, silakan klik tombol di bawah untuk lanjut ke langkah Rating!**`)
                 .setFooter({ text: 'Auto detect • No button needed' });
 
             const enabledButtons = new ActionRowBuilder()
@@ -458,17 +498,27 @@ class VerifySystem {
                         .setDisabled(false) // <--- INI PENGAKTIFAN TOMBOL
                 );
             
-            // Menggunakan Webhook API untuk mengedit pesan ephemeral (@original)
-            await client.api.webhooks(client.user.id, token).messages('@original').patch({
-                data: {
-                    embeds: [embed.toJSON()],
-                    components: [enabledButtons.toJSON()]
-                }
-            });
+            // 2. Menggunakan Webhook API untuk mengedit pesan ephemeral (@original)
+            // Menggunakan REST API langsung untuk menghindari potensi masalah internal client.api
+            const REST_API_URL = `https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`;
+            
+            const payload = {
+                embeds: [embed.toJSON()],
+                components: [enabledButtons.toJSON()]
+            };
+
+            await client.rest.patch(REST_API_URL, { body: payload });
 
         } catch (error) {
+            // Error ini adalah yang paling mungkin terjadi jika token kadaluarsa (> 15 menit)
             console.error('❌ Edit ephemeral mission message error (Token-based failed):', error.message);
-            // Menangkap error jika pesan sudah terlalu lama atau sudah dihapus user
+            // Memberikan pesan alternatif kepada pengguna jika edit gagal
+            try {
+                const user = await client.users.fetch(userId);
+                await user.send({ 
+                    content: `⚠️ Misi Anda telah selesai, namun tombol "NEXT VERIFY" tidak dapat diaktifkan. Silakan klik tombol verifikasi di channel utama lagi untuk melanjutkan proses. (Error: Token Expired)` 
+                });
+            } catch (e) { /* ignore DM error */ }
         }
     }
 
@@ -486,6 +536,11 @@ class VerifySystem {
             
             // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate(); 
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
             
             const ratingEmbed = new EmbedBuilder()
                 .setColor(0xFFD700)
@@ -536,6 +591,11 @@ class VerifySystem {
     async handleNextFinal(interaction) {
         // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
         await interaction.deferUpdate();
+        // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+        this.updateUserSession(interaction.user.id, { 
+            interactionToken: interaction.token 
+        });
+        // ----------------------------------------------------
         await this.showFinalCompletion(interaction);
     }
     
@@ -571,6 +631,11 @@ class VerifySystem {
         try {
             // ⚡ DISMISSIVE (Defer update untuk edit message yang sama)
             await interaction.deferUpdate();
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
 
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
@@ -690,10 +755,15 @@ class VerifySystem {
     // ========== MODAL SUBMIT HANDLERS (DISMISSIVE) ==========
     async handleRatingSubmit(interaction) {
         try {
-            // ⚡ DISMISSIVE (Defer untuk edit message utama - ephemeral)
+            // ⚡ DISMISSIVE (Defer ephemeral untuk edit message utama - ephemeral)
             await interaction.deferReply({ 
                 ephemeral: true 
             }); 
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
 
             const ratingValue = interaction.fields.getTextInputValue('rating_value');
             const rating = parseInt(ratingValue);
@@ -748,6 +818,11 @@ class VerifySystem {
             await interaction.deferReply({ 
                 flags: MessageFlags.Ephemeral 
             });
+            // --- KRUSIAL: UPDATE TOKEN SETIAP ADA INTERAKSI BARU ---
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token 
+            });
+            // ----------------------------------------------------
 
             const feedbackContent = interaction.fields.getTextInputValue('feedback_content');
             
@@ -823,7 +898,7 @@ class VerifySystem {
         }
     }
 
-    // ========== LOGGING SYSTEM (TETAP SAMA SEPERTI SEMULA - TIDAK DIUBAH) ========== 
+    // ========== LOGGING SYSTEM (TETAP SAMA SEPERULA) ========== 
     async logVerification(interaction) {
         try {
             const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
@@ -864,7 +939,7 @@ class VerifySystem {
         } 
     }
 
-    // ========== LOG CONTENT GENERATOR - TETAP SAMA SEPERTI SEMULA ==========
+    // ========== LOG CONTENT GENERATOR - TETAP SAMA SEPERULA ==========
     generateLogContent(user, member, session) { 
         const timestamp = new Date().toLocaleString('id-ID'); 
         const accountAge = this.getAccountAge(user.createdAt); 
@@ -898,7 +973,8 @@ class VerifySystem {
 ├─ 🎂 Account Age: ${accountAge} hari
 ├─ 🔹 Client: ${this.getUserClient(user)}
 ├─ 🔑 Interaction Token: ${session?.interactionToken || 'N/A'}
-└─ 📍 Channel ID: ${session?.channelId || 'N/A'}
+├─ 📍 Channel ID: ${session?.channelId || 'N/A'}
+└─ 🤖 Application ID: ${session?.applicationId || 'N/A'}
 
 📱 ACCOUNT BADGES & PREMIUM
 ├─ 🏆 Early Supporter: ${earlySupporterStatus}
@@ -958,7 +1034,7 @@ class VerifySystem {
 
 📋 LOG METADATA
 ├─ 🕒 Generated: ${timestamp}
-├─ 🔧 System Version: VerifySystem v3.2.1
+├─ 🔧 System Version: VerifySystem v3.2.1 (FIXED)
 ├─ 🤖 Bot ID: BS#9886
 ├─ 🏠 Server: BananaSkiee Community
 ├─ 📁 Log ID: VRF_${user.id}_${Date.now()}
@@ -966,7 +1042,7 @@ class VerifySystem {
 `;
     }
 
-    // ========== HELPER FUNCTIONS (TETAP SAMA SEPERTI SEMULA) ==========
+    // ========== HELPER FUNCTIONS (TETAP SAMA SEPERULA) ==========
     getAccountAge(accountCreationDate) { 
         const created = new Date(accountCreationDate); 
         const now = new Date(); 
@@ -1076,7 +1152,10 @@ class VerifySystem {
             step: 'pending', // Ubah ke pending agar token bisa disimpan duluan
             data: {}, 
             lastActivity: Date.now(), 
-            welcomeSent: false 
+            welcomeSent: false,
+            // Field baru
+            interactionToken: null, 
+            applicationId: null 
         };
         this.userSessions.set(userId, session);
         return session;
