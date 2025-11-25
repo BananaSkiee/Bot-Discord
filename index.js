@@ -220,6 +220,8 @@ process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
 });
 
+startSelfPing();
+
 // 🔐 Login bot
 client.login(config.token);
 
