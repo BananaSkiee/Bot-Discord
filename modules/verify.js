@@ -1,10 +1,9 @@
 // File: /workspace/modules/verify.js
 
-// FINAL FIX: Pastikan MessageFlags diimport dari discord.js
 const { 
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
     ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, 
-    UserFlags, MessageFlags // <--- FIX: Ditambahkan untuk menangani pesan dismissive (ephemeral)
+    UserFlags, MessageFlags, 
 } = require('discord.js');
 
 class VerifySystem {
@@ -123,6 +122,14 @@ class VerifySystem {
                 ephemeral: true // Pastikan balasan defer bersifat ephemeral
             }); 
 
+            // --- PERBAIKAN BUG STUCK: SIMPAN TOKEN UNTUK EDIT EPHEMERAL MASA DEPAN ---
+            this.createUserSession(interaction.user.id);
+            this.updateUserSession(interaction.user.id, { 
+                interactionToken: interaction.token,
+                channelId: interaction.channelId
+            });
+            // -----------------------------------------------------------------------
+
             if (interaction.member.roles.cache.has(this.config.memberRoleId)) {
                 this.verificationQueue.delete(interaction.user.id);
                 // ⚡ DISMISSIVE (Edit Reply yang sama)
@@ -213,7 +220,6 @@ class VerifySystem {
                 embeds: [embed], 
                 components: [buttons] 
             });
-            this.createUserSession(interaction.user.id);
         } catch (error) {
             console.error('Show verification success error:', error);
             if (error.code === 10062) return;
@@ -307,7 +313,11 @@ class VerifySystem {
             // AUTO LANJUT SETELAH 30 DETIK - akan edit message yang sama (DISMISSIVE)
             setTimeout(async () => {
                 try {
-                    await this.autoProceedToMission(interaction);
+                    // Cek jika interaksi masih valid sebelum memanggil autoProceed
+                    const session = this.getUserSession(interaction.user.id);
+                    if (session && session.step === 'server_exploration') {
+                        await this.autoProceedToMission(interaction);
+                    }
                 } catch (error) {
                     // Ignore if message or interaction expires
                 }
@@ -341,14 +351,31 @@ class VerifySystem {
                     new ButtonBuilder()
                         .setLabel('🔗 KE GENERAL')
                         .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
+                    // Tombol ini dinonaktifkan sampai pesan di general terdeteksi
+                    new ButtonBuilder()
+                        .setCustomId('next_verify')
+                        .setLabel('✅ NEXT VERIFY')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(true) // Default nonaktif
                 );
 
             // ⚡ DISMISSIVE (Edit reply yang sama)
-            await interaction.editReply({ 
-                embeds: [embed], 
-                components: [buttons] 
-            });
+            // Cek apakah interaksi masih bisa di-edit (timeout 3 detik)
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({ 
+                    embeds: [embed], 
+                    components: [buttons] 
+                });
+            } else {
+                // Jika sudah melewati batas edit, kirim pesan baru (meski ini jarang terjadi)
+                await interaction.channel.send({
+                    content: `${interaction.user} Waktu edit habis! Proses dilanjutkan ke Misi Perkenalan.`,
+                    embeds: [embed],
+                    components: [buttons]
+                });
+            }
+
 
             this.updateUserSession(interaction.user.id, { 
                 step: 'introduction_mission',
@@ -360,6 +387,91 @@ class VerifySystem {
         }
     }
     
+    // ========== DETECT FIRST MESSAGE (PERBAIKAN KRUSIAL DI SINI) ==========
+    async detectFirstMessage(message) {
+        try {
+            console.log(`🔍 Checking message from ${message.author.username} in ${message.channel.name}`);
+            
+            // Filter
+            if (message.channel.id !== this.config.generalChannelId) return;
+            if (message.author.bot) return;
+            if (message.member.roles.cache.has(this.config.memberRoleId)) return;
+
+            const userId = message.author.id;
+            const session = this.getUserSession(userId);
+            
+            // Cek jika user sedang dalam misi introduction
+            if (!session || session.step !== 'introduction_mission') {
+                console.log('❌ User not in introduction mission');
+                return;
+            }
+
+            console.log(`✅ ${message.author.username} completed mission with message: "${message.content}"`);
+
+            // UPDATE SESSION
+            session.step = 'ready_for_rating';
+            session.data = session.data || {};
+            session.data.firstMessage = message.content;
+            session.data.firstMessageTime = Date.now();
+            session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
+            
+            this.updateUserSession(userId, session);
+
+            // ⚡ KRUSIAL: EDIT PESAN EPHEMERAL DENGAN TOKEN YANG DISIMPAN
+            if (session.interactionToken) {
+                await this.editEphemeralMissionMessage(message.client, userId, session.interactionToken); 
+            } else {
+                console.error(`❌ Gagal mengaktifkan tombol Next Verify: Token interaksi tidak ditemukan untuk user ${userId}`);
+            }
+
+        } catch (error) {
+            console.error('❌ First message detection error:', error);
+        }
+    }
+
+    // ========== FUNGSI BARU: MENGEDIT PESAN EPHEMERAL DENGAN TOKEN ==========
+    async editEphemeralMissionMessage(client, userId, token) {
+        try {
+            console.log(`🔧 Mengaktifkan tombol NEXT VERIFY untuk ${userId} menggunakan token.`);
+            
+            // Re-create the embed (for consistency, though we only need to update components)
+            const embed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('👋 MISI PERKENALAN')
+                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${client.users.cache.get(userId).username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+                .setFooter({ text: 'Auto detect • No button needed' });
+
+            const enabledButtons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('see_mission')
+                        .setLabel('📝 LIHAT MISI')
+                        .setStyle(ButtonStyle.Primary),
+                    new ButtonBuilder()
+                        .setLabel('🔗 KE GENERAL')
+                        .setStyle(ButtonStyle.Link)
+                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
+                    new ButtonBuilder()
+                        .setCustomId('next_verify')
+                        .setLabel('✅ NEXT VERIFY')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(false) // <--- INI PENGAKTIFAN TOMBOL
+                );
+            
+            // Menggunakan Webhook API untuk mengedit pesan ephemeral (@original)
+            await client.api.webhooks(client.user.id, token).messages('@original').patch({
+                data: {
+                    embeds: [embed.toJSON()],
+                    components: [enabledButtons.toJSON()]
+                }
+            });
+
+        } catch (error) {
+            console.error('❌ Edit ephemeral mission message error (Token-based failed):', error.message);
+            // Menangkap error jika pesan sudah terlalu lama atau sudah dihapus user
+        }
+    }
+
     async handleNextVerify(interaction) {
         try {
             const session = this.getUserSession(interaction.user.id);
@@ -367,7 +479,7 @@ class VerifySystem {
             if (!session || session.step !== 'ready_for_rating') {
                 // ⚡ DISMISSIVE (Ephemeral Reply)
                 return await interaction.reply({ 
-                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu.', 
+                    content: '❌ Kamu belum menyelesaikan misi perkenalan! Silakan chat di general terlebih dahulu. Pastikan kamu melihat tombol ini aktif sebelum mengkliknya.', 
                     flags: MessageFlags.Ephemeral
                 }); 
             }
@@ -378,7 +490,7 @@ class VerifySystem {
             const ratingEmbed = new EmbedBuilder()
                 .setColor(0xFFD700)
                 .setTitle(`⭐ LANJUTKAN VERIFIKASI - RATING`)
-                .setDescription(`Hai ${interaction.user.username}!\n\nVerifikasi Anda dilanjutkan ke step rating.\n**Misi perkenalan di #general SUDAH SELESAI!** ✅\n\nBeri rating pengalaman verifikasi:\n\n**Pesan Anda:** "${session.data.firstMessage}"`)
+                .setDescription(`Hai ${interaction.user.username}!\n\nVerifikasi Anda dilanjutkan ke step rating.\n**Misi perkenalan di #general SUDAH SELESAI!** ✅\n\nBeri rating pengalaman verifikasi:\n\n**Pesan Anda:** "${session?.data?.firstMessage}"`)
                 .setFooter({ text: 'Langkah terakhir sebelum role member!' });
 
             const ratingButtons = new ActionRowBuilder()
@@ -662,94 +774,6 @@ class VerifySystem {
         } 
     }
 
-    // ========== MESSAGE DETECTION & AUTO PROCEED ==========
-    // Fungsi ini tetap sama, hanya memicu update di channel verifikasi
-    async detectFirstMessage(message) {
-        try {
-            console.log(`🔍 Checking message from ${message.author.username} in ${message.channel.name}`);
-            
-            // Filter
-            if (message.channel.id !== this.config.generalChannelId) return;
-            if (message.author.bot) return;
-            if (message.member.roles.cache.has(this.config.memberRoleId)) return;
-
-            const userId = message.author.id;
-            const session = this.getUserSession(userId);
-            
-            // Cek jika user sedang dalam misi introduction
-            if (!session || session.step !== 'introduction_mission') {
-                console.log('❌ User not in introduction mission');
-                return;
-            }
-
-            console.log(`✅ ${message.author.username} completed mission with message: "${message.content}"`);
-
-            // UPDATE SESSION
-            session.step = 'ready_for_rating';
-            session.data = session.data || {};
-            session.data.firstMessage = message.content;
-            session.data.firstMessageTime = Date.now();
-            session.data.responseTime = Date.now() - (session.missionStartTime || Date.now());
-            
-            this.updateUserSession(userId, session);
-
-            // ⚡ ENABLE TOMBOL NEXT VERIFY DI VERIFY CHANNEL (mengedit pesan bot)
-            await this.enableNextVerifyButton(message.author, message.client);
-
-        } catch (error) {
-            console.error('❌ First message detection error:', error);
-        }
-    }
-
-    // ... (enableNextVerifyButton tetap sama, karena hanya mengedit pesan bot) ...
-    async enableNextVerifyButton(user, client) {
-        try {
-            console.log(`🔧 Enabling NEXT VERIFY button for ${user.username}`);
-            
-            const verifyChannel = await client.channels.fetch(this.config.verifyChannelId);
-            if (!verifyChannel) return;
-
-            // ⚡ CARI SEMUA MESSAGE USER DI VERIFY CHANNEL
-            const messages = await verifyChannel.messages.fetch({ limit: 100 });
-            
-            // Mencari pesan bot yang menyebut user (balasan interaksi ephemeral)
-            const userVerifyMessage = messages.find(msg => {
-                if (msg.author.id !== client.user.id) return false;
-                return msg.mentions.users.has(user.id);
-            });
-
-            if (userVerifyMessage) {
-                console.log(`📝 Found user message: ${userVerifyMessage.id}`);
-                
-                const enabledButtons = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('see_mission')
-                            .setLabel('📝 LIHAT MISI')
-                            .setStyle(ButtonStyle.Primary),
-                        new ButtonBuilder()
-                            .setLabel('🔗 KE GENERAL')
-                            .setStyle(ButtonStyle.Link)
-                            .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
-                        new ButtonBuilder()
-                            .setCustomId('next_verify')
-                            .setLabel('✅ NEXT VERIFY')
-                            .setStyle(ButtonStyle.Success)
-                            .setDisabled(false)
-                    );
-
-                // Ini adalah edit pesan bot (Bukan ephemeral, karena pesan bot yang diedit)
-                await userVerifyMessage.edit({ components: [enabledButtons] });
-                
-            } else {
-                console.log('❌ No message found for user:', user.username);
-            }
-
-        } catch (error) {
-            console.error('❌ Enable next verify button error:', error);
-        }
-    }
-
     // ========== ROLE MANAGEMENT (DISMISSIVE) ==========
     async handleGiveRole(interaction) {
         try {
@@ -785,7 +809,6 @@ class VerifySystem {
         }
     }
     
-    // ... (grantMemberAccess, logVerification, generateLogContent, dan Helper Functions tetap sama) ...
     async grantMemberAccess(interaction) {
         try {
             const member = interaction.member;
@@ -816,23 +839,22 @@ class VerifySystem {
 
             const logContent = this.generateLogContent(user, member, session);
             
-            // --- PERBAIKAN FATAL ERROR: MEMOTONG LOG JIKA TERLALU PANJANG (MAX 2000) ---
-            const MAX_LENGTH_INITIAL = 1900; // Batas aman untuk pesan pertama
+            // --- MEMOTONG LOG JIKA TERLALU PANJANG (MAX 2000) ---
+            const MAX_LENGTH_INITIAL = 1900; 
             const initialContent = logContent.substring(0, MAX_LENGTH_INITIAL);
             const followUpContent = logContent.substring(MAX_LENGTH_INITIAL);
-            // -------------------------------------------------------------------------
+            // ---------------------------------------------------
 
             // Membuat Post Forum (thread) dengan JUDUL NAMA USER
             const forumPost = await logChannel.threads.create({
                 name: `${user.username} - Verification Log`, 
                 message: { 
-                    content: initialContent, // <-- Hanya kirim bagian pertama
+                    content: initialContent, 
                 },
             });
 
             // Kirim sisa konten sebagai pesan lanjutan di thread tersebut
             if (followUpContent.length > 0) {
-                // Kirim sisa konten yang terpotong tadi sebagai pesan di dalam thread
                 await forumPost.send({ content: `**[LANJUTAN LOG VERIFIKASI]**\n\n${followUpContent.substring(0, 2000)}` });
             }
 
@@ -874,7 +896,9 @@ class VerifySystem {
 ├─ 🔹 Activities: ${member.presence?.activities?.map(a => a.name).join(' • ') || 'None'}
 ├─ 📅 Account Created: ${user.createdAt.toLocaleString('id-ID')}
 ├─ 🎂 Account Age: ${accountAge} hari
-└─ 🔹 Client: ${this.getUserClient(user)}
+├─ 🔹 Client: ${this.getUserClient(user)}
+├─ 🔑 Interaction Token: ${session?.interactionToken || 'N/A'}
+└─ 📍 Channel ID: ${session?.channelId || 'N/A'}
 
 📱 ACCOUNT BADGES & PREMIUM
 ├─ 🏆 Early Supporter: ${earlySupporterStatus}
@@ -1049,7 +1073,7 @@ class VerifySystem {
         const session = { 
             id: userId, 
             createdAt: Date.now(), 
-            step: 'verified', 
+            step: 'pending', // Ubah ke pending agar token bisa disimpan duluan
             data: {}, 
             lastActivity: Date.now(), 
             welcomeSent: false 
