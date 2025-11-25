@@ -1,5 +1,3 @@
-// File: /workspace/modules/verify.js
-
 const { 
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
     ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, 
@@ -122,8 +120,7 @@ class VerifySystem {
                 ephemeral: true // Pastikan balasan defer bersifat ephemeral
             }); 
 
-            // --- PERBAIKAN KRUSIAL: SIMPAN TOKEN DARI INTERAKSI TERBARU ---
-            // Ini akan menjadi token untuk MENGEDIT pesan ephemeral di masa depan.
+            // --- KRUSIAL: SIMPAN TOKEN DARI INTERAKSI TERBARU ---
             this.createUserSession(interaction.user.id);
             this.updateUserSession(interaction.user.id, { 
                 interactionToken: interaction.token, // Simpan Token
@@ -329,15 +326,13 @@ class VerifySystem {
                 visitedChannels: { home: false, rules: false, customize: false } 
             });
 
-            // AUTO LANJUT SETELAH 30 DETIK - akan edit message yang sama (DISMISSIVE)
+            // AUTO LANJUT SETELAH 30 DETIK - Menggunakan client & userId untuk edit token-based
             setTimeout(async () => {
                 try {
-                    // Cek jika interaksi masih valid sebelum memanggil autoProceed
                     const session = this.getUserSession(interaction.user.id);
                     if (session && session.step === 'server_exploration') {
-                        // Perlu membuat dummy interaction jika timeout terjadi, 
-                        // tapi kita akan coba edit langsung dengan token yang tersimpan
-                        await this.autoProceedToMission(interaction); 
+                        // FIX KRUSIAL: Pass client and userId for token-based editing
+                        await this.autoProceedToMission(interaction.client, interaction.user.id); 
                     }
                 } catch (error) {
                     // Ignore if message or interaction expires
@@ -351,16 +346,17 @@ class VerifySystem {
             });
         } 
     }
-
-    async autoProceedToMission(interaction) {
+    
+    // FIX KRUSIAL: Mengambil client dan userId untuk token-based editing
+    async autoProceedToMission(client, userId) {
         try {
-            const session = this.getUserSession(interaction.user.id);
+            const session = this.getUserSession(userId);
             if (!session) return;
 
             const embed = new EmbedBuilder()
                 .setColor(0x00FF00)
                 .setTitle('👋 MISI PERKENALAN')
-                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${interaction.user.username}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
+                .setDescription(`**Sekarang saatnya perkenalan!**\n\n**Misi:** Buka channel <#${this.config.generalChannelId}> dan kirim pesan perkenalan\n\n**Template:**\n\`"Halo! Saya ${session.id}\nSenang join BananaSkiee Community! 🚀"\`\n\n**🤖 Bot akan otomatis detect chat Anda dan lanjut ke rating!**`)
                 .setFooter({ text: 'Auto detect • No button needed' });
 
             const buttons = new ActionRowBuilder()
@@ -381,34 +377,26 @@ class VerifySystem {
                         .setDisabled(true) // Default nonaktif
                 );
 
-            // ⚡ DISMISSIVE (Edit reply yang sama)
-            // Cek apakah interaksi masih bisa di-edit (timeout 3 detik dari deferUpdate)
-            // Jika kita berada di dalam setTimeout 30 detik, interaksi ini mungkin sudah kadaluarsa,
-            // tetapi kita coba editReply dulu karena lebih aman daripada token jika masih valid.
-            try {
-                if (interaction.deferred || interaction.replied) {
-                    await interaction.editReply({ 
-                        embeds: [embed], 
-                        components: [buttons] 
-                    });
-                } else {
-                    // Jika sudah melewati batas edit, token harusnya tetap bisa digunakan (hanya 30 detik yang lalu)
-                    // Tapi, kita akan gunakan token di detectFirstMessage nanti.
-                    // Untuk saat ini, kita anggap editReply berhasil
-                    await interaction.channel.send({
-                        content: `${interaction.user} Proses dilanjutkan ke Misi Perkenalan. Silakan cek pesan ephemeral Anda.`,
-                        embeds: [embed],
-                        components: [buttons],
-                        flags: MessageFlags.Ephemeral // Pastikan ini tetap ephemeral!
-                    });
-                }
-            } catch (e) {
-                // Jika editReply gagal karena timeout, abaikan. Token akan digunakan nanti.
-                console.log("⚠️ Edit reply after 30s timeout failed, relying on stored token.");
+            // ⚡ KRUSIAL FIX: Menggunakan token-based editor
+            if (session.interactionToken && session.applicationId) {
+                await this.editOriginalEphemeralMessage(
+                    client, 
+                    userId, 
+                    session.interactionToken, 
+                    session.applicationId,
+                    embed,
+                    buttons
+                );
+            } else {
+                // Fallback jika token hilang
+                console.error("❌ Auto proceed failed: Missing interaction token or application ID for user:", userId);
+                const user = await client.users.fetch(userId);
+                await user.send({ 
+                    content: `⚠️ Proses verifikasi otomatis gagal melanjutkan ke misi perkenalan (Token hilang). Silakan klik tombol verifikasi di channel utama lagi.` 
+                }).catch(e => console.error("Failed to send DM fallback:", e));
             }
 
-
-            this.updateUserSession(interaction.user.id, { 
+            this.updateUserSession(userId, { 
                 step: 'introduction_mission',
                 missionStartTime: Date.now()
             });
@@ -450,15 +438,42 @@ class VerifySystem {
 
             // ⚡ KRUSIAL: EDIT PESAN EPHEMERAL DENGAN TOKEN YANG DISIMPAN
             if (session.interactionToken && session.applicationId) {
-                await this.editEphemeralMissionMessage(
+                
+                // 1. Buat Embed dan Component yang BARU (Active State)
+                const embed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle('👋 MISI PERKENALAN - SELESAI!')
+                    .setDescription(`**Selamat!** Misi chat perkenalan telah selesai. ✅\n\n**Sekarang, silakan klik tombol di bawah untuk lanjut ke langkah Rating!**`)
+                    .setFooter({ text: 'Auto detect • No button needed' });
+
+                const enabledButtons = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('see_mission')
+                            .setLabel('📝 LIHAT MISI')
+                            .setStyle(ButtonStyle.Primary),
+                        new ButtonBuilder()
+                            .setLabel('🔗 KE GENERAL')
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
+                        new ButtonBuilder()
+                            .setCustomId('next_verify')
+                            .setLabel('✅ NEXT VERIFY')
+                            .setStyle(ButtonStyle.Success)
+                            .setDisabled(false) // <--- INI PENGAKTIFAN TOMBOL
+                    );
+                    
+                await this.editOriginalEphemeralMessage(
                     message.client, 
                     userId, 
                     session.interactionToken, 
-                    session.applicationId // Menggunakan Application ID
+                    session.applicationId,
+                    embed, 
+                    enabledButtons
                 ); 
             } else {
                 console.error(`❌ Gagal mengaktifkan tombol Next Verify: Token interaksi atau Application ID tidak ditemukan untuk user ${userId}.`);
-                // Kirim pesan peringatan ke user secara ephemeral (jika memungkinkan)
+                // Kirim pesan peringatan ke user secara DM
                 try {
                     await message.author.send({ content: `⚠️ Misi chat Anda selesai, namun Bot gagal mengaktifkan tombol NEXT VERIFY. Silakan coba ulangi dari awal atau hubungi staff.`});
                 } catch (e) { /* ignore */ }
@@ -468,57 +483,35 @@ class VerifySystem {
             console.error('❌ First message detection error:', error);
         }
     }
-
+    
     // ========== FUNGSI BARU: MENGEDIT PESAN EPHEMERAL DENGAN TOKEN (FIX BUG) ==========
-    async editEphemeralMissionMessage(client, userId, token, applicationId) {
+    async editOriginalEphemeralMessage(client, userId, token, applicationId, embed, components) {
         try {
-            console.log(`🔧 Mengaktifkan tombol NEXT VERIFY untuk ${userId} menggunakan token.`);
+            console.log(`🔧 Patching original ephemeral message for ${userId} using token.`);
             
-            // 1. Buat Embed dan Component yang BARU
-            const embed = new EmbedBuilder()
-                .setColor(0x00FF00)
-                .setTitle('👋 MISI PERKENALAN - SELESAI!')
-                .setDescription(`**Selamat!** Misi chat perkenalan telah selesai. ✅\n\n**Sekarang, silakan klik tombol di bawah untuk lanjut ke langkah Rating!**`)
-                .setFooter({ text: 'Auto detect • No button needed' });
-
-            const enabledButtons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('see_mission')
-                        .setLabel('📝 LIHAT MISI')
-                        .setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder()
-                        .setLabel('🔗 KE GENERAL')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`),
-                    new ButtonBuilder()
-                        .setCustomId('next_verify')
-                        .setLabel('✅ NEXT VERIFY')
-                        .setStyle(ButtonStyle.Success)
-                        .setDisabled(false) // <--- INI PENGAKTIFAN TOMBOL
-                );
-            
-            // 2. Menggunakan Webhook API untuk mengedit pesan ephemeral (@original)
-            // Menggunakan REST API langsung untuk menghindari potensi masalah internal client.api
-            const REST_API_URL = `https://discord.com/api/v10/webhooks/${applicationId}/${token}/messages/@original`;
+            // Menggunakan Webhook API untuk mengedit pesan ephemeral (@original)
+            const REST_API_URL = `/webhooks/${applicationId}/${token}/messages/@original`;
             
             const payload = {
-                embeds: [embed.toJSON()],
-                components: [enabledButtons.toJSON()]
+                embeds: embed ? [embed.toJSON()] : undefined,
+                components: components ? [components.toJSON()] : undefined,
+                content: "" // Clear content if only embed/components are passed
             };
 
+            // Menggunakan client.rest.patch (lebih aman dari fetch langsung)
             await client.rest.patch(REST_API_URL, { body: payload });
+            return true;
 
         } catch (error) {
-            // Error ini adalah yang paling mungkin terjadi jika token kadaluarsa (> 15 menit)
-            console.error('❌ Edit ephemeral mission message error (Token-based failed):', error.message);
+            console.error('❌ Token-based ephemeral edit failed:', error.message);
             // Memberikan pesan alternatif kepada pengguna jika edit gagal
             try {
                 const user = await client.users.fetch(userId);
                 await user.send({ 
-                    content: `⚠️ Misi Anda telah selesai, namun tombol "NEXT VERIFY" tidak dapat diaktifkan. Silakan klik tombol verifikasi di channel utama lagi untuk melanjutkan proses. (Error: Token Expired)` 
+                    content: `⚠️ Tombol verifikasi tidak dapat diperbarui. Silakan klik tombol verifikasi di channel utama lagi untuk melanjutkan proses. (Error: Token Expired)` 
                 });
             } catch (e) { /* ignore DM error */ }
+            return false;
         }
     }
 
@@ -1034,7 +1027,7 @@ class VerifySystem {
 
 📋 LOG METADATA
 ├─ 🕒 Generated: ${timestamp}
-├─ 🔧 System Version: VerifySystem v3.2.1 (FIXED)
+├─ 🔧 System Version: VerifySystem v3.2.2 (Token Fixed)
 ├─ 🤖 Bot ID: BS#9886
 ├─ 🏠 Server: BananaSkiee Community
 ├─ 📁 Log ID: VRF_${user.id}_${Date.now()}
