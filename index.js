@@ -228,19 +228,6 @@ process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
 });
 
-// 🚀 Start bot dan self-ping system
-client.once("ready", () => {
-  console.log(`✅ ${client.user.tag} is now online!`);
-  startSelfPing(); 
-  try {
-    const onlineCounter = require("./modules/online");
-    onlineCounter(client);
-    console.log("✅ Sistem online counter aktif");
-  } catch (err) {
-    console.error("❌ Gagal inisialisasi onlineCounter:", err);
-  }
-});
-
 // 🔐 Login bot
 client.login(config.token);
 
