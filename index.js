@@ -8,7 +8,6 @@ const config = require("./config");
 // 🧠 Custom modules & data log
 const stickyHandler = require("./sticky");
 const autoGreeting = require("./modules/autoGreeting");
-const updateTimeChannel = require("./modules/updateTimeChannel");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
@@ -216,12 +215,6 @@ client.on("guildMemberRemove", async (member) => {
     // Log event Leave nyata ke Forum
     await logMemberAction(member, 'LEAVE'); 
 });
-
-
-// ⏱ Update waktu di voice channel tiap 30 detik
-setInterval(() => {
-  updateTimeChannel(client);
-}, 30 * 1000);
 
 // 🧯 Global Error Handler
 process.on("unhandledRejection", (err) => {
