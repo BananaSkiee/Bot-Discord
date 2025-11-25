@@ -11,7 +11,6 @@ const rainbowRole = require("../modules/rainbowRole");
 const minecraft = require("../modules/minecraft");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
-const updateTimeChannel = require("../modules/updateTimeChannel");
 
 const verifySystem = new VerifySystem();
 
@@ -32,14 +31,6 @@ module.exports = {
     // 🧭 Server Info
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
-
-    // ⏰ Update jam channel tiap 1 menit
-    try {
-      updateTimeChannel(client);
-      setInterval(() => updateTimeChannel(client), 60_000);
-    } catch (err) {
-      console.error("❌ Gagal inisialisasi updateTimeChannel:", err);
-    }
 
     // 🌈 Rainbow role (interval aman 25 detik)
     try {
