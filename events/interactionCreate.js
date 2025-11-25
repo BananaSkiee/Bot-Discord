@@ -52,17 +52,24 @@ if (interaction.isButton()) {
   
   // Auto Welcome Button
   if (customId === 'auto_welcome') {
-    return await verifySystem.handleAutoWelcome(interaction);
+    // Fungsi ini tidak ada di verify.js yang terakhir, perlu diimplementasikan
+    // return await verifySystem.handleAutoWelcome(interaction);
+    console.log("⚠️ handleAutoWelcome tidak diimplementasikan.");
+    return interaction.reply({ content: "⚠️ Fitur Auto Welcome belum aktif.", ephemeral: true });
   }
 
   // Welcome Selection Buttons
   if (customId.startsWith('welcome_')) {
-    return await verifySystem.handleWelcomeSelection(interaction);
+    // return await verifySystem.handleWelcomeSelection(interaction);
+    console.log("⚠️ handleWelcomeSelection tidak diimplementasikan.");
+    return interaction.reply({ content: "⚠️ Fitur Welcome Selection belum aktif.", ephemeral: true });
   }
   
   // Custom Message Button
   if (customId === 'custom_message') {
-    return await verifySystem.handleCustomMessage(interaction);
+    // return await verifySystem.handleCustomMessage(interaction);
+    console.log("⚠️ handleCustomMessage tidak diimplementasikan.");
+    return interaction.reply({ content: "⚠️ Fitur Custom Message belum aktif.", ephemeral: true });
   }
   
   // Input Rating Button
@@ -115,7 +122,9 @@ if (interaction.isModalSubmit()) {
     }
     
     if (customId === 'custom_message_modal') {
-        return await verifySystem.handleCustomMessageSubmit(interaction);
+        // return await verifySystem.handleCustomMessageSubmit(interaction);
+        console.log("⚠️ handleCustomMessageSubmit tidak diimplementasikan.");
+        return interaction.reply({ content: "⚠️ Fitur Custom Message Submit belum aktif.", ephemeral: true });
     }
 }  
       
@@ -385,4 +394,3 @@ if (interaction.isModalSubmit()) {
     }
   },
 };
-                  
