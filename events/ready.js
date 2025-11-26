@@ -3,12 +3,12 @@ const { ChannelType } = require("discord.js");
 const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
 const joinvoice = require("../modules/joinvoice");
-const countValidator = require("../modules/countValidator");
+// Menghapus: const countValidator = require("../modules/countValidator");
 const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
-const minecraft = require("../modules/minecraft");
+// Menghapus: const minecraft = require("../modules/minecraft");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 
@@ -33,11 +33,11 @@ module.exports = {
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
 
     // 🌈 Rainbow role (interval aman 45 detik)
-try {
-  rainbowRole(client, 45_000); // <-- DIUBAH MENJADI 45.000 ms (45 detik)
-} catch (err) {
-  console.error("❌ Rainbow role error:", err);
-}
+    try {
+      rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
+    } catch (err) {
+      console.error("❌ Rainbow role error:", err);
+    }
 
     // 🧷 Sticky handler
     try {
@@ -125,10 +125,11 @@ try {
     }
 
     // ⛏️ Minecraft bot init
-    try {
-      if (minecraft.init) minecraft.init(client);
-    } catch (err) {
-      console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    }
+    // KODE INI DIHAPUS untuk menghilangkan ERROR: ECONNREFUSED
+    // try {
+    //   if (minecraft.init) minecraft.init(client);
+    // } catch (err) {
+    //   console.error("❌ Gagal inisialisasi Minecraft bot:", err);
+    // }
   },
 };
