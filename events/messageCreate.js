@@ -5,7 +5,6 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, EmbedBu
 const handleHapusTag = require("../modules/hapusTagCommand");
 const translateHandler = require("../modules/translate");
 const memeCommand = require("../modules/memeCommand");
-const autoReply = require("../modules/autoReply");
 const generateWelcomeCard = require("../modules/welcomeCard");
 const getRandomQuote = require("../modules/welcomeQuotes");
 const beritaCmd = require("../modules/beritaCmd.js");
@@ -64,7 +63,6 @@ module.exports = {
 await verifySystem.detectFirstMessage(message);
     
     // Panggil fungsi-fungsinya saat ada pesan baru
-    await autoReply(message);
     await autoEmoji(message);
     autoReactEmoji.execute(message);
     
