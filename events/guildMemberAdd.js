@@ -4,10 +4,12 @@
 const { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const generateWelcomeCard = require('../modules/welcomeCard.js');
 const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-nya
+const { handleBotRoles } = require('../modules/autoBotRole'); 
 
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member, client) {
+        await handleBotRoles(member); 
         // --- PENGATURAN ID (GANTI SESUAI SERVER ANDA) ---
         const welcomeChannelId = '1352311290432983182';
         const rulesChannelId   = '1352326247186694164';
