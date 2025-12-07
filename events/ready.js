@@ -11,6 +11,7 @@ const rainbowRole = require("../modules/rainbowRole");
 // Menghapus: const minecraft = require("../modules/minecraft");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
+const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 
 const verifySystem = new VerifySystem();
 
@@ -32,6 +33,13 @@ module.exports = {
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
 
+        // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
+    try {
+        await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
+    } catch (err) {
+        console.error("❌ Auto Bot Role (Initial) error:", err);
+    }
+    
     // 🌈 Rainbow role (interval aman 45 detik)
     try {
       rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
