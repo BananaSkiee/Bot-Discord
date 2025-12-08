@@ -515,6 +515,7 @@ async function processMemberRoleUpdateForTags(oldMember, newMember) {
 
 module.exports = {
     logMemberAction,
+    logFirstMessage,
     logMemberNicknameChange,
     processMemberRoleUpdateForTags, 
     FORUM_CHANNEL_ID,
