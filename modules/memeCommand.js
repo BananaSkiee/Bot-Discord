@@ -7,7 +7,7 @@ module.exports = {
   description: "Mengirim meme acak dari Reddit",
   async execute(message) {
     try {
-      const res = await axios.get("https://meme-api.com/gimme/memeIndonesia");
+      const res = await axios.get("https://meme-api.com/gimme/Indonesia/5");
       const meme = res.data;
 
       const embed = new EmbedBuilder()
