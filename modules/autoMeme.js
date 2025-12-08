@@ -8,7 +8,7 @@ const filePath = path.join(__dirname, "../data/usedMemes.json");
 
 module.exports = async function autoSendMeme(channel) {
   try {
-    const res = await axios.get("https://meme-api.com/gimme/memes");
+    const res = await axios.get("https://meme-api.com/gimme/Indonesia/5");
     const meme = res.data;
 
     // Baca list meme yang sudah pernah dikirim
