@@ -21,6 +21,34 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
+    const ROLE_NON_VERIFY = "1444248589051367435";
+    const ROLE_MEMBER = "1352286235233620108";
+
+    // --- LOGIKA MASS SCAN (TAMBAHKAN INI) ---
+    console.log("🔍 Melakukan pengecekan role seluruh member...");
+    client.guilds.cache.forEach(async (guild) => {
+      try {
+        const members = await guild.members.fetch();
+        members.forEach(member => {
+          if (member.user.bot) return;
+
+          const hasMemberRole = member.roles.cache.has(ROLE_MEMBER);
+          const hasNonVerifyRole = member.roles.cache.has(ROLE_NON_VERIFY);
+
+          // Jika tidak punya role Member dan belum punya Non-Verify
+          if (!hasMemberRole && !hasNonVerifyRole) {
+            member.roles.add(ROLE_NON_VERIFY).catch(() => {});
+          }
+          // Jika sudah punya Member tapi Non-Verify masih nempel
+          if (hasMemberRole && hasNonVerifyRole) {
+            member.roles.remove(ROLE_NON_VERIFY).catch(() => {});
+          }
+        });
+      } catch (err) {
+        console.error(`Gagal scan di guild: ${guild.name}`);
+      }
+    });
+    
     // ✅ Verify System
     try {
       await verifySystem.initialize(client);
