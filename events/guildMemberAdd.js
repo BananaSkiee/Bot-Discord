@@ -9,6 +9,13 @@ const { handleBotRoles } = require('../modules/autoBotRole');
 module.exports = {
     name: 'guildMemberAdd',
     async execute(member, client) {
+
+        const ROLE_NON_VERIFY = "1444248589051367435"; // ID Role Non-Verify
+        
+        if (!member.user.bot) {
+            await member.roles.add(ROLE_NON_VERIFY).catch(console.error);
+        }
+        
         await handleBotRoles(member); 
         // --- PENGATURAN ID (GANTI SESUAI SERVER ANDA) ---
         const welcomeChannelId = '1352311290432983182';
