@@ -47,6 +47,21 @@ const ROLE_DISPLAY_MAP = {
 module.exports = {
   name: "guildMemberUpdate",
   async execute(oldMember, newMember) {
+        if (newMember.user.bot) return;
+
+    const ROLE_NON_VERIFY = "1444248589051367435";
+    const ROLE_MEMBER = "1352286235233620108";
+
+    // --- LOGIKA AUTO-HAPUS NON-VERIFY (TAMBAHKAN INI) ---
+    const hadMember = oldMember.roles.cache.has(ROLE_MEMBER);
+    const hasMemberNow = newMember.roles.cache.has(ROLE_MEMBER);
+    const hasNonVerifyNow = newMember.roles.cache.has(ROLE_NON_VERIFY);
+
+    // Jika dia baru saja mendapatkan role Member
+    if (!hadMember && hasMemberNow && hasNonVerifyNow) {
+        await newMember.roles.remove(ROLE_NON_VERIFY).catch(() => {});
+        console.log(`✅ Role Non-Verify dicabut dari ${newMember.user.tag} karena sudah verifikasi.`);
+  }
     // Cek role yang baru ditambahkan
     const addedRoles = newMember.roles.cache.filter(r => !oldMember.roles.cache.has(r.id));
     console.log("🧪 Added roles:", addedRoles.map(r => `${r.name} (${r.id})`).join(", "));
