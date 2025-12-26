@@ -4,63 +4,49 @@ const {
   TextDisplayBuilder, 
   ThumbnailBuilder, 
   MessageFlags 
-} = require('discord.js'); // WAJIB ADA INI
+} = require('discord.js');
 
-module.exports = {
-  // Tambahkan data slash command agar bisa didaftarkan oleh bot kamu
-  data: {
-    name: "server-info-v2",
-    description: "Kirim info server menggunakan Components V2",
-  },
-
-  /**
-   * @param {import('discord.js').Client} client
-   * @param {import('discord.js').CommandInteraction} interaction
-   */
-  run: async (client, interaction) => {
-    const { guild } = interaction;
+/**
+ * Fungsi untuk mengirim pesan V2 secara otomatis
+ * @param {import('discord.js').Client} client 
+ */
+async function sendAutoV2(client) {
     const targetChannelId = '1442949900622102528'; 
-
+    
     try {
-      const targetChannel = await client.channels.fetch(targetChannelId);
+        const targetChannel = await client.channels.fetch(targetChannelId);
+        if (!targetChannel) return console.error("❌ [V2] Channel tidak ditemukan.");
 
-      if (!targetChannel) {
-        return interaction.reply({ content: "❌ Channel tidak ditemukan!", ephemeral: true });
-      }
+        // Ambil server pertama tempat bot berada (guild)
+        const guild = client.guilds.cache.first();
+        if (!guild) return console.error("❌ [V2] Bot tidak berada di server manapun.");
 
-      const serverIcon = guild.iconURL({ extension: 'png', size: 512 }) || client.user.displayAvatarURL();
-      const thumbnail = new ThumbnailBuilder({ media: { url: serverIcon } });
+        const serverIcon = guild.iconURL({ extension: 'png', size: 512 }) || client.user.displayAvatarURL();
+        
+        const mainContainer = new ContainerBuilder()
+            .setAccentColor(0x5865F2)
+            .addSectionComponents(
+                new SectionBuilder()
+                    .addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent(`👑 **${guild.name}**`),
+                        new TextDisplayBuilder().setContent(guild.description || "BananaSkiee Community - Status: Online")
+                    )
+                    .setThumbnailAccessory(new ThumbnailBuilder({ media: { url: serverIcon } }))
+            )
+            .addTextDisplayComponents(
+                new TextDisplayBuilder().setContent(`🆔 **Server ID:** ${guild.id}`),
+                new TextDisplayBuilder().setContent(`📅 **Pesan Otomatis:** Sistem V2 Aktif`)
+            );
 
-      const headerSection = new SectionBuilder()
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`👑 **${guild.name}**`),
-          new TextDisplayBuilder().setContent(guild.description || "Tidak ada deskripsi.")
-        )
-        .setThumbnailAccessory(thumbnail);
+        await targetChannel.send({
+            components: [mainContainer],
+            flags: MessageFlags.IsComponentsV2,
+        });
 
-      const mainContainer = new ContainerBuilder()
-        .setAccentColor(0x5865F2)
-        .addSectionComponents(headerSection)
-        .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`🆔 **Server ID:** ${guild.id}`)
-        );
-
-      await targetChannel.send({
-        components: [mainContainer],
-        flags: MessageFlags.IsComponentsV2,
-      });
-
-      await interaction.reply({ 
-        content: `✅ Info server telah dikirim ke <#${targetChannelId}>`, 
-        ephemeral: true 
-      });
-
+        console.log("✅ [V2] Pesan otomatis berhasil dikirim ke channel.");
     } catch (err) {
-      console.error("🚨 Error di serverInfoV2:", err);
-      // Cek apakah interaksi sudah dibalas agar tidak error ganda
-      if (!interaction.replied) {
-        await interaction.reply({ content: "❌ Terjadi kesalahan!", ephemeral: true });
-      }
+        console.error("❌ [V2] Gagal kirim otomatis:", err.message);
     }
-  },
-};
+}
+
+module.exports = { sendAutoV2 };
