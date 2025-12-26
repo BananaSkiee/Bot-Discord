@@ -12,7 +12,7 @@ const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
-const { sendAutoV2 } = require("../Modules/serverInfoV2.js");
+const { sendAutoV2 } = require("../modules/serverInfoV2.js");
 
 const verifySystem = new VerifySystem();
 
