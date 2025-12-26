@@ -84,9 +84,12 @@ module.exports = {
       console.error("❌ Componen v2 Embed error:", err);
     }
 
-    // 🔰 Intro Card
+    // 🔰 Intro Card (Kirim pesan pemicu sekali saja)
     try {
-      await handleIntroInteractions(interaction);
+      // Ganti ID channel sesuai permintaanmu: 1430930313382461460
+      // Hapus/Comment baris ini setelah pesan terkirim sekali di Discord!
+      await sendInitialCard(client, '1430930313382461460'); 
+      console.log("✅ Intro Card Initial Message Sent");
     } catch (err) {
       console.error("❌ Intro Card error:", err);
     }
