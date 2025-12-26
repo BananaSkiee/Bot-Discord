@@ -12,7 +12,6 @@ const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
-const { sendAutoV2 } = require("../modules/serverInfoV2.js");
 const { sendInitialCard } = require('../modules/introCard');
 
 const verifySystem = new VerifySystem();
@@ -77,21 +76,13 @@ module.exports = {
       console.error("❌ Rainbow role error:", err);
     }
 
-     // 🔰 Componen v2 Embed
+    
+// ... di bagian paling bawah execute(client)
     try {
-      sendAutoV2(client);
+        // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
+        await sendInitialCard(client, '1430930313382461460'); 
     } catch (err) {
-      console.error("❌ Componen v2 Embed error:", err);
-    }
-
-    // 🔰 Intro Card (Kirim pesan pemicu sekali saja)
-    try {
-      // Ganti ID channel sesuai permintaanmu: 1430930313382461460
-      // Hapus/Comment baris ini setelah pesan terkirim sekali di Discord!
-      await sendInitialCard(client, '1430930313382461460'); 
-      console.log("✅ Intro Card Initial Message Sent");
-    } catch (err) {
-      console.error("❌ Intro Card error:", err);
+        console.error("❌ Intro Card gagal dipicu:", err.message);
     }
     
     // 🧷 Sticky handler
