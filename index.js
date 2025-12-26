@@ -13,6 +13,7 @@ const invitesTracker = require("./modules/invitesTracker");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
 const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
+const { handleIntroInteractions } = require('./modules/introCard');
 
 const client = new Client({
   intents: [
@@ -224,6 +225,14 @@ startSelfPing();
 
 // 🔐 Login bot
 client.login(config.token);
+// --- HANDLER UNTUK INTRO CARD (MODAL & INFO DESKRIPSI) ---
+client.on('interactionCreate', async (interaction) => {
+    try {
+        await handleIntroInteractions(interaction);
+    } catch (err) {
+        console.error("❌ Intro Interaction Error:", err);
+    }
+});
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
