@@ -13,7 +13,7 @@ const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 const { sendAutoV2 } = require("../modules/serverInfoV2.js");
-const { handleIntroInteractions } = require('./modules/introCard');
+const { sendInitialCard } = require('../modules/introCard');
 
 const verifySystem = new VerifySystem();
 
