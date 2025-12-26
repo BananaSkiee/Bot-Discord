@@ -12,6 +12,7 @@ const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
+const { sendAutoV2 } = require("../Modules/serverInfoV2.js");
 
 const verifySystem = new VerifySystem();
 
@@ -75,6 +76,13 @@ module.exports = {
       console.error("❌ Rainbow role error:", err);
     }
 
+     // 🔰 Componen v2 Embed
+    try {
+      sendAutoV2(client);
+    } catch (err) {
+      console.error("❌ Componen v2 Embed error:", err);
+    }
+    
     // 🧷 Sticky handler
     try {
       stickyHandler(client);
