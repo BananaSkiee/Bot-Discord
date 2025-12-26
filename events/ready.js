@@ -13,6 +13,7 @@ const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 const { sendAutoV2 } = require("../modules/serverInfoV2.js");
+const { handleIntroInteractions } = require('./modules/introCard');
 
 const verifySystem = new VerifySystem();
 
@@ -81,6 +82,13 @@ module.exports = {
       sendAutoV2(client);
     } catch (err) {
       console.error("❌ Componen v2 Embed error:", err);
+    }
+
+    // 🔰 Intro Card
+    try {
+      await handleIntroInteractions(interaction);
+    } catch (err) {
+      console.error("❌ Intro Card error:", err);
     }
     
     // 🧷 Sticky handler
