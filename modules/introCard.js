@@ -47,7 +47,7 @@ module.exports = {
                             ]
                         },
                         { type: 14, spacing: 1 }, 
-                        { type: 10, content: `© BS Community ${dateString} <t:${ts}:R>` }
+                        { type: 10, content: `-# © BS Community ${dateString} <t:${ts}:R>` }
                     ]
                 }]
             };
@@ -108,7 +108,7 @@ module.exports = {
                             ]
                         },
                         { type: 14, spacing: 1 },
-                        { type: 10, content: `© BS Community ${dateStr} <t:${ts}:R>` }
+                        { type: 10, content: `-# © BS Community ${dateStr} <t:${ts}:R>` }
                     ]
                 }]
             };
