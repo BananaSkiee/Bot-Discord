@@ -13,6 +13,7 @@ const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 const { sendInitialCard } = require('../modules/introCard');
+const activitySystem = require("../modules/activitySystem");
 
 const verifySystem = new VerifySystem();
 
@@ -76,6 +77,13 @@ module.exports = {
       console.error("❌ Rainbow role error:", err);
     }
 
+    // 🏆 Activity System (Leaderboard)
+try {
+    activitySystem(client);
+    console.log("✅ Activity & Leaderboard system active");
+} catch (err) {
+    console.error("❌ Activity system error:", err);
+}
     
 // ... di bagian paling bawah execute(client)
     try {
