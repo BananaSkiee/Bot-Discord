@@ -80,7 +80,7 @@ module.exports = {
 // ... di bagian paling bawah execute(client)
     try {
         // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
-        await sendInitialCard(client, '1430930313382461460'); 
+        await sendInitialCard(client, ''); 
     } catch (err) {
         console.error("❌ Intro Card gagal dipicu:", err.message);
     }
