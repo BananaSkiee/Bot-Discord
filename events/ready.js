@@ -70,12 +70,12 @@ module.exports = {
         console.error("❌ Auto Bot Role (Initial) error:", err);
     }
     
-    // 🌈 Rainbow role (interval aman 45 detik)
+    /* 🌈 Rainbow role (interval aman 45 detik)
     try {
       rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
     } catch (err) {
       console.error("❌ Rainbow role error:", err);
-    }
+    } */
 
     // 🏆 Activity System (Leaderboard)
 try {
