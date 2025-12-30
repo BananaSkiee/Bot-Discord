@@ -1,3 +1,4 @@
+// events/interactionCreate.js
 const fs = require("fs");
 const path = require("path");
 const { ROLES, guildId } = require("../config");
