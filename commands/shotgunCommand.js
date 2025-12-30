@@ -1,3 +1,4 @@
+// commands/shotgunCommand.js
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const ShotgunDuels = require('../modules/shotgunDuels');
 
