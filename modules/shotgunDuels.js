@@ -1,3 +1,4 @@
+// modules/shotgunDuels.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 class ShotgunDuels {
