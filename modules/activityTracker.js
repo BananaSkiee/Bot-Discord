@@ -1,12 +1,13 @@
-// activityTracker.js
 const schedule = require("node-schedule");
 
+// Database sementara (Data Hari Ini)
 let currentStats = {
     hourlyActivity: new Array(24).fill(0),
     messages: {}, 
     voice: {}
 };
 
+// Snapshot data kemarin (Agar tombol tetap berfungsi setelah jam 00:00)
 let lastDayStats = {
     hourlyActivity: new Array(24).fill(0),
     messages: {},
@@ -16,8 +17,22 @@ let lastDayStats = {
 module.exports = (client) => {
     const CHANNEL_ID = "1455791109446832240";
 
+    // --- TRACKING MESSAGES ---
     client.on("messageCreate", (message) => {
         if (message.author.bot || !message.guild) return;
+
+        // Command Test Prefix !teststats
+        if (message.content.startsWith("!teststats") && message.member.permissions.has("Administrator")) {
+            lastDayStats = JSON.parse(JSON.stringify(currentStats)); // Copy data saat ini ke snapshot
+            const peakData = getPeaks(lastDayStats.hourlyActivity);
+            const topChat = getTop(lastDayStats.messages, "count");
+            const topVoice = getTop(lastDayStats.voice, "seconds");
+            
+            message.reply("✅ **Mengirim Test Analytics (Data Real-time)...**");
+            return message.channel.send(generateMainLayout(peakData, topChat, topVoice));
+        }
+
+        // Simpan data pesan
         currentStats.hourlyActivity[new Date().getHours()]++;
         const userId = message.author.id;
         if (!currentStats.messages[userId]) {
@@ -26,6 +41,7 @@ module.exports = (client) => {
         currentStats.messages[userId].count++;
     });
 
+    // --- TRACKING VOICE ---
     client.on("voiceStateUpdate", (oldState, newState) => {
         if (newState.member?.user.bot) return;
         const userId = newState.id;
@@ -42,6 +58,7 @@ module.exports = (client) => {
         }
     });
 
+    // --- CRON JOB JAM 00:00 ---
     schedule.scheduleJob("0 0 * * *", async () => {
         const channel = client.channels.cache.get(CHANNEL_ID);
         if (!channel) return;
@@ -56,12 +73,13 @@ module.exports = (client) => {
         await channel.send(generateMainLayout(peakData, topChat, topVoice));
     });
 
+    // --- INTERACTION HANDLER (Leaderboard & Grafik) ---
     client.on("interactionCreate", async (interaction) => {
         if (!interaction.isButton()) return;
 
         const [action, type, pageStr] = interaction.custom_id.split("_");
         
-        // Logic khusus Stats Online/Offline (Grafik)
+        // Logic Grafik Jam (Online/Offline)
         if (action === "st" && (type === "online" || type === "offline")) {
             return interaction.reply({
                 flags: 64,
@@ -78,6 +96,7 @@ module.exports = (client) => {
         const totalPages = Math.ceil(dataArray.length / 10) || 1;
         let currentPage = parseInt(pageStr) || 1;
 
+        // Logic Navigasi Advanced
         if (action === "next") currentPage = (currentPage >= totalPages) ? 1 : currentPage + 1;
         if (action === "prev") currentPage = (currentPage <= 1) ? totalPages : currentPage - 1;
         if (action === "last") currentPage = (currentPage + 5 > totalPages) ? totalPages : currentPage + 5;
@@ -86,13 +105,12 @@ module.exports = (client) => {
         
         if (action === "myrank") {
             const index = dataArray.findIndex(u => u.id === interaction.user.id);
-            if (index === -1) return interaction.reply({ content: "Kamu belum terdata.", ephemeral: true });
+            if (index === -1) return interaction.reply({ content: "Kamu belum masuk dalam data hari ini.", ephemeral: true });
             currentPage = Math.floor(index / 10) + 1;
         }
 
         const payload = generateLBLayout(dataArray, type, currentPage, totalPages, interaction.user.id);
         
-        // Membedakan reply baru atau edit pesan yang sudah ada
         if (interaction.message.flags.has(64)) {
             await interaction.update(payload);
         } else {
@@ -101,7 +119,7 @@ module.exports = (client) => {
     });
 };
 
-// --- HELPERS (Tetap sama namun lebih solid) ---
+// --- HELPERS ---
 function renderGraph(data) {
     const max = Math.max(...data) || 1;
     return data.map((count, hour) => {
