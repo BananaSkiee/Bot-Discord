@@ -12,8 +12,9 @@ const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
-const { sendInitialCard } = require('../modules/introCard');
+// const { sendInitialCard } = require('../modules/introCard');
 const activitySystem = require("../modules/activitySystem");
+const tracker = require("../modules/activityTracker");
 
 const verifySystem = new VerifySystem();
 
@@ -84,14 +85,21 @@ try {
 } catch (err) {
     console.error("❌ Activity system error:", err);
 }
+
+try {
+    tracker(client);
+    console.log("✅ Tracker & Leaderboard System Active");
+} catch (err) {
+    console.error("❌ Tracker system error:", err);
+}
     
 // ... di bagian paling bawah execute(client)
-    try {
+/*    try {
         // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
         await sendInitialCard(client, ''); 
     } catch (err) {
         console.error("❌ Intro Card gagal dipicu:", err.message);
-    }
+    } */
     
     // 🧷 Sticky handler
     try {
