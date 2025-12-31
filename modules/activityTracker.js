@@ -1,14 +1,12 @@
 // activityTracker.js
 const schedule = require("node-schedule");
 
-// Database sementara
 let currentStats = {
     hourlyActivity: new Array(24).fill(0),
     messages: {}, 
     voice: {}
 };
 
-// Snapshot data kemarin (biar tombol tetap berfungsi setelah jam 00.00)
 let lastDayStats = {
     hourlyActivity: new Array(24).fill(0),
     messages: {},
@@ -18,7 +16,6 @@ let lastDayStats = {
 module.exports = (client) => {
     const CHANNEL_ID = "1455791109446832240";
 
-    // --- TRACKING MESSAGES ---
     client.on("messageCreate", (message) => {
         if (message.author.bot || !message.guild) return;
         currentStats.hourlyActivity[new Date().getHours()]++;
@@ -29,7 +26,6 @@ module.exports = (client) => {
         currentStats.messages[userId].count++;
     });
 
-    // --- TRACKING VOICE ---
     client.on("voiceStateUpdate", (oldState, newState) => {
         if (newState.member?.user.bot) return;
         const userId = newState.id;
@@ -46,20 +42,12 @@ module.exports = (client) => {
         }
     });
 
-    // --- RESET & AUTO SEND (JAM 00.00) ---
     schedule.scheduleJob("0 0 * * *", async () => {
         const channel = client.channels.cache.get(CHANNEL_ID);
         if (!channel) return;
 
-        // Pindahkan data ke snapshot
         lastDayStats = JSON.parse(JSON.stringify(currentStats));
-        
-        // Reset data hari ini
-        currentStats = {
-            hourlyActivity: new Array(24).fill(0),
-            messages: {},
-            voice: {}
-        };
+        currentStats = { hourlyActivity: new Array(24).fill(0), messages: {}, voice: {} };
 
         const peakData = getPeaks(lastDayStats.hourlyActivity);
         const topChat = getTop(lastDayStats.messages, "count");
@@ -68,12 +56,20 @@ module.exports = (client) => {
         await channel.send(generateMainLayout(peakData, topChat, topVoice));
     });
 
-    // --- INTERACTION HANDLER (TOMBOL) ---
     client.on("interactionCreate", async (interaction) => {
         if (!interaction.isButton()) return;
 
         const [action, type, pageStr] = interaction.custom_id.split("_");
-        if (!["st", "prev", "next", "first", "last", "top", "myrank"].includes(action)) return;
+        
+        // Logic khusus Stats Online/Offline (Grafik)
+        if (action === "st" && (type === "online" || type === "offline")) {
+            return interaction.reply({
+                flags: 64,
+                content: `## 📈 Grafik Aktivitas Jam\n\`\`\`text\n${renderGraph(lastDayStats.hourlyActivity)}\n\`\`\``
+            });
+        }
+
+        if (!["prev", "next", "first", "last", "top", "myrank", "st"].includes(action)) return;
 
         let dataArray = (type === "msg") 
             ? Object.values(lastDayStats.messages).sort((a, b) => b.count - a.count)
@@ -82,31 +78,39 @@ module.exports = (client) => {
         const totalPages = Math.ceil(dataArray.length / 10) || 1;
         let currentPage = parseInt(pageStr) || 1;
 
-        // Logic Navigasi
         if (action === "next") currentPage = (currentPage >= totalPages) ? 1 : currentPage + 1;
         if (action === "prev") currentPage = (currentPage <= 1) ? totalPages : currentPage - 1;
-        if (action === "last") currentPage = (currentPage + 5 > totalPages) ? 1 : currentPage + 5;
-        if (action === "first") currentPage = (currentPage - 5 < 1) ? totalPages : currentPage - 5;
+        if (action === "last") currentPage = (currentPage + 5 > totalPages) ? totalPages : currentPage + 5;
+        if (action === "first") currentPage = (currentPage - 5 < 1) ? 1 : currentPage - 5;
         if (action === "top") currentPage = 1;
         
-        // Logic My Rank
         if (action === "myrank") {
             const index = dataArray.findIndex(u => u.id === interaction.user.id);
-            if (index === -1) return interaction.reply({ content: "Kamu belum terdata di leaderboard ini.", ephemeral: true });
+            if (index === -1) return interaction.reply({ content: "Kamu belum terdata.", ephemeral: true });
             currentPage = Math.floor(index / 10) + 1;
         }
 
         const payload = generateLBLayout(dataArray, type, currentPage, totalPages, interaction.user.id);
         
-        if (interaction.replied || interaction.deferred) {
-            await interaction.editReply(payload);
+        // Membedakan reply baru atau edit pesan yang sudah ada
+        if (interaction.message.flags.has(64)) {
+            await interaction.update(payload);
         } else {
             await interaction.reply({ ...payload, ephemeral: true });
         }
     });
 };
 
-// --- FORMATTERS ---
+// --- HELPERS (Tetap sama namun lebih solid) ---
+function renderGraph(data) {
+    const max = Math.max(...data) || 1;
+    return data.map((count, hour) => {
+        const barSize = Math.round((count / max) * 10);
+        const bar = "🟦".repeat(barSize) + "⬜".repeat(10 - barSize);
+        return `${hour.toString().padStart(2, '0')}:00 ${bar} ${count}`;
+    }).join("\n");
+}
+
 function getPeaks(arr) {
     const max = Math.max(...arr);
     const min = Math.min(...arr);
@@ -122,7 +126,6 @@ function getTop(obj, key) {
 
 function generateMainLayout(peak, chat, vc) {
     return {
-        flags: 0,
         components: [{
             type: 17,
             components: [
@@ -165,7 +168,7 @@ function generateLBLayout(data, type, page, total, userId) {
             components: [
                 {
                     type: 9,
-                    components: [{ type: 10, content: `## Top ${category} Leaderboard\nUser: <@${userId}>\n` }],
+                    components: [{ type: 10, content: `## Top ${category} Leaderboard\n` }],
                     accessory: { style: 2, type: 2, label: "My Rank", custom_id: `myrank_${type}_${page}` }
                 },
                 { type: 14 },
