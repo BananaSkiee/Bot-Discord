@@ -88,20 +88,15 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.guild || !message.member) return;
 
+  // 1. Jalankan Sticky Handler (Tetap Simpan ini)
   stickyHandler(client, message);
-  invitesTracker(client);
   
   const member = message.member;
   const content = message.content.toLowerCase();
   
-  // --- A. LOG PESAN PERTAMA ---
-  if (!firstMessageCache.has(member.id)) {
-    // Catat pesan pertama, lalu masukkan ke cache
-    await logFirstMessage(message); 
-    firstMessageCache.set(member.id, true);
-  }
+  // 2. Log First Message (BAGIAN INI SUDAH DIHAPUS SUPAYA GAK CRASH)
 
-  // --- B. COMMAND SIMULASI LOG: !1, !2, !3 ---
+  // 3. COMMAND SIMULASI LOG: !1, !2, !3 (Tetap Simpan ini kalau lo masih butuh ngetes log)
   if (content === "!1" || content === "!2" || content === "!3") {
       const isOwnerOrAdmin = member?.permissions.has("ADMINISTRATOR") || member?.guild.ownerId === member.id;
       
@@ -114,17 +109,19 @@ client.on("messageCreate", async (message) => {
       else if (content === '!2') { logTypeText = 'Simulasi: Member Keluar'; }
       else if (content === '!3') { logTypeText = 'Simulasi: Member Masuk Kembali'; }
 
-      // Catat aksi di Forum Log Persisten
-      const confirmationEmbed = await createLogEntryEmbed(member, 'CMD_SIM', { command: content });
-      await logMemberAction(member, 'CMD_SIM', { command: content }); 
+      try {
+          const confirmationEmbed = await createLogEntryEmbed(member, 'CMD_SIM', { command: content });
+          await logMemberAction(member, 'CMD_SIM', { command: content }); 
 
-      // Kirim balasan konfirmasi
-      await message.channel.send({ 
-          content: `**[KONFIRMASI]** ${member.user.tag} memicu simulasi: ${logTypeText}`,
-          embeds: [confirmationEmbed] 
-      }).catch(err => console.error("❌ Gagal mengirim konfirmasi simulasi:", err.message));
+          await message.channel.send({ 
+              content: `**[KONFIRMASI]** ${member.user.tag} memicu simulasi: ${logTypeText}`,
+              embeds: [confirmationEmbed] 
+          });
+      } catch (err) {
+          console.error("❌ Log Forum Error:", err.message);
+      }
       
-      if (message.deletable) await message.delete().catch(err => console.error("❌ Gagal delete pesan perintah:", err));
+      if (message.deletable) await message.delete().catch(() => {});
       return;
   }
 });
