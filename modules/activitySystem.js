@@ -1,3 +1,4 @@
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { QuickDB } = require("quick.db");
 const db = new QuickDB();
 const cron = require('node-cron');
@@ -48,8 +49,8 @@ module.exports = (client) => {
         })).sort((a, b) => b.val - a.val);
     }
 
-    // --- UI RENDERER (RAW JSON FOR V2 SUPPORT) ---
-    function renderV2(type, page, data, userId, isSnap) {
+    // --- UI RENDERER (PROFESSIONAL EMBED) ---
+    function renderLB(type, page, data, userId, isSnap) {
         const totalP = Math.ceil(data.length / 10) || 1;
         const start = page * 10;
         const current = data.slice(start, start + 10);
@@ -58,70 +59,46 @@ module.exports = (client) => {
         let list = "";
         const emojis = ["🥇", "🥈", "🥉", "4.", "5.", "6.", "7.", "8.", "9.", "10."];
         
-        // Render 10 user atau isi dengan None jika kosong
         for (let i = 0; i < 10; i++) {
             const u = current[i];
             const pos = start + i + 1;
             if (u && u.val > 0) {
                 const score = type === 'message' ? `${u.val.toLocaleString()} Msg` : `${(u.val / 3600000).toFixed(1)}h`;
-                // Pake @username (teks biasa), bukan <@id> supaya gak ngetag
-                let line = `${pos <= 3 ? emojis[i] : `**${pos}.**`} @${u.name} — \`${score}\``;
-                if (u.id === userId) line = `> **${line}** <`;
+                let line = `${pos <= 3 ? emojis[i] : `**${pos}.**`} **@${u.name}** — \`${score}\``;
+                if (u.id === userId) line = `> ${line} <`;
                 list += line + "\n";
             } else {
                 list += `${pos <= 3 ? emojis[i] : `**${pos}.**`} _None_\n`;
             }
         }
 
-        // Return Raw Component Object (Bypass D.JS Limitations)
-        return {
-            flags: 64, 
-            components: [{
-                type: 17,
-                components: [
-                    {
-                        type: 9,
-                        components: [{ type: 10, content: `## ${type === 'message' ? 'Massage' : 'Voice'} Leaderboard\nUser: <@${userId}>\nStatus: **${isSnap ? 'Arsip Bulan Lalu' : 'Real-time'}**` }],
-                        accessory: { style: 2, type: 2, label: "My Rank", custom_id: `lb_rank_${type}_${page}_${tagMode}` }
-                    },
-                    { type: 14 },
-                    {
-                        type: 9,
-                        components: [{ type: 10, content: list }],
-                        accessory: { style: 2, type: 2, label: "Top", custom_id: `lb_top_${type}_0_${tagMode}` }
-                    },
-                    { type: 14 },
-                    {
-                        type: 1,
-                        components: [
-                            { style: 2, type: 2, label: "◀◀", custom_id: `lb_p5_${type}_${page}_${tagMode}` },
-                            { style: 2, type: 2, label: "◀", custom_id: `lb_p1_${type}_${page}_${tagMode}` },
-                            { style: 2, type: 2, label: `${page + 1}/${totalP}`, custom_id: "none", disabled: true },
-                            { style: 2, type: 2, label: "▶", custom_id: `lb_n1_${type}_${page}_${tagMode}` },
-                            { style: 2, type: 2, label: "▶▶", custom_id: `lb_n5_${type}_${page}_${tagMode}` }
-                        ]
-                    },
-                    { type: 14 },
-                    { type: 10, content: "-# © BS Community by BananaSkiee" }
-                ]
-            }]
-        };
+        const embed = new EmbedBuilder()
+            .setTitle(`🏆 ${type === 'message' ? 'Massage' : 'Voice'} Leaderboard`)
+            .setDescription(`**Status:** ${isSnap ? '📁 Arsip Bulan Lalu' : '🟢 Real-time'}\n\n${list}`)
+            .setColor(isSnap ? '#5865F2' : '#FEE75C')
+            .setFooter({ text: `Halaman ${page + 1}/${totalP} • © BS Community` })
+            .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`lb_p5_${type}_${page}_${tagMode}`).setLabel('◀◀').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`lb_p1_${type}_${page}_${tagMode}`).setLabel('◀').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`lb_rank_${type}_${page}_${tagMode}`).setLabel('My Rank').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`lb_n1_${type}_${page}_${tagMode}`).setLabel('▶').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`lb_n5_${type}_${page}_${tagMode}`).setLabel('▶▶').setStyle(ButtonStyle.Secondary)
+        );
+
+        return { embeds: [embed], components: [row], fetchReply: true };
     }
 
     // --- COMMAND HANDLER ---
     client.on('messageCreate', async (msg) => {
         if (msg.author.bot || !msg.content.startsWith('!lb')) return;
         const arg = msg.content.split(' ')[1]?.toLowerCase();
+        
         if (arg === 'massage' || arg === 'voice') {
             const type = arg === 'massage' ? 'message' : 'voice';
             const data = await fetchLB(type, false);
-            // Gunakan API mentah untuk mengirim komponen v2
-            await client.rest.post(`/channels/${msg.channel.id}/messages`, {
-                body: { 
-                    ...renderV2(type, 0, data, msg.author.id, false),
-                    message_reference: { message_id: msg.id }
-                }
-            }).catch(err => console.error("Gagal kirim LB V2:", err));
+            await msg.reply(renderLB(type, 0, data, msg.author.id, false));
         }
     });
 
@@ -141,10 +118,8 @@ module.exports = (client) => {
         else if (mode === 'p1') p = (p - 1 < 0) ? totalP - 1 : p - 1;
         else if (mode === 'n1') p = (p + 1 >= totalP) ? 0 : p + 1;
         else if (mode === 'n5') p = (p + 5 >= totalP) ? 0 : p + 5;
-        else if (mode === 'top') p = 0;
 
-        // Update interaction menggunakan API mentah supaya v2 jalan
-        await i.update(renderV2(type, p, data, i.user.id, isSnap)).catch(() => {});
+        await i.update(renderLB(type, p, data, i.user.id, isSnap)).catch(() => {});
     });
 
     // --- AUTO SEND (TANGGAL 1) ---
@@ -159,22 +134,18 @@ module.exports = (client) => {
         const topM = raw.sort((a,b) => (b.messages||0) - (a.messages||0))[0];
         const topV = raw.sort((a,b) => (b.voiceTime||0) - (a.voiceTime||0))[0];
 
-        await client.rest.post(`/channels/${chan.id}/messages`, {
-            body: {
-                content: "@everyone",
-                components: [{
-                    type: 17,
-                    components: [
-                        { type: 10, content: `## Monthly Leaderboard Results\n>>> **Top Massage:** ${topM ? `@${topM.username}` : 'None'}\n**Top Voice:** ${topV ? `@${topV.username}` : 'None'}` },
-                        { type: 14 },
-                        { type: 1, components: [
-                            { style: 2, type: 2, label: "Stats Massage", custom_id: "lb_top_message_0_snapshot" },
-                            { style: 2, type: 2, label: "Stats Voice", custom_id: "lb_top_voice_0_snapshot" }
-                        ]}
-                    ]
-                }]
-            }
-        });
+        const embed = new EmbedBuilder()
+            .setTitle('📅 Rekap Leaderboard Bulanan')
+            .setDescription(`Aktivitas bulan ini telah direset! Berikut adalah juaranya:\n\n🏆 **Top Massage:** @${topM?.username || 'None'}\n🏆 **Top Voice:** @${topV?.username || 'None'}`)
+            .setColor('#2F3136')
+            .setFooter({ text: 'Klik tombol di bawah untuk detail arsip' });
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`lb_top_message_0_snapshot`).setLabel('Detail Massage').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`lb_top_voice_0_snapshot`).setLabel('Detail Voice').setStyle(ButtonStyle.Success)
+        );
+
+        await chan.send({ content: "@everyone", embeds: [embed], components: [row] });
 
         const keys = all.filter(i => i.id.startsWith('stats_')).map(i => i.id);
         for(const k of keys) await db.delete(k);
