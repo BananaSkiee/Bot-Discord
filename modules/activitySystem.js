@@ -1,3 +1,4 @@
+// modules/activitySystem.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const { QuickDB } = require("quick.db");
 const db = new QuickDB();
@@ -5,64 +6,64 @@ const cron = require('node-cron');
 
 module.exports = (client) => {
 
-    // --- TRACKING SYSTEM (CHAT) ---
+    // --- TRACKING CORE (Chat & Voice) ---
     client.on('messageCreate', async (m) => {
         if (m.author.bot || !m.guild) return;
-        await db.add(`stats_${m.author.id}.messages`, 1);
+        // Simpan username & tambah poin message
         await db.set(`stats_${m.author.id}.username`, m.author.username);
+        await db.add(`stats_${m.author.id}.messages`, 1);
     });
 
-    // --- TRACKING SYSTEM (VOICE) ---
-    const voiceStatus = new Map();
-    client.on('voiceStateUpdate', async (oldState, newState) => {
-        if (newState.member?.user.bot) return;
-        if (!oldState.channelId && newState.channelId) voiceStatus.set(newState.id, Date.now());
-        if (oldState.channelId && !newState.channelId) {
-            const joinTime = voiceStatus.get(newState.id);
-            if (joinTime) {
-                const duration = Date.now() - joinTime;
-                await db.add(`stats_${newState.id}.voiceTime`, duration);
-                await db.set(`stats_${newState.id}.username`, newState.member.user.username);
-                voiceStatus.delete(newState.id);
+    const vStates = new Map();
+    client.on('voiceStateUpdate', async (oldS, newS) => {
+        if (newS.member?.user.bot) return;
+        // Join
+        if (!oldS.channelId && newS.channelId) vStates.set(newS.id, Date.now());
+        // Leave
+        if (oldS.channelId && !newS.channelId) {
+            const start = vStates.get(newS.id);
+            if (start) {
+                const diff = Date.now() - start;
+                await db.set(`stats_${newS.id}.username`, newS.member.user.username);
+                await db.add(`stats_${newS.id}.voiceTime`, diff);
+                vStates.delete(newS.id);
             }
         }
     });
 
-    // --- HELPER: AMBIL DATA ---
-    async function getData(type, isSnapshot = false) {
-        let all;
-        if (isSnapshot) {
-            all = await db.get(`snapshot_last_month`) || [];
-            return all.map(u => ({
+    // --- DATA FETCHING ENGINE ---
+    async function fetchLB(type, isSnap) {
+        if (isSnap) {
+            const snap = await db.get(`snapshot_last_month`) || [];
+            return snap.map(u => ({
                 id: u.id, username: u.username,
-                value: type === 'message' ? (u.messages || 0) : (u.voiceTime || 0)
-            })).sort((a, b) => b.value - a.value);
-        } else {
-            const raw = await db.all();
-            return raw.filter(i => i.id.startsWith('stats_')).map(u => ({
-                id: u.id.split('_')[1],
-                username: u.value.username || 'Unknown',
-                value: type === 'message' ? (u.value.messages || 0) : (u.value.voiceTime || 0)
-            })).sort((a, b) => b.value - a.value);
+                val: type === 'message' ? (u.messages || 0) : (u.voiceTime || 0)
+            })).sort((a, b) => b.val - a.val);
         }
+        const raw = await db.all();
+        return raw.filter(i => i.id.startsWith('stats_')).map(u => ({
+            id: u.id.split('_')[1],
+            username: u.value.username || 'Unknown',
+            val: type === 'message' ? (u.value.messages || 0) : (u.value.voiceTime || 0)
+        })).sort((a, b) => b.val - a.val);
     }
 
-    // --- RENDER LAYOUT V2 (PROFESIONAL) ---
-    function renderLayout(type, page, data, userId, isSnapshot) {
-        const totalPages = Math.ceil(data.length / 10) || 1;
+    // --- UI COMPONENT V2 BUILDER ---
+    function buildUI(type, page, data, userId, isSnap) {
+        const totalP = Math.ceil(data.length / 10) || 1;
         const start = page * 10;
-        const currentData = data.slice(start, start + 10);
-        const snapLabel = isSnapshot ? "snapshot" : "realtime";
+        const current = data.slice(start, start + 10);
+        const label = isSnap ? "snapshot" : "realtime";
         
-        let lbList = "";
-        const emojis = ["🥇", "🥈", "🥉", "4.", "5.", "6.", "7.", "8.", "9.", "10."];
+        let list = "";
+        const emj = ["🥇", "🥈", "🥉", "4.", "5.", "6.", "7.", "8.", "9.", "10."];
         
-        currentData.forEach((u, i) => {
+        current.forEach((u, i) => {
             const pos = start + i + 1;
-            const val = type === 'message' ? `${u.value.toLocaleString()} Msg` : `${(u.value / 3600000).toFixed(1)}h`;
-            let line = `${pos <= 3 ? emojis[i] : `**${pos}.**`} ${u.username} — \`${val}\``;
-            if (u.id === userId) line = `> **${line}** <`;
-            lbList += line + "\n";
+            const score = type === 'message' ? `${u.val.toLocaleString()} Msg` : `${(u.val / 3600000).toFixed(1)}h`;
+            let txt = `${pos <= 3 ? emj[pos-1] : `**${pos}.**`} ${u.username} — \`${score}\``;
+            if (u.id === userId) txt = `> **${txt}** <`;
+            list += txt + "\n";
         });
 
         return [{
@@ -70,27 +71,24 @@ module.exports = (client) => {
             components: [
                 {
                     type: 9,
-                    components: [{ 
-                        type: 10, 
-                        content: `## Top ${type === 'message' ? 'Massage' : 'Voice'} Leaderboard\nUser: <@${userId}>\nHari: ${new Date().toLocaleDateString('id-ID', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'})}` 
-                    }],
-                    accessory: { style: 2, type: 2, label: "My Rank", custom_id: `lb_rank_${type}_${page}_${snapLabel}` }
+                    components: [{ type: 10, content: `## Top ${type === 'message' ? 'Massage' : 'Voice'} Leaderboard\nUser: <@${userId}>\nStatus: **${isSnap ? 'Archive' : 'Live'}**` }],
+                    accessory: { style: 2, type: 2, label: "My Rank", custom_id: `lb_rank_${type}_${page}_${label}` }
                 },
                 { type: 14 },
                 {
                     type: 9,
-                    components: [{ type: 10, content: lbList || "_No data found in this range._" }],
-                    accessory: { style: 2, type: 2, label: "Top", custom_id: `lb_top_${type}_0_${snapLabel}` }
+                    components: [{ type: 10, content: list || "Belum ada data." }],
+                    accessory: { style: 2, type: 2, label: "Top", custom_id: `lb_top_${type}_0_${label}` }
                 },
                 { type: 14 },
                 {
                     type: 1,
                     components: [
-                        { style: 2, type: 2, label: "◀◀", custom_id: `lb_prev5_${type}_${page}_${snapLabel}` },
-                        { style: 2, type: 2, label: "◀", custom_id: `lb_prev1_${type}_${page}_${snapLabel}` },
-                        { style: 2, type: 2, label: `${page + 1}/${totalPages}`, custom_id: "noop", disabled: true },
-                        { style: 2, type: 2, label: "▶", custom_id: `lb_next1_${type}_${page}_${snapLabel}` },
-                        { style: 2, type: 2, label: "▶▶", custom_id: `lb_next5_${type}_${page}_${snapLabel}` }
+                        { style: 2, type: 2, label: "◀◀", custom_id: `lb_p5_${type}_${page}_${label}` },
+                        { style: 2, type: 2, label: "◀", custom_id: `lb_p1_${type}_${page}_${label}` },
+                        { style: 2, type: 2, label: `${page + 1}/${totalP}`, custom_id: "none", disabled: true },
+                        { style: 2, type: 2, label: "▶", custom_id: `lb_n1_${type}_${page}_${label}` },
+                        { style: 2, type: 2, label: "▶▶", custom_id: `lb_n5_${type}_${page}_${label}` }
                     ]
                 },
                 { type: 14 },
@@ -99,22 +97,45 @@ module.exports = (client) => {
         }];
     }
 
-    // --- COMMANDS: !lb massage / !lb voice ---
-    client.on('messageCreate', async (message) => {
-        if (message.author.bot || !message.content.startsWith('!lb')) return;
-        const sub = message.content.split(' ')[1]?.toLowerCase();
-
-        if (sub === 'massage' || sub === 'voice') {
-            const type = sub === 'massage' ? 'message' : 'voice';
-            const data = await getData(type, false);
-            await message.reply({ components: renderLayout(type, 0, data, message.author.id, false) });
+    // --- TEST COMMANDS ---
+    client.on('messageCreate', async (msg) => {
+        if (msg.author.bot || !msg.content.startsWith('!lb')) return;
+        const arg = msg.content.split(' ')[1]?.toLowerCase();
+        if (arg === 'massage' || arg === 'voice') {
+            const type = arg === 'massage' ? 'message' : 'voice';
+            const data = await fetchLB(type, false);
+            await msg.reply({ components: buildUI(type, 0, data, msg.author.id, false) });
         }
     });
 
-    // --- AUTO RESET & SNAPSHOT (Setiap Tanggal 1 Jam 00:00) ---
+    // --- INTERACTION HANDLER ---
+    client.on('interactionCreate', async (i) => {
+        if (!i.isButton() || !i.customId.startsWith('lb_')) return;
+        const [_, mode, type, pStr, label] = i.customId.split('_');
+        const isSnap = label === 'snapshot';
+        const data = await fetchLB(type, isSnap);
+        const totalP = Math.ceil(data.length / 10) || 1;
+        let p = parseInt(pStr);
+
+        if (mode === 'rank') {
+            const pos = data.findIndex(u => u.id === i.user.id);
+            p = pos === -1 ? 0 : Math.floor(pos / 10);
+        } else if (mode === 'p5') p = (p - 5 < 0) ? totalP - 1 : p - 5;
+        else if (mode === 'p1') p = (p - 1 < 0) ? totalP - 1 : p - 1;
+        else if (mode === 'n1') p = (p + 1 >= totalP) ? 0 : p + 1;
+        else if (mode === 'n5') p = (p + 5 >= totalP) ? 0 : p + 5;
+        else if (mode === 'top') p = 0;
+
+        await i.update({
+            flags: 64,
+            components: buildUI(type, p, data, i.user.id, isSnap)
+        });
+    });
+
+    // --- MONTHLY AUTO SEND (TANGGAL 1) ---
     cron.schedule('0 0 1 * *', async () => {
-        const channel = client.channels.cache.get("1455791109446832240");
-        if (!channel) return;
+        const chan = client.channels.cache.get("1455791109446832240");
+        if (!chan) return;
 
         const all = await db.all();
         const raw = all.filter(i => i.id.startsWith('stats_')).map(u => ({ id: u.id.split('_')[1], ...u.value }));
@@ -123,13 +144,14 @@ module.exports = (client) => {
         const topM = raw.sort((a,b) => (b.messages||0) - (a.messages||0))[0];
         const topV = raw.sort((a,b) => (b.voiceTime||0) - (a.voiceTime||0))[0];
 
-        await channel.send({
+        await chan.send({
+            content: "@everyone",
             components: [{
                 type: 17,
                 components: [
                     {
                         type: 10,
-                        content: `## Monthly Leaderboard\n**Statistik aktivitas bulan ini telah di-arsip.**\n>>> **Stats Massage:** ${topM ? `**${topM.username}** (${topM.messages} Pts)` : 'N/A'}\n**Stats Voice:** ${topV ? `**${topV.username}** (${(topV.voiceTime/3600000).toFixed(1)}h)` : 'N/A'}`
+                        content: `## Monthly Leaderboard Results\n**Berikut adalah ringkasan aktivitas bulan ini:**\n>>> **Stats Massage:** ${topM ? `**${topM.username}** (${topM.messages} Pts)` : 'N/A'}\n**Stats Voice:** ${topV ? `**${topV.username}** (${(topV.voiceTime/3600000).toFixed(1)}h)` : 'N/A'}`
                     },
                     { type: 14 },
                     {
@@ -138,38 +160,12 @@ module.exports = (client) => {
                             { style: 2, type: 2, label: "Stats Massage", custom_id: "lb_top_message_0_snapshot" },
                             { style: 2, type: 2, label: "Stats Voice", custom_id: "lb_top_voice_0_snapshot" }
                         ]
-                    },
-                    { type: 14 },
-                    { type: 10, content: "-# © BS Community by BananaSkiee" }
+                    }
                 ]
             }]
         });
 
-        for(const item of all.filter(i => i.id.startsWith('stats_'))) { await db.delete(item.id); }
-    });
-
-    // --- INTERACTION HANDLER (PAGINATION & MY RANK) ---
-    client.on('interactionCreate', async (interaction) => {
-        if (!interaction.isButton() || !interaction.customId.startsWith('lb_')) return;
-        
-        const [_, mode, type, pageStr, snapLabel] = interaction.customId.split('_');
-        const isSnapshot = snapLabel === 'snapshot';
-        const data = await getData(type, isSnapshot);
-        const totalPages = Math.ceil(data.length / 10) || 1;
-        let page = parseInt(pageStr);
-
-        if (mode === 'rank') {
-            const pos = data.findIndex(u => u.id === interaction.user.id);
-            page = pos === -1 ? 0 : Math.floor(pos / 10);
-        } else if (mode === 'prev5') page = (page - 5 < 0) ? totalPages - 1 : page - 5;
-        else if (mode === 'prev1') page = (page - 1 < 0) ? totalPages - 1 : page - 1;
-        else if (mode === 'next1') page = (page + 1 >= totalPages) ? 0 : page + 1;
-        else if (mode === 'next5') page = (page + 5 >= totalPages) ? 0 : page + 5;
-        else if (mode === 'top') page = 0;
-
-        await interaction.update({
-            flags: 64, // Ephemeral
-            components: renderLayout(type, page, data, interaction.user.id, isSnapshot)
-        });
+        for(const item of all.filter(i => i.id.startsWith('stats_'))) await db.delete(item.id);
     });
 };
+            
