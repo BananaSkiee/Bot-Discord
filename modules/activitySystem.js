@@ -1,4 +1,3 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { QuickDB } = require("quick.db");
 const db = new QuickDB();
 const cron = require('node-cron');
@@ -27,87 +26,117 @@ module.exports = (client) => {
         }
     });
 
-    // --- CORE DATA FETCH (NO PING) ---
-    async function fetchLB(type, isSnap) {
-        let raw;
-        if (isSnap) {
-            raw = await db.get(`snapshot_last_month`) || [];
-        } else {
-            const all = await db.all();
-            raw = all.filter(i => i.id.startsWith('stats_')).map(u => ({
-                id: u.id.split('_')[1],
-                username: u.value.username || 'Unknown',
-                messages: u.value.messages || 0,
-                voiceTime: u.value.voiceTime || 0
-            }));
-        }
-
-        return raw.map(u => ({
-            id: u.id,
-            name: u.username || 'None',
-            val: type === 'message' ? (u.messages || 0) : (u.voiceTime || 0)
-        })).sort((a, b) => b.val - a.val);
+    // --- DATA FETCH ENGINE ---
+    async function fetchAllData(type) {
+        const guild = client.guilds.cache.first(); // Ambil server utama bot
+        if (!guild) return [];
+        
+        await guild.members.fetch(); // Pastikan cache member terbaru
+        const allStats = await db.all();
+        
+        return guild.members.cache.map(m => {
+            const stat = allStats.find(s => s.id === `stats_${m.id}`)?.value || {};
+            return {
+                id: m.id,
+                username: m.user.username,
+                val: type === 'message' ? (stat.messages || 0) : (stat.voiceTime || 0)
+            };
+        }).sort((a, b) => b.val - a.val);
     }
 
-    // --- UI RENDERER (PROFESSIONAL EMBED) ---
-    function renderLB(type, page, data, userId, isSnap) {
+    // --- UI BUILDER V2 ---
+    function buildMainUI(topM, topV) {
+        return {
+            components: [{
+                type: 17,
+                components: [
+                    {
+                        type: 10,
+                        content: `## BananaSkiee Activity Center\n**Pantau keaktifan warga BS di sini:**\n>>> **Stats Massage:** @${topM?.username || 'None'} — \`${topM?.val || 0} Msg\`\n**Stats Voice:** @${topV?.username || 'None'} — \`${((topV?.val || 0)/3600000).toFixed(1)}h\``
+                    },
+                    { type: 14 },
+                    {
+                        type: 1,
+                        components: [
+                            { style: 2, type: 2, label: "Stats Massage", custom_id: "lb_top_message_0_live" },
+                            { style: 2, type: 2, label: "Stats Voice", custom_id: "lb_top_voice_0_live" }
+                        ]
+                    },
+                    { type: 14 },
+                    { type: 10, content: "-# © BS Community by BananaSkiee" }
+                ]
+            }]
+        };
+    }
+
+    function buildDetailUI(type, page, data, userId) {
         const totalP = Math.ceil(data.length / 10) || 1;
-        const start = page * 10;
-        const current = data.slice(start, start + 10);
-        const tagMode = isSnap ? "snapshot" : "live";
+        const current = data.slice(page * 10, (page * 10) + 10);
+        const now = new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
         let list = "";
-        const emojis = ["🥇", "🥈", "🥉", "4.", "5.", "6.", "7.", "8.", "9.", "10."];
+        const emj = ["🥇", "🥈", "🥉", "4.", "5.", "6.", "7.", "8.", "9.", "10."];
         
-        for (let i = 0; i < 10; i++) {
-            const u = current[i];
-            const pos = start + i + 1;
-            if (u && u.val > 0) {
-                const score = type === 'message' ? `${u.val.toLocaleString()} Msg` : `${(u.val / 3600000).toFixed(1)}h`;
-                let line = `${pos <= 3 ? emojis[i] : `**${pos}.**`} **@${u.name}** — \`${score}\``;
-                if (u.id === userId) line = `> ${line} <`;
-                list += line + "\n";
-            } else {
-                list += `${pos <= 3 ? emojis[i] : `**${pos}.**`} _None_\n`;
-            }
-        }
+        current.forEach((u, i) => {
+            const pos = (page * 10) + i + 1;
+            const score = type === 'message' ? `${u.val} Msg` : `${(u.val / 3600000).toFixed(1)}h`;
+            let txt = `${pos <= 3 ? emj[i] : `**${pos}.**`} @${u.username} — \`${score}\``;
+            if (u.id === userId) txt = `> **${txt}** <`;
+            list += txt + "\n";
+        });
 
-        const embed = new EmbedBuilder()
-            .setTitle(`🏆 ${type === 'message' ? 'Massage' : 'Voice'} Leaderboard`)
-            .setDescription(`**Status:** ${isSnap ? '📁 Arsip Bulan Lalu' : '🟢 Real-time'}\n\n${list}`)
-            .setColor(isSnap ? '#5865F2' : '#FEE75C')
-            .setFooter({ text: `Halaman ${page + 1}/${totalP} • © BS Community` })
-            .setTimestamp();
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`lb_p5_${type}_${page}_${tagMode}`).setLabel('◀◀').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`lb_p1_${type}_${page}_${tagMode}`).setLabel('◀').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`lb_rank_${type}_${page}_${tagMode}`).setLabel('My Rank').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`lb_n1_${type}_${page}_${tagMode}`).setLabel('▶').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`lb_n5_${type}_${page}_${tagMode}`).setLabel('▶▶').setStyle(ButtonStyle.Secondary)
-        );
-
-        return { embeds: [embed], components: [row], fetchReply: true };
+        return {
+            components: [{
+                type: 17,
+                components: [
+                    {
+                        type: 9,
+                        components: [{ type: 10, content: `## Top ${type === 'message' ? 'Massage' : 'Voice'} Leaderboard\nUser: <@${userId}>\nTanggal: ${now}` }],
+                        accessory: { style: 2, type: 2, label: "My Rank", custom_id: `lb_rank_${type}_${page}_live` }
+                    },
+                    { type: 14 },
+                    {
+                        type: 9,
+                        components: [{ type: 10, content: list || "Kosong." }],
+                        accessory: { style: 2, type: 2, label: "Top", custom_id: `lb_top_${type}_0_live` }
+                    },
+                    { type: 14 },
+                    {
+                        type: 1,
+                        components: [
+                            { style: 2, type: 2, label: "<<", custom_id: `lb_p5_${type}_${page}_live` },
+                            { style: 2, type: 2, label: "<", custom_id: `lb_p1_${type}_${page}_live` },
+                            { style: 2, type: 2, label: `${page + 1}/${totalP}`, custom_id: "none", disabled: true },
+                            { style: 2, type: 2, label: ">", custom_id: `lb_n1_${type}_${page}_live` },
+                            { style: 2, type: 2, label: ">>", custom_id: `lb_n5_${type}_${page}_live` }
+                        ]
+                    },
+                    { type: 14 },
+                    { type: 10, content: "-# © BS Community by BananaSkiee" }
+                ]
+            }]
+        };
     }
 
-    // --- COMMAND HANDLER ---
+    // --- HANDLER COMMAND !LB ---
     client.on('messageCreate', async (msg) => {
-        if (msg.author.bot || !msg.content.startsWith('!lb')) return;
-        const arg = msg.content.split(' ')[1]?.toLowerCase();
+        if (msg.author.bot || msg.content !== '!lb') return;
         
-        if (arg === 'massage' || arg === 'voice') {
-            const type = arg === 'massage' ? 'message' : 'voice';
-            const data = await fetchLB(type, false);
-            await msg.reply(renderLB(type, 0, data, msg.author.id, false));
-        }
+        const dataM = await fetchAllData('message');
+        const dataV = await fetchAllData('voice');
+
+        // Pake REST post biar support Type 17
+        await client.rest.post(`/channels/${msg.channel.id}/messages`, {
+            body: buildMainUI(dataM[0], dataV[0])
+        }).catch(e => console.error("ERR !lb:", e));
     });
 
     // --- INTERACTION HANDLER ---
     client.on('interactionCreate', async (i) => {
         if (!i.isButton() || !i.customId.startsWith('lb_')) return;
-        const [_, mode, type, pStr, tag] = i.customId.split('_');
-        const isSnap = tag === 'snapshot';
-        const data = await fetchLB(type, isSnap);
+        
+        const [_, mode, type, pStr] = i.customId.split('_');
+        const data = await fetchAllData(type);
         const totalP = Math.ceil(data.length / 10) || 1;
         let p = parseInt(pStr);
 
@@ -118,36 +147,8 @@ module.exports = (client) => {
         else if (mode === 'p1') p = (p - 1 < 0) ? totalP - 1 : p - 1;
         else if (mode === 'n1') p = (p + 1 >= totalP) ? 0 : p + 1;
         else if (mode === 'n5') p = (p + 5 >= totalP) ? 0 : p + 5;
+        else if (mode === 'top') p = 0;
 
-        await i.update(renderLB(type, p, data, i.user.id, isSnap)).catch(() => {});
-    });
-
-    // --- AUTO SEND (TANGGAL 1) ---
-    cron.schedule('0 0 1 * *', async () => {
-        const chan = client.channels.cache.get("1455791109446832240");
-        if (!chan) return;
-
-        const all = await db.all();
-        const raw = all.filter(i => i.id.startsWith('stats_')).map(u => ({ id: u.id.split('_')[1], ...u.value }));
-        await db.set(`snapshot_last_month`, raw);
-
-        const topM = raw.sort((a,b) => (b.messages||0) - (a.messages||0))[0];
-        const topV = raw.sort((a,b) => (b.voiceTime||0) - (a.voiceTime||0))[0];
-
-        const embed = new EmbedBuilder()
-            .setTitle('📅 Rekap Leaderboard Bulanan')
-            .setDescription(`Aktivitas bulan ini telah direset! Berikut adalah juaranya:\n\n🏆 **Top Massage:** @${topM?.username || 'None'}\n🏆 **Top Voice:** @${topV?.username || 'None'}`)
-            .setColor('#2F3136')
-            .setFooter({ text: 'Klik tombol di bawah untuk detail arsip' });
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`lb_top_message_0_snapshot`).setLabel('Detail Massage').setStyle(ButtonStyle.Primary),
-            new ButtonBuilder().setCustomId(`lb_top_voice_0_snapshot`).setLabel('Detail Voice').setStyle(ButtonStyle.Success)
-        );
-
-        await chan.send({ content: "@everyone", embeds: [embed], components: [row] });
-
-        const keys = all.filter(i => i.id.startsWith('stats_')).map(i => i.id);
-        for(const k of keys) await db.delete(k);
+        await i.update(buildDetailUI(type, p, data, i.user.id)).catch(() => {});
     });
 };
