@@ -3,16 +3,13 @@ const { ChannelType } = require("discord.js");
 const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
 const joinvoice = require("../modules/joinvoice");
-// Menghapus: const countValidator = require("../modules/countValidator");
 const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
-const rainbowRole = require("../modules/rainbowRole");
 const minecraftBot = require("../modules/minecraftBot");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
-// const { sendInitialCard } = require('../modules/introCard');
 const activitySystem = require("../modules/activitySystem");
 const tracker = require("../modules/activityTracker");
 
@@ -24,34 +21,20 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
-    const ROLE_NON_VERIFY = "1444248589051367435";
-    const ROLE_MEMBER = "1352286235233620108";
+    // ==========================================
+    // 1. MINECRAFT BOT (DIJALANKAN PERTAMA)
+    // ==========================================
+    try {
+        if (minecraftBot.init) {
+            minecraftBot.init(client);
+        } else {
+            minecraftBot(client);
+        }
+        console.log("✅ Minecraft Bot Module Active");
+    } catch (err) {
+        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
+    }
 
-    // --- LOGIKA MASS SCAN (TAMBAHKAN INI) ---
-    console.log("🔍 Melakukan pengecekan role seluruh member...");
-    client.guilds.cache.forEach(async (guild) => {
-      try {
-        const members = await guild.members.fetch();
-        members.forEach(member => {
-          if (member.user.bot) return;
-
-          const hasMemberRole = member.roles.cache.has(ROLE_MEMBER);
-          const hasNonVerifyRole = member.roles.cache.has(ROLE_NON_VERIFY);
-
-          // Jika tidak punya role Member dan belum punya Non-Verify
-          if (!hasMemberRole && !hasNonVerifyRole) {
-            member.roles.add(ROLE_NON_VERIFY).catch(() => {});
-          }
-          // Jika sudah punya Member tapi Non-Verify masih nempel
-          if (hasMemberRole && hasNonVerifyRole) {
-            member.roles.remove(ROLE_NON_VERIFY).catch(() => {});
-          }
-        });
-      } catch (err) {
-        console.error(`Gagal scan di guild: ${guild.name}`);
-      }
-    });
-    
     // ✅ Verify System
     try {
       await verifySystem.initialize(client);
@@ -64,135 +47,81 @@ module.exports = {
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
 
-        // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
+    // 🏆 Activity & Tracker
     try {
-        await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
+        activitySystem(client);
+        tracker(client);
+        console.log("✅ Activity & Tracker Systems Active");
     } catch (err) {
-        console.error("❌ Auto Bot Role (Initial) error:", err);
+        console.error("❌ Tracker system error:", err);
     }
     
-    /* 🌈 Rainbow role (interval aman 45 detik)
-    try {
-      rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
-    } catch (err) {
-      console.error("❌ Rainbow role error:", err);
-    } */
-
-    // 🏆 Activity System (Leaderboard)
-try {
-    activitySystem(client);
-    console.log("✅ Activity & Leaderboard system active");
-} catch (err) {
-    console.error("❌ Activity system error:", err);
-}
-
-try {
-    tracker(client);
-    console.log("✅ Tracker & Leaderboard System Active");
-} catch (err) {
-    console.error("❌ Tracker system error:", err);
-}
-    
-// ... di bagian paling bawah execute(client)
-/*    try {
-        // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
-        await sendInitialCard(client, ''); 
-    } catch (err) {
-        console.error("❌ Intro Card gagal dipicu:", err.message);
-    } */
-    
-    // 🧷 Sticky handler
+    // 🧷 Sticky, Greeting, & Icon Anim
     try {
       stickyHandler(client);
-    } catch (err) {
-      console.error("❌ Sticky handler error:", err);
-    }
-
-    // 👋 Auto greeting
-    try {
       autoGreeting(client);
-    } catch (err) {
-      console.error("❌ Auto greeting error:", err);
-    }
-
-    // 🧠 Auto animasi icon server
-    try {
       startAutoAnimation(client);
     } catch (err) {
-      console.error("❌ Icon anim error:", err);
+      console.error("❌ Basic handlers error:", err);
     }
 
-    // 📝 Slash command register
+    // 📝 Slash Command & News
     try {
       await slashCommandSetup(client);
-    } catch (err) {
-      console.error("❌ Gagal setup slash command:", err);
-    }
-
-    // 📰 Auto berita
-    try {
       beritaModule(client);
     } catch (err) {
-      console.error("❌ Auto berita error:", err);
+      console.error("❌ Setup modules error:", err);
     }
 
-    // 🟡 Auto status rotasi tiap 1 menit
-    const statuses = [
-      "🌌 Menjaga BananaSkiee Community",
-      "📖 Memandu member baru",
-      "🎧 Mendengarkan komunitas",
-      "🧠 Belajar bersama member",
-      "🗝️ Mengamankan server",
-      "🕊️ Menyebar positivity",
-      "⚙️ Melayani BananaSkiee",
-      "🌙 Standby 24/7",
-      "🔮 Masa depan cerah",
-      "🌟 Cahaya komunitas",
-      "🛡️ Proteksi maksimal",
-      "📡 Terhubung dengan semua",
-      "⏳ Setia menemani",
-    ];
+    // 🟡 Status Rotation
+    const statuses = ["🌌 BananaSkiee", "🛡️ Proteksi Maksimal", "🌙 Standby 24/7"];
     let index = 0;
-    const updateStatus = () => {
-      try {
-        const status = statuses[index % statuses.length];
-        client.user.setActivity(status, { type: 0 });
+    setInterval(() => {
+        client.user.setActivity(statuses[index % statuses.length], { type: 0 });
         index++;
-      } catch (err) {
-        console.error("❌ Update status error:", err);
-      }
-    };
-    updateStatus();
-    setInterval(updateStatus, 60_000);
+    }, 60000);
 
-    // 🤣 Auto meme tiap 3 jam
+    // 🤣 Auto Meme
     const memeChannelId = process.env.MEME_CHANNEL_ID;
     if (memeChannelId) {
       const memeChannel = client.channels.cache.get(memeChannelId);
-      if (memeChannel) {
-        setInterval(() => autoSendMeme(memeChannel), 10_800_000);
-        console.log("✅ Fitur auto meme aktif.");
-      } else {
-        console.error("❌ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
-      }
-    } else {
-      console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
+      if (memeChannel) setInterval(() => autoSendMeme(memeChannel), 10800000);
     }
 
-    // 🎙️ Join voice channel saat ready
+    // 🎙️ Join Voice
     try {
       await joinvoice(client);
     } catch (err) {
       console.error("❌ Gagal join voice channel:", err);
     }
 
-    // ⛏️ Minecraft bot init (New Module)
-    try {
-        minecraftBot(client);
-        console.log("✅ Minecraft Bot Module Active");
-    } catch (err) {
-        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    }
+    // ==========================================
+    // 2. PROSES BERAT (DIJALANKAN TERAKHIR)
+    // ==========================================
+    
+    // Pengecekan Role Member (Non-Verify)
+    console.log("🔍 Melakukan pengecekan role seluruh member...");
+    const ROLE_NON_VERIFY = "1444248589051367435";
+    const ROLE_MEMBER = "1352286235233620108";
 
+    client.guilds.cache.forEach(async (guild) => {
+      try {
+        const members = await guild.members.fetch();
+        members.forEach(member => {
+          if (member.user.bot) return;
+          const hasMember = member.roles.cache.has(ROLE_MEMBER);
+          const hasNonV = member.roles.cache.has(ROLE_NON_VERIFY);
+          if (!hasMember && !hasNonV) member.roles.add(ROLE_NON_VERIFY).catch(() => {});
+          if (hasMember && hasNonV) member.roles.remove(ROLE_NON_VERIFY).catch(() => {});
+        });
+      } catch (err) { console.error(`Gagal scan member: ${guild.name}`); }
+    });
+
+    // Pengecekan Role Bot
+    try {
+        await setInitialBotRoles(client);
+    } catch (err) {
+        console.error("❌ Auto Bot Role (Initial) error:", err);
+    }
   },
 };
