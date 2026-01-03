@@ -1,4 +1,3 @@
-// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
 let mcBot = null;
@@ -15,11 +14,11 @@ const randomDelay = (min, max) => Math.floor(Math.random() * (max - min + 1)) + 
 
 module.exports = {
     init: (client) => {
-        console.log('[MC-BOT] 🔄 Memulai koneksi khusus versi 1.21.11...');
+        console.log('[MC-BOT] 🔄 Menghubungkan ke Server Java v1.21.10...');
         
         const connect = () => {
             const currentNickname = nicknames[nicknameIndex];
-            console.log(`[MC-BOT] 🎮 Mencoba connect: ${currentNickname}`);
+            console.log(`[MC-BOT] 🎮 Mencoba login: ${currentNickname}`);
             
             if (mcBot) {
                 mcBot.removeAllListeners();
@@ -30,31 +29,31 @@ module.exports = {
                 host: 'empirebs.falixsrv.me',
                 port: 37152,
                 username: currentNickname,
-                // Gunakan false agar bot mendeteksi versi otomatis dari server 1.21.11
+                // Gunakan false agar Mineflayer melakukan auto-negotiation versi 1.21.10
                 version: false, 
                 auth: 'offline',
-                // --- FIX 1.21.11 / GEYSER HANDSHAKE ---
+                // --- PENANGANAN KHUSUS PROTOKOL 1.21.10 ---
                 disableChatSigning: true,
                 checkTimeoutInterval: 120000,
                 viewDistance: 'tiny',
                 skipValidation: true,
-                // Memaksa bot mengabaikan error paket saat login 1.21.11
+                // Mengabaikan error paket transisi versi
                 hideErrors: true 
             });
 
             mcBot.on('login', () => {
-                console.log(`[MC-BOT] ✅ Berhasil Masuk ke 1.21.11 sebagai: ${currentNickname}`);
+                console.log(`[MC-BOT] ✅ Sukses! Terhubung ke 1.21.10 sebagai: ${currentNickname}`);
                 
                 setTimeout(() => {
-                    if (mcBot) mcBot.chat('Bot Akira Online! Support v1.21.11 🎮');
+                    if (mcBot) mcBot.chat('Bot Akira siap! Mendukung Java 1.21.10 🎮');
                 }, 10000);
 
-                // Anti-AFK
+                // Anti-AFK Gerak
                 const afkInterval = setInterval(() => {
                     if (!mcBot || !mcBot.entity) return;
                     mcBot.setControlState('jump', true);
                     setTimeout(() => mcBot.setControlState('jump', false), 500);
-                }, randomDelay(40000, 70000));
+                }, randomDelay(40000, 80000));
 
                 mcBot.once('end', () => clearInterval(afkInterval));
             });
@@ -70,22 +69,22 @@ module.exports = {
                 handleRotation();
             });
 
-            mcBot.on('end', reason => {
-                console.log(`[MC-BOT] 🔌 Putus dari server: ${reason}`);
+            mcBot.on('end', (reason) => {
+                console.log(`[MC-BOT] 🔌 Putus: ${reason}`);
                 handleRotation();
             });
 
             const handleRotation = () => {
                 nicknameIndex = (nicknameIndex + 1) % nicknames.length;
-                console.log(`[MC-BOT] 🔄 Rotasi ke: ${nicknames[nicknameIndex]}`);
+                console.log(`[MC-BOT] 🔄 Rotasi identitas ke: ${nicknames[nicknameIndex]}`);
                 scheduleReconnect();
             };
         };
 
         const scheduleReconnect = () => {
             if (reconnectInterval) clearTimeout(reconnectInterval);
-            const delay = randomDelay(30000, 50000); 
-            console.log(`[MC-BOT] ⏳ Reconnect dalam ${Math.floor(delay/1000)} detik...`);
+            const delay = randomDelay(35000, 55000); 
+            console.log(`[MC-BOT] ⏳ Menunggu ${Math.floor(delay/1000)} detik sebelum coba lagi...`);
             reconnectInterval = setTimeout(connect, delay);
         };
 
