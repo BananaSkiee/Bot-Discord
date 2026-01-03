@@ -1,11 +1,10 @@
-// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 const { Vec3 } = require('vec3');
 
 const nicknames = [
     'RianGamerz', 'DikaAja', 'FahriPro', 'BaimCuy', 'ZakiTzy', 'RezaWibu', 'AndikaYT', 'SatriaGans', 
     'EkoPedia', 'RizkyPlayz', 'AditSopo', 'FarelSky', 'GilangGanteng', 'YayanBotak', 'DaniMc',
-    'RafliBoy', 'AldiGacor', 'YudhaCuy', 'BayuAja', 'TegarID', 'FajarPlay', 'DimasCuy', 'AgusGamer'
+    'RafliBoy', 'AldiGacor', 'YudhaCuy', 'BayuAja', 'TegarID', 'FajarPlay'
 ];
 
 const chatDB = {
@@ -27,7 +26,7 @@ const chatDB = {
         "Adminnya ramah-ramah euy", "Suka banget sama komunitasnya", "Jangan lupa makan gess di dunia nyata",
         "Okee siap bang", "Nanti bantuin gw ya", "Gas polll", "Mantul gess", "Banyak mob nih ngeri",
         
-        // --- GAMEPLAY & MINING ---
+        // --- GAMEPLAY & SURVIVAL ---
         "Duh pickaxe gw mau patah", "Cari iron dimana ya yang cepet?", "Ada yang jual mending?", 
         "Lagi dapet banyak gold nih", "Waduh nemu lava terus", "Gelap banget di bawah", "Bawa obor dikit tadi",
         "Ada yang mau temenin ke nether?", "Nether ngeri gess banyak ghast", "Cari blaze rod dulu buat ramuan",
@@ -36,8 +35,10 @@ const chatDB = {
         "Mending bikin rumah kayu apa batu ya?", "Ada yang punya bibit bambu?", "Lagi bikin sistem redstone nih",
         "Gila sih ini worldnya luas banget", "Server ini ada mapnya gak ya?", "Cek inventory penuh terus",
         "Buang-buang cobblestone dulu gess", "Banyak skeleton nembak terus", "Pvp di spawn dilarang ya?",
+        "Lagi nyari spawn chunk nih", "Bikin farm iron seru kali ya", "Ada yang punya buku fortune?",
+        "Lagi mancing dapet sepatu luntur", "Enchantment table dimana ya?", "Butuh lapis lazuli banyak",
         
-        // --- INTERAKSI SANTAI ---
+        // --- SANTAI & KOPI ---
         "Mending main malem apa siang gess?", "Kopi mana kopi", "Absen dulu dari mana aja kalian?",
         "Salam dari pemain baru", "Izin nyimak aja gess", "Buseeet keren amat itu", "Gak nyangka nemu ginian",
         "Hampir aja mati konyol", "Lagi liatin pemandangan", "Servernya smooth no lag lag", "Admin jaya jaya jaya",
@@ -54,16 +55,15 @@ const chatDB = {
     welcome: [
         "Halo @name! Selamat datang ya", "Wah ada @name join, salken!", "Welcome kak @name, enjoy di sini",
         "Halo @name, semangat mainnya!", "Hai @name, salam kenal ya", "Salken @name, semoga betah",
-        "Wih member baru @name masuk, halo!", "Welcome @name! Jangan lupa baca rules ya", "Halo @name, salam dari tim bot"
-    ],
-    goodbye: [
-        "Yah kak @name keluar, sampai jumpa lagi!", "Dadah @name, hati-hati ya", "See you @name, balik lagi nanti",
-        "Terima kasih sudah main @name", "Sampai ketemu besok @name", "Dah @name, sukses selalu"
+        "Wih member baru @name masuk, halo!", "Welcome @name! Jangan lupa baca rules ya"
     ],
     death: [
         "Waduh @name sabar ya, itemnya aman kan?", "Loh @name kenapa? Hati-hati gess", "Semangat @name, jangan menyerah ya",
-        "Turut berduka @name, tadi kena apa?", "Aduh @name, mau dibantuin balik ke sana?", "Sabar ya @name, semangat lagi",
-        "Yah @name mati, sabar kak ntar dapet lagi", "Lagi apes ya @name? Semangat balik lagi"
+        "Turut berduka @name, tadi kena apa?", "Aduh @name, mau dibantuin balik ke sana?", "Sabar ya @name, semangat lagi"
+    ],
+    combat: [
+        "Aduh ada monster!", "Sini lu zombie!", "Ngeri gess mobnya rame", "Kabur dulu gess darah dikit", 
+        "Buset kaget gw ada creeper", "Skeleton ganggu aja lagi santai"
     ]
 };
 
@@ -71,10 +71,10 @@ const activeBots = new Map();
 
 module.exports = {
     init: () => {
-        console.log('[MC-SYSTEM] 🛡️ Mode Player Ramah (200+ Chat & Fix Crash)');
+        console.log('[MC-SYSTEM] 🛡️ Guard System & 200+ Chat Active');
 
         const createSingleBot = (name) => {
-            if (activeBots.has(name)) return;
+            if (activeBots.has(name) || activeBots.size >= 6) return;
 
             const bot = mineflayer.createBot({
                 host: 'empirebs.falixsrv.me',
@@ -84,81 +84,102 @@ module.exports = {
                 auth: 'offline',
                 checkTimeoutInterval: 120000,
                 disableChatSigning: true,
-                hideErrors: true
+                hideErrors: true,
+                viewDistance: 'tiny'
             });
 
+            // --- LOGIKA AI (COMBAT, EAT, ESCAPE) ---
             const startLiving = () => {
-                const lifeTask = setInterval(async () => {
+                const aiTask = setInterval(async () => {
                     if (!bot.entity || !bot.entity.position) return;
 
-                    const pos = bot.entity.position;
-                    const r = Math.random();
-
-                    const checkPos = pos.offset(1, -1, 0);
-                    const blockBelowFront = bot.blockAt(checkPos);
-                    
-                    if (blockBelowFront && (blockBelowFront.name.includes('water') || blockBelowFront.name === 'air')) {
-                        bot.look(bot.entity.yaw + Math.PI / 2, 0);
-                    } else {
-                        try {
-                            const blockInFront = bot.blockAt(pos.offset(1, 0, 0));
-                            if (blockInFront && blockInFront.name !== 'air' && !blockInFront.name.includes('water')) {
-                                await bot.dig(blockInFront);
-                            }
-                            bot.setControlState('forward', true);
-                            setTimeout(() => { if(bot.setControlState) bot.setControlState('forward', false); }, 800);
-                        } catch (e) {}
+                    // 1. AUTO EAT
+                    if (bot.food < 15 || bot.health < 14) {
+                        const food = bot.inventory.items().find(i => 
+                            ['bread', 'steak', 'cooked_beef', 'apple', 'cooked_chicken'].includes(i.name));
+                        if (food) { 
+                            await bot.equip(food, 'hand'); 
+                            bot.consume(); 
+                        }
                     }
 
-                    if (r < 0.01) {
+                    // 2. DETEKSI MOB TERDEKAT
+                    const enemy = bot.nearestEntity(e => 
+                        e.type === 'mob' && e.position.distanceTo(bot.entity.position) < 6);
+
+                    if (enemy) {
+                        const dist = enemy.position.distanceTo(bot.entity.position);
+                        
+                        // KABUR JIKA SEKARAT
+                        if (bot.health < 10) {
+                            if (Math.random() < 0.01) bot.chat(chatDB.combat[3]);
+                            const runDir = bot.entity.position.subtract(enemy.position).normalize().multiply(5);
+                            bot.lookAt(bot.entity.position.add(runDir));
+                            bot.setControlState('forward', true);
+                            bot.setControlState('sprint', true);
+                            setTimeout(() => { 
+                                bot.setControlState('forward', false); 
+                                bot.setControlState('sprint', false); 
+                            }, 3000);
+                        } 
+                        // SERANG JIKA DEKAT
+                        else if (dist < 3.8) {
+                            bot.lookAt(enemy.position.offset(0, 1, 0));
+                            bot.attack(enemy);
+                            if (Math.random() < 0.01) bot.chat(chatDB.combat[Math.floor(Math.random()*3)]);
+                        }
+                    }
+
+                    // 3. GERAKAN RANDOM & ANTI-WATER
+                    const r = Math.random();
+                    const checkBlock = bot.blockAt(bot.entity.position.offset(1, -1, 0));
+                    if (checkBlock && (checkBlock.name.includes('water') || checkBlock.name === 'air')) {
+                        bot.look(bot.entity.yaw + Math.PI, 0);
+                    } else if (r < 0.15) {
+                        bot.setControlState('forward', true);
+                        setTimeout(() => { if(bot.setControlState) bot.setControlState('forward', false); }, 1000);
+                    }
+
+                    // 4. CHAT RANDOM SANGAT JARANG
+                    if (r < 0.003) {
                         bot.chat(chatDB.random[Math.floor(Math.random() * chatDB.random.length)]);
                     }
-                }, 10000); // 10 Detik sekali agar chat tidak terlalu spam
 
-                bot.once('end', () => clearInterval(lifeTask));
+                }, 5000);
+                bot.once('end', () => clearInterval(aiTask));
             };
-
-            bot.on('playerJoined', (player) => {
-                if (player.username === bot.username || activeBots.has(player.username)) return;
-                if (Math.random() < 0.15) {
-                    const msg = chatDB.welcome[Math.floor(Math.random() * chatDB.welcome.length)].replace('@name', player.username);
-                    setTimeout(() => { if(bot.chat) bot.chat(msg); }, 4000);
-                }
-            });
-
-            bot.on('entityDead', (entity) => {
-                if (entity.type === 'player' && entity.username !== bot.username) {
-                    if (Math.random() < 0.2) {
-                        const msg = chatDB.death[Math.floor(Math.random() * chatDB.death.length)].replace('@name', entity.username);
-                        setTimeout(() => { if(bot.chat) bot.chat(msg); }, 3000);
-                    }
-                }
-            });
 
             bot.on('login', () => {
                 activeBots.set(name, bot);
-                console.log(`[MC-BOT] ✅ ${name} sudah join.`);
-                setTimeout(startLiving, 3000);
+                console.log(`[MC-BOT] ✅ ${name} Join & Ready.`);
+                setTimeout(startLiving, 5000);
+            });
+
+            bot.on('playerJoined', (player) => {
+                if (activeBots.has(player.username)) return;
+                if (Math.random() < 0.1) {
+                    const msg = chatDB.welcome[Math.floor(Math.random() * chatDB.welcome.length)].replace('@name', player.username);
+                    setTimeout(() => { if(bot.chat) bot.chat(msg); }, 8000);
+                }
             });
 
             bot.on('death', () => {
-                setTimeout(() => { if(bot.respawn) bot.respawn(); }, 5000);
+                setTimeout(() => { if(bot.respawn) bot.respawn(); }, 10000);
             });
 
             bot.on('end', (reason) => {
                 activeBots.delete(name);
-                console.log(`[MC-BOT] 🔌 ${name} Off: ${reason}`);
-                setTimeout(() => createSingleBot(name), 30000);
+                console.log(`[MC-BOT] 🔌 ${name} Off. Tunggu 80 detik...`);
+                setTimeout(() => createSingleBot(name), 80000);
             });
 
             bot.on('error', () => {});
         };
 
-        for (let i = 0; i < 8; i++) {
-            setTimeout(() => {
-                createSingleBot(nicknames[i]);
-            }, i * 30000);
+        // LOGIN BERTAHAP (80 DETIK SEKALI)
+        for (let i = 0; i < nicknames.length; i++) {
+            if (i >= 6) break; // Batasi 6 bot saja demi stabilitas IP
+            setTimeout(() => createSingleBot(nicknames[i]), i * 80000);
         }
     }
 };
-        
