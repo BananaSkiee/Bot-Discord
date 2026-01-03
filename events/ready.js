@@ -24,16 +24,16 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
+    const ROLE_NON_VERIFY = "1444248589051367435";
+    const ROLE_MEMBER = "1352286235233620108";
+    
         // ⛏️ Minecraft bot init (New Module)
     try {
-        minecraftBot(client);
-        console.log("✅ Minecraft Bot Module Active");
+        minecraftBot.init(client); 
+      console.log("✅ Minecraft Bot Module Active");
     } catch (err) {
         console.error("❌ Gagal inisialisasi Minecraft bot:", err);
     }
-
-    const ROLE_NON_VERIFY = "1444248589051367435";
-    const ROLE_MEMBER = "1352286235233620108";
     
     // ✅ Verify System
     try {
