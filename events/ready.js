@@ -8,7 +8,7 @@ const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
-// Menghapus: const minecraft = require("../modules/minecraft");
+const minecraftBot = require("../modules/minecraftBot");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
@@ -186,12 +186,13 @@ try {
       console.error("❌ Gagal join voice channel:", err);
     }
 
-    // ⛏️ Minecraft bot init
-    // KODE INI DIHAPUS untuk menghilangkan ERROR: ECONNREFUSED
-    // try {
-    //   if (minecraft.init) minecraft.init(client);
-    // } catch (err) {
-    //   console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    // }
+    // ⛏️ Minecraft bot init (New Module)
+    try {
+        minecraftBot(client);
+        console.log("✅ Minecraft Bot Module Active");
+    } catch (err) {
+        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
+    }
+
   },
 };
