@@ -27,7 +27,7 @@ module.exports = {
                 host: 'empirebs.falixsrv.me',
                 port: 37152,
                 username: currentNickname,
-                version: '1.21.1',
+                version: '1.21.11',
                 auth: 'offline',
                 checkTimeoutInterval: 90000,
                 disableChatSigning: true, // Bypass error 'void future'
