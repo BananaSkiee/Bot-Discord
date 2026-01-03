@@ -1,61 +1,71 @@
 const mineflayer = require('mineflayer');
 
-// Daftar IP Server
-const serverConfig = {
+const mcConfig = {
     host: 'empirebs.falixsrv.me', 
     port: 37152,
-    version: '1.20.1'
+    version: '1.21.1', // Sesuaikan dengan base version Java servernya
 };
 
-// Fungsi untuk menghasilkan nama acak (misal: Player_1234)
 function generateRandomName() {
-    const prefix = "User"; // Awalan nama
-    const randomDigits = Math.floor(1000 + Math.random() * 9000); // Angka acak 4 digit
-    return `${prefix}_${randomDigits}`;
+    // Menggunakan prefix berbeda agar tidak dianggap spam bot yang sama
+    const prefixes = ["Member", "Guest", "Player", "Banana"];
+    const randomPref = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const randomId = Math.floor(100 + Math.random() * 900);
+    return `${randomPref}_${randomId}`;
 }
 
-function createBot() {
-    const currentName = generateRandomName();
+module.exports = function startMinecraftBot(client) {
+    const username = generateRandomName();
     
-    console.log(`[SYSTEM] Mencoba masuk dengan nama baru: ${currentName}`);
+    console.log(`[MC-BOT] 🔄 Mencoba masuk ke FalixSrv: ${username}`);
 
     const bot = mineflayer.createBot({
-        host: serverConfig.host,
-        port: serverConfig.port,
-        username: currentName,
-        version: serverConfig.version
+        host: mcConfig.host,
+        port: mcConfig.port,
+        username: username,
+        version: mcConfig.version,
+        // Penting untuk server hosting seperti Falix:
+        checkTimeoutInterval: 60000,
+        connectTimeout: 60000,
+        hideErrors: false
     });
 
     bot.on('login', () => {
-        console.log(`[SUCCESS] Bot berhasil join sebagai: ${bot.username}`);
+        console.log(`[MC-BOT] ✅ Berhasil masuk sebagai ${bot.username}`);
     });
 
     bot.on('spawn', () => {
-        // Anti-AFK Sederhana agar tidak kena kick karena diam
-        setInterval(() => {
-            bot.look(Math.random() * 6.28, (Math.random() - 0.5) * 1.5);
-        }, 15000);
+        console.log(`[MC-BOT] 📍 Bot telah spawn di lobby/dunia.`);
+        
+        // Anti-AFK yang lebih halus
+        const afkTask = setInterval(() => {
+            if (!bot) return clearInterval(afkTask);
+            
+            // Gerakan kepala random
+            bot.look(Math.random() * 6.2, (Math.random() - 0.5) * 1, false);
+            
+            // Lompat kecil 20% kemungkinan agar tidak terdeteksi mesin
+            if (Math.random() > 0.8) {
+                bot.setControlState('jump', true);
+                setTimeout(() => bot.setControlState('jump', false), 400);
+            }
+        }, 25000);
     });
 
-    // Kejadian jika bot keluar, di-kick, atau server restart
     bot.on('end', (reason) => {
-        console.log(`[KICKED/DISCONNECT] Bot keluar karena: ${reason}`);
-        console.log(`[WAIT] Menunggu 15 detik sebelum masuk dengan nama baru...`);
+        // Jika alasan kick adalah 'kicked', 'ban', atau 'socketClosed'
+        console.warn(`[MC-BOT] ⚠️ Terputus: ${reason}`);
         
-        // Menunggu sebentar agar IP tidak dianggap spamming/flooding
+        bot.removeAllListeners();
+        
+        // Jeda 20 detik sebelum ganti nama & masuk lagi (agar IP tidak kena rate limit Falix)
+        console.log(`[MC-BOT] ⏳ Menunggu 20 detik sebelum Re-login...`);
         setTimeout(() => {
-            createBot(); 
-        }, 15000);
+            startMinecraftBot(client);
+        }, 20000);
     });
 
     bot.on('error', (err) => {
-        if (err.code === 'ECONNREFUSED') {
-            console.log(`[ERROR] Gagal konek ke ${err.address}, mencoba lagi...`);
-        } else {
-            console.log(`[ERROR] Terjadi kesalahan: ${err.message}`);
-        }
+        console.error(`[MC-BOT] ❌ Error detail: ${err.message}`);
     });
-}
-
-// Jalankan bot untuk pertama kali
-createBot();
+};
