@@ -1,71 +1,78 @@
 const mineflayer = require('mineflayer');
 
 const mcConfig = {
-    host: 'empirebs.falixsrv.me', 
+    host: 'empirebs.falixsrv.me',
     port: 37152,
-    version: '1.21.1', // Sesuaikan dengan base version Java servernya
+    version: '1.21.1', // Gunakan versi Java 1.21.1
 };
 
 function generateRandomName() {
-    // Menggunakan prefix berbeda agar tidak dianggap spam bot yang sama
-    const prefixes = ["Member", "Guest", "Player", "Banana"];
-    const randomPref = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const randomId = Math.floor(100 + Math.random() * 900);
-    return `${randomPref}_${randomId}`;
+    // Nama random agar tidak dianggap bot yang sama saat login ulang
+    const id = Math.floor(1000 + Math.random() * 9000);
+    return `Banana_${id}`;
 }
 
 module.exports = function startMinecraftBot(client) {
     const username = generateRandomName();
     
-    console.log(`[MC-BOT] 🔄 Mencoba masuk ke FalixSrv: ${username}`);
+    console.log(`[MC-BOT] 🔄 Mencoba login: ${username}`);
 
     const bot = mineflayer.createBot({
         host: mcConfig.host,
         port: mcConfig.port,
         username: username,
         version: mcConfig.version,
-        // Penting untuk server hosting seperti Falix:
-        checkTimeoutInterval: 60000,
+        // Bypass filter sederhana
+        fakeHost: mcConfig.host,
+        // Penyesuaian waktu koneksi untuk hosting Koyeb
         connectTimeout: 60000,
-        hideErrors: false
+        checkTimeoutInterval: 60000,
+        // Sembunyikan pesan error internal mineflayer yang tidak perlu
+        hideErrors: true 
     });
 
-    bot.on('login', () => {
-        console.log(`[MC-BOT] ✅ Berhasil masuk sebagai ${bot.username}`);
-    });
-
-    bot.on('spawn', () => {
-        console.log(`[MC-BOT] 📍 Bot telah spawn di lobby/dunia.`);
-        
-        // Anti-AFK yang lebih halus
-        const afkTask = setInterval(() => {
-            if (!bot) return clearInterval(afkTask);
-            
-            // Gerakan kepala random
-            bot.look(Math.random() * 6.2, (Math.random() - 0.5) * 1, false);
-            
-            // Lompat kecil 20% kemungkinan agar tidak terdeteksi mesin
-            if (Math.random() > 0.8) {
-                bot.setControlState('jump', true);
-                setTimeout(() => bot.setControlState('jump', false), 400);
-            }
-        }, 25000);
-    });
-
-    bot.on('end', (reason) => {
-        // Jika alasan kick adalah 'kicked', 'ban', atau 'socketClosed'
-        console.warn(`[MC-BOT] ⚠️ Terputus: ${reason}`);
-        
+    // Mencegah memory leak: Hapus semua listener saat bot terputus
+    const cleanup = () => {
         bot.removeAllListeners();
+        if (bot.afkInterval) clearInterval(bot.afkInterval);
+    };
+
+    bot.once('spawn', () => {
+        console.log(`[MC-BOT] ✅ Bot ${bot.username} Berhasil Spawn!`);
         
-        // Jeda 20 detik sebelum ganti nama & masuk lagi (agar IP tidak kena rate limit Falix)
-        console.log(`[MC-BOT] ⏳ Menunggu 20 detik sebelum Re-login...`);
-        setTimeout(() => {
-            startMinecraftBot(client);
+        // Anti-AFK: Menggerakkan kepala setiap 20 detik
+        bot.afkInterval = setInterval(() => {
+            if (bot.entity) {
+                bot.look(bot.entity.yaw + 0.5, 0);
+            }
         }, 20000);
     });
 
+    // Menangani Chat (Auto-Register/Login)
+    bot.on('message', (message) => {
+        const msg = message.toString();
+        // Deteksi butuh register/login di server cracked
+        if (msg.includes('/register')) {
+            bot.chat('/register BananaBot123 BananaBot123');
+        } else if (msg.includes('/login')) {
+            bot.chat('/login BananaBot123');
+        }
+    });
+
+    bot.on('end', (reason) => {
+        console.warn(`[MC-BOT] ❌ Terputus: ${reason}`);
+        cleanup();
+        
+        // Jeda 30 detik sebelum Re-login (Sangat penting di FalixSrv agar tidak kena IP Ban)
+        setTimeout(() => {
+            startMinecraftBot(client);
+        }, 30000);
+    });
+
     bot.on('error', (err) => {
-        console.error(`[MC-BOT] ❌ Error detail: ${err.message}`);
+        // Abaikan error koneksi standar agar console tetap bersih
+        if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
+        console.error(`[MC-BOT] ⚠️ Error: ${err.message}`);
+        cleanup();
     });
 };
