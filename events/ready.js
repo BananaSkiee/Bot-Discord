@@ -24,16 +24,18 @@ module.exports = {
     // ==========================================
     // 1. MINECRAFT BOT (DIJALANKAN PERTAMA)
     // ==========================================
-    try {
-        if (minecraftBot.init) {
-            minecraftBot.init(client);
-        } else {
-            minecraftBot(client);
-        }
-        console.log("✅ Minecraft Bot Module Active");
-    } catch (err) {
-        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
+    // Di dalam execute(client)
+try {
+    // Memastikan modul dipanggil dengan benar baik sebagai fungsi atau objek
+    if (typeof minecraftBot === 'function') {
+        minecraftBot(client);
+    } else if (minecraftBot.init) {
+        minecraftBot.init(client);
     }
+    console.log("✅ Minecraft Bot Module Active");
+} catch (err) {
+    console.error("❌ Gagal inisialisasi Minecraft bot:", err);
+}
 
     // ✅ Verify System
     try {
