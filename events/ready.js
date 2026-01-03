@@ -24,33 +24,16 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
+        // ⛏️ Minecraft bot init (New Module)
+    try {
+        minecraftBot(client);
+        console.log("✅ Minecraft Bot Module Active");
+    } catch (err) {
+        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
+    }
+
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
-
-    // --- LOGIKA MASS SCAN (TAMBAHKAN INI) ---
-    console.log("🔍 Melakukan pengecekan role seluruh member...");
-    client.guilds.cache.forEach(async (guild) => {
-      try {
-        const members = await guild.members.fetch();
-        members.forEach(member => {
-          if (member.user.bot) return;
-
-          const hasMemberRole = member.roles.cache.has(ROLE_MEMBER);
-          const hasNonVerifyRole = member.roles.cache.has(ROLE_NON_VERIFY);
-
-          // Jika tidak punya role Member dan belum punya Non-Verify
-          if (!hasMemberRole && !hasNonVerifyRole) {
-            member.roles.add(ROLE_NON_VERIFY).catch(() => {});
-          }
-          // Jika sudah punya Member tapi Non-Verify masih nempel
-          if (hasMemberRole && hasNonVerifyRole) {
-            member.roles.remove(ROLE_NON_VERIFY).catch(() => {});
-          }
-        });
-      } catch (err) {
-        console.error(`Gagal scan di guild: ${guild.name}`);
-      }
-    });
     
     // ✅ Verify System
     try {
@@ -63,13 +46,6 @@ module.exports = {
     // 🧭 Server Info
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
-
-        // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
-    try {
-        await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
-    } catch (err) {
-        console.error("❌ Auto Bot Role (Initial) error:", err);
-    }
     
     /* 🌈 Rainbow role (interval aman 45 detik)
     try {
@@ -186,13 +162,37 @@ try {
       console.error("❌ Gagal join voice channel:", err);
     }
 
-    // ⛏️ Minecraft bot init (New Module)
-    try {
-        minecraftBot(client);
-        console.log("✅ Minecraft Bot Module Active");
-    } catch (err) {
-        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    }
+       // --- LOGIKA MASS SCAN (TAMBAHKAN INI) ---
+    console.log("🔍 Melakukan pengecekan role seluruh member...");
+    client.guilds.cache.forEach(async (guild) => {
+      try {
+        const members = await guild.members.fetch();
+        members.forEach(member => {
+          if (member.user.bot) return;
 
+          const hasMemberRole = member.roles.cache.has(ROLE_MEMBER);
+          const hasNonVerifyRole = member.roles.cache.has(ROLE_NON_VERIFY);
+
+          // Jika tidak punya role Member dan belum punya Non-Verify
+          if (!hasMemberRole && !hasNonVerifyRole) {
+            member.roles.add(ROLE_NON_VERIFY).catch(() => {});
+          }
+          // Jika sudah punya Member tapi Non-Verify masih nempel
+          if (hasMemberRole && hasNonVerifyRole) {
+            member.roles.remove(ROLE_NON_VERIFY).catch(() => {});
+          }
+        });
+      } catch (err) {
+        console.error(`Gagal scan di guild: ${guild.name}`);
+      }
+    });
+
+            // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
+    try {
+        await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
+    } catch (err) {
+        console.error("❌ Auto Bot Role (Initial) error:", err);
+    }
+    
   },
 };
