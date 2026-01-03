@@ -1,3 +1,4 @@
+// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
 let mcBot = null;
