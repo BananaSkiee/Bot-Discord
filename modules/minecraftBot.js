@@ -6,7 +6,7 @@ const activeBots = new Map();
 
 module.exports = {
     init: () => {
-        console.log('[MC-SYSTEM] 🏃 Anti-Idle Walking Mode Aktif...');
+        console.log('[MC-SYSTEM] 🛡️ MEMULAI MODE PATROLI: Bot Tidak Akan Keluar!');
 
         const createSingleBot = (name) => {
             if (activeBots.has(name)) return;
@@ -21,54 +21,65 @@ module.exports = {
                 disableChatSigning: true
             });
 
-            // --- LOGIKA BERJALAN AGAR TIDAK DI-KICK ---
-            const startWalkingAI = () => {
-                const moveTask = setInterval(() => {
+            // --- LOGIKA PATROLI (BERJALAN BOLAK-BALIK) ---
+            const startPatrol = () => {
+                const patrolTask = setInterval(() => {
                     if (!bot.entity) return;
 
-                    // Bot berjalan maju selama 2 detik
+                    // 1. Maju selama 3 detik
                     bot.setControlState('forward', true);
-                    
                     setTimeout(() => {
                         if (bot.setControlState) {
                             bot.setControlState('forward', false);
-                            // Setelah maju, bot melompat sekali
-                            bot.setControlState('jump', true);
-                            setTimeout(() => bot.setControlState('jump', false), 500);
+                            
+                            // 2. Putar balik (180 derajat)
+                            const currentYaw = bot.entity.yaw;
+                            bot.look(currentYaw + Math.PI, 0);
+
+                            // 3. Mundur/Maju lagi ke posisi awal selama 3 detik
+                            setTimeout(() => {
+                                if (bot.setControlState) {
+                                    bot.setControlState('forward', true);
+                                    setTimeout(() => {
+                                        if (bot.setControlState) bot.setControlState('forward', false);
+                                    }, 3000);
+                                }
+                            }, 500);
                         }
-                    }, 2000);
+                    }, 3000);
 
-                    // Menoleh secara acak agar lebih natural
-                    const yaw = Math.random() * Math.PI * 2;
-                    bot.look(yaw, 0);
+                    // 4. Melompat agar lebih meyakinkan
+                    bot.setControlState('jump', true);
+                    setTimeout(() => { if(bot.setControlState) bot.setControlState('jump', false); }, 500);
 
-                }, 40000); // Dilakukan setiap 40 detik (sebelum kena kick idle)
+                }, 45000); // Ulangi setiap 45 detik agar timer AFK reset terus
 
-                bot.once('end', () => clearInterval(moveTask));
+                bot.once('end', () => clearInterval(patrolTask));
             };
 
             bot.on('login', () => {
                 activeBots.set(name, bot);
-                console.log(`[MC-BOT] ✅ ${name} Online.`);
-                setTimeout(startWalkingAI, 5000);
+                console.log(`[MC-BOT] ✅ ${name} Sudah Online dan Mulai Patroli.`);
+                setTimeout(startPatrol, 10000);
             });
 
             bot.on('death', () => {
                 setTimeout(() => { if(bot.respawn) bot.respawn(); }, 20000);
             });
 
-            bot.on('end', () => {
+            bot.on('end', (reason) => {
                 activeBots.delete(name);
-                console.log(`[MC-BOT] 🔌 ${name} Off. Reconnecting...`);
+                console.log(`[MC-BOT] 🔌 ${name} Terputus: ${reason}. Masuk lagi dalam 120 detik...`);
                 setTimeout(() => createSingleBot(name), 120000); 
             });
 
             bot.on('error', () => {});
         };
 
-        // LOGIN BERTAHAP (120 Detik antar bot)
+        // LOGIN BERTAHAP (Kunci agar tidak di-limit IP)
         nicknames.forEach((name, i) => {
             setTimeout(() => createSingleBot(name), i * 120000);
         });
     }
 };
+                                
