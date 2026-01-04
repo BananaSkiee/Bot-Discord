@@ -1,3 +1,4 @@
+// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
 const nicknames = ['RianGamerz', 'DikaAja', 'FahriPro', 'BaimCuy', 'ZakiTzy'];
