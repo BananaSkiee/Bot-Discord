@@ -1,12 +1,12 @@
 const mineflayer = require('mineflayer');
 
-// Kita fokus ke 3 Nickname pertama saja supaya stabil
+// Kita fokus ke 3 bot saja agar IP kamu tidak diblokir permanen oleh server
 const nicknames = ['RianGamerz', 'DikaAja', 'FahriPro'];
 const activeBots = new Map();
 
 module.exports = {
     init: () => {
-        console.log('[MC-SYSTEM] 🛡️ Menjalankan 3 Bot Stabil - Mode Anti-Idle Aktif');
+        console.log('[MC-SYSTEM] 🛡️ Menjalankan Solusi Anti-Kick: Mode Stay-Online Aktif');
 
         const createSingleBot = (name) => {
             if (activeBots.has(name) || activeBots.size >= 3) return;
@@ -17,60 +17,57 @@ module.exports = {
                 username: name,
                 version: '1.21.1',
                 auth: 'offline',
-                checkTimeoutInterval: 120000,
-                disableChatSigning: true,
-                hideErrors: true
+                checkTimeoutInterval: 60000,
+                disableChatSigning: true
             });
 
-            // --- LOGIKA UTAMA: BERJALAN SEDIKIT UNTUK RESET AFK ---
-            const startLiving = () => {
-                const stayTask = setInterval(() => {
+            // LOGIKA AGAR TIDAK DIANGGAP AFK (BERJALAN MONDAR-MANDIR)
+            const startAntiAFK = () => {
+                const afkTask = setInterval(() => {
                     if (!bot.entity) return;
 
-                    // Bot berjalan maju selama 1 detik saja (pindah blok)
+                    // Langkah 1: Jalan maju sebentar
                     bot.setControlState('forward', true);
                     
                     setTimeout(() => {
                         if (bot.setControlState) {
                             bot.setControlState('forward', false);
-                            // Melompat tipis setelah jalan
-                            bot.setControlState('jump', true);
-                            setTimeout(() => bot.setControlState('jump', false), 500);
+                            
+                            // Langkah 2: Mundur ke posisi semula
+                            bot.setControlState('back', true);
+                            setTimeout(() => {
+                                if (bot.setControlState) bot.setControlState('back', false);
+                            }, 1000);
                         }
-                    }, 1000); // Jalan 1 detik
+                    }, 1000);
 
-                    // Menoleh secara acak
-                    const yaw = (Math.random() - 0.5) * 2 * Math.PI;
-                    bot.look(yaw, 0);
+                }, 40000); // Ulangi setiap 40 detik
 
-                }, 30000); // Ulangi setiap 30 detik agar server tidak kick
-
-                bot.once('end', () => clearInterval(stayTask));
+                bot.once('end', () => clearInterval(afkTask));
             };
 
             bot.on('login', () => {
                 activeBots.set(name, bot);
-                console.log(`[MC-BOT] ✅ ${name} Masuk dan Stay.`);
-                setTimeout(startLiving, 5000);
+                console.log(`[MC-BOT] ✅ ${name} Join dan Stay.`);
+                setTimeout(startAntiAFK, 5000);
             });
 
             bot.on('death', () => {
-                // Beri jeda lama sebelum respawn agar tidak dideteksi spam
-                setTimeout(() => { if(bot.respawn) bot.respawn(); }, 20000);
+                setTimeout(() => { if(bot.respawn) bot.respawn(); }, 15000);
             });
 
             bot.on('end', () => {
                 activeBots.delete(name);
-                console.log(`[MC-BOT] 🔌 ${name} Terputus. Menunggu 3 Menit...`);
-                // Jeda reconnect diperlama (3 menit) supaya IP dingin dulu
-                setTimeout(() => createSingleBot(name), 180000); 
+                // INI SOLUSINYA: Kasih jeda 5 menit (300000ms) kalau bot terputus
+                // Supaya log server tidak penuh (ngespam) dan IP kamu aman
+                console.log(`[MC-BOT] 🔌 ${name} Off. Menunggu 5 Menit sebelum masuk lagi...`);
+                setTimeout(() => createSingleBot(name), 300000); 
             });
 
             bot.on('error', (err) => {});
         };
 
-        // LOGIN BERTAHAP (Jeda 3 Menit antar bot)
-        // Ini kunci agar server menganggap pemain masuk satu per satu secara normal
+        // LOGIN BERTAHAP (Kasih jeda 3 menit antar bot)
         nicknames.forEach((name, i) => {
             setTimeout(() => createSingleBot(name), i * 180000);
         });
