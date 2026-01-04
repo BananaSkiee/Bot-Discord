@@ -1,15 +1,15 @@
-// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-const nicknames = ['RianGamerz', 'DikaAja', 'FahriPro', 'BaimCuy', 'ZakiTzy'];
+// Kita fokus ke 3 Nickname pertama saja supaya stabil
+const nicknames = ['RianGamerz', 'DikaAja', 'FahriPro'];
 const activeBots = new Map();
 
 module.exports = {
     init: () => {
-        console.log('[MC-SYSTEM] 🛡️ MEMULAI MODE PATROLI: Bot Tidak Akan Keluar!');
+        console.log('[MC-SYSTEM] 🛡️ Menjalankan 3 Bot Stabil - Mode Anti-Idle Aktif');
 
         const createSingleBot = (name) => {
-            if (activeBots.has(name)) return;
+            if (activeBots.has(name) || activeBots.size >= 3) return;
 
             const bot = mineflayer.createBot({
                 host: 'empirebs.falixsrv.me',
@@ -18,68 +18,61 @@ module.exports = {
                 version: '1.21.1',
                 auth: 'offline',
                 checkTimeoutInterval: 120000,
-                disableChatSigning: true
+                disableChatSigning: true,
+                hideErrors: true
             });
 
-            // --- LOGIKA PATROLI (BERJALAN BOLAK-BALIK) ---
-            const startPatrol = () => {
-                const patrolTask = setInterval(() => {
+            // --- LOGIKA UTAMA: BERJALAN SEDIKIT UNTUK RESET AFK ---
+            const startLiving = () => {
+                const stayTask = setInterval(() => {
                     if (!bot.entity) return;
 
-                    // 1. Maju selama 3 detik
+                    // Bot berjalan maju selama 1 detik saja (pindah blok)
                     bot.setControlState('forward', true);
+                    
                     setTimeout(() => {
                         if (bot.setControlState) {
                             bot.setControlState('forward', false);
-                            
-                            // 2. Putar balik (180 derajat)
-                            const currentYaw = bot.entity.yaw;
-                            bot.look(currentYaw + Math.PI, 0);
-
-                            // 3. Mundur/Maju lagi ke posisi awal selama 3 detik
-                            setTimeout(() => {
-                                if (bot.setControlState) {
-                                    bot.setControlState('forward', true);
-                                    setTimeout(() => {
-                                        if (bot.setControlState) bot.setControlState('forward', false);
-                                    }, 3000);
-                                }
-                            }, 500);
+                            // Melompat tipis setelah jalan
+                            bot.setControlState('jump', true);
+                            setTimeout(() => bot.setControlState('jump', false), 500);
                         }
-                    }, 3000);
+                    }, 1000); // Jalan 1 detik
 
-                    // 4. Melompat agar lebih meyakinkan
-                    bot.setControlState('jump', true);
-                    setTimeout(() => { if(bot.setControlState) bot.setControlState('jump', false); }, 500);
+                    // Menoleh secara acak
+                    const yaw = (Math.random() - 0.5) * 2 * Math.PI;
+                    bot.look(yaw, 0);
 
-                }, 45000); // Ulangi setiap 45 detik agar timer AFK reset terus
+                }, 30000); // Ulangi setiap 30 detik agar server tidak kick
 
-                bot.once('end', () => clearInterval(patrolTask));
+                bot.once('end', () => clearInterval(stayTask));
             };
 
             bot.on('login', () => {
                 activeBots.set(name, bot);
-                console.log(`[MC-BOT] ✅ ${name} Sudah Online dan Mulai Patroli.`);
-                setTimeout(startPatrol, 10000);
+                console.log(`[MC-BOT] ✅ ${name} Masuk dan Stay.`);
+                setTimeout(startLiving, 5000);
             });
 
             bot.on('death', () => {
+                // Beri jeda lama sebelum respawn agar tidak dideteksi spam
                 setTimeout(() => { if(bot.respawn) bot.respawn(); }, 20000);
             });
 
-            bot.on('end', (reason) => {
+            bot.on('end', () => {
                 activeBots.delete(name);
-                console.log(`[MC-BOT] 🔌 ${name} Terputus: ${reason}. Masuk lagi dalam 120 detik...`);
-                setTimeout(() => createSingleBot(name), 120000); 
+                console.log(`[MC-BOT] 🔌 ${name} Terputus. Menunggu 3 Menit...`);
+                // Jeda reconnect diperlama (3 menit) supaya IP dingin dulu
+                setTimeout(() => createSingleBot(name), 180000); 
             });
 
-            bot.on('error', () => {});
+            bot.on('error', (err) => {});
         };
 
-        // LOGIN BERTAHAP (Kunci agar tidak di-limit IP)
+        // LOGIN BERTAHAP (Jeda 3 Menit antar bot)
+        // Ini kunci agar server menganggap pemain masuk satu per satu secara normal
         nicknames.forEach((name, i) => {
-            setTimeout(() => createSingleBot(name), i * 120000);
+            setTimeout(() => createSingleBot(name), i * 180000);
         });
     }
 };
-                                
