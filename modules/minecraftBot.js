@@ -6,7 +6,7 @@ const activeBots = new Map();
 
 module.exports = {
     init: () => {
-        console.log('[MC-SYSTEM] 🛡️ Menjalankan Mode Anti-Kick...');
+        console.log('[MC-SYSTEM] 🏃 Anti-Idle Walking Mode Aktif...');
 
         const createSingleBot = (name) => {
             if (activeBots.has(name)) return;
@@ -21,43 +21,52 @@ module.exports = {
                 disableChatSigning: true
             });
 
-            // ANTI-IDLE: Gerakan kecil yang tidak memicu anti-cheat
-            const startStayActive = () => {
-                const stayTask = setInterval(() => {
+            // --- LOGIKA BERJALAN AGAR TIDAK DI-KICK ---
+            const startWalkingAI = () => {
+                const moveTask = setInterval(() => {
                     if (!bot.entity) return;
-                    
-                    // Lompat sekali
-                    bot.setControlState('jump', true);
-                    setTimeout(() => { if(bot.setControlState) bot.setControlState('jump', false); }, 500);
-                    
-                    // Menoleh sedikit (Yaw) agar tidak dianggap AFK
-                    bot.look(bot.entity.yaw + 0.1, 0);
-                }, 15000); // Setiap 15 detik
 
-                bot.once('end', () => clearInterval(stayTask));
+                    // Bot berjalan maju selama 2 detik
+                    bot.setControlState('forward', true);
+                    
+                    setTimeout(() => {
+                        if (bot.setControlState) {
+                            bot.setControlState('forward', false);
+                            // Setelah maju, bot melompat sekali
+                            bot.setControlState('jump', true);
+                            setTimeout(() => bot.setControlState('jump', false), 500);
+                        }
+                    }, 2000);
+
+                    // Menoleh secara acak agar lebih natural
+                    const yaw = Math.random() * Math.PI * 2;
+                    bot.look(yaw, 0);
+
+                }, 40000); // Dilakukan setiap 40 detik (sebelum kena kick idle)
+
+                bot.once('end', () => clearInterval(moveTask));
             };
 
             bot.on('login', () => {
                 activeBots.set(name, bot);
-                console.log(`[MC-BOT] ✅ ${name} Masuk.`);
-                setTimeout(startStayActive, 5000);
+                console.log(`[MC-BOT] ✅ ${name} Online.`);
+                setTimeout(startWalkingAI, 5000);
             });
 
-            // Respawn lebih lambat agar tidak dianggap spam death
             bot.on('death', () => {
                 setTimeout(() => { if(bot.respawn) bot.respawn(); }, 20000);
             });
 
             bot.on('end', () => {
                 activeBots.delete(name);
-                console.log(`[MC-BOT] 🔌 ${name} Off. Tunggu 2 menit...`);
+                console.log(`[MC-BOT] 🔌 ${name} Off. Reconnecting...`);
                 setTimeout(() => createSingleBot(name), 120000); 
             });
 
             bot.on('error', () => {});
         };
 
-        // LOGIN BERTAHAP: Ini WAJIB, jangan barengan!
+        // LOGIN BERTAHAP (120 Detik antar bot)
         nicknames.forEach((name, i) => {
             setTimeout(() => createSingleBot(name), i * 120000);
         });
