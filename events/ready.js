@@ -8,13 +8,10 @@ const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
 const rainbowRole = require("../modules/rainbowRole");
-const minecraftBot = require("../modules/minecraftBot");
 const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 // const { sendInitialCard } = require('../modules/introCard');
-const activitySystem = require("../modules/activitySystem");
-const tracker = require("../modules/activityTracker");
 
 const verifySystem = new VerifySystem();
 
@@ -28,12 +25,12 @@ module.exports = {
     const ROLE_MEMBER = "1352286235233620108";
     
         // ⛏️ Minecraft bot init (New Module)
-    try {
+   /* try {
         minecraftBot.init(client); 
       console.log("✅ Minecraft Bot Module Active");
     } catch (err) {
         console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    }
+    } */
     
     // ✅ Verify System
     try {
@@ -55,7 +52,7 @@ module.exports = {
     } */
 
     // 🏆 Activity System (Leaderboard)
-try {
+/* try {
     activitySystem(client);
     console.log("✅ Activity & Leaderboard system active");
 } catch (err) {
@@ -67,7 +64,7 @@ try {
     console.log("✅ Tracker & Leaderboard System Active");
 } catch (err) {
     console.error("❌ Tracker system error:", err);
-}
+} */
     
 // ... di bagian paling bawah execute(client)
 /*    try {
