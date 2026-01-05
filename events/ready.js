@@ -12,6 +12,7 @@ const VerifySystem = require("../modules/verify");
 const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 // const { sendInitialCard } = require('../modules/introCard');
+const minecraftBot = require("../modules/minecraftBot");
 
 const verifySystem = new VerifySystem();
 
@@ -25,12 +26,12 @@ module.exports = {
     const ROLE_MEMBER = "1352286235233620108";
     
         // ⛏️ Minecraft bot init (New Module)
-   /* try {
+    try {
         minecraftBot.init(client); 
       console.log("✅ Minecraft Bot Module Active");
     } catch (err) {
         console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    } */
+    }
     
     // ✅ Verify System
     try {
