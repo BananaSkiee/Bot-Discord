@@ -1,13 +1,12 @@
-
+// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-// Cukup gunakan satu nickname paling stabil
 const botName = 'RianGamerz';
 let botInstance = null;
 
 module.exports = {
     init: () => {
-        console.log(`[MC-SYSTEM] 🛡️ Memulai Bot Tunggal: ${botName}. Fokus Utama: STAY ONLINE.`);
+        console.log(`[MC-SYSTEM] 🛡️ MEMULAI MODE GHOST-STAY: Bot ${botName} Wajib Online!`);
 
         const startBot = () => {
             if (botInstance) return;
@@ -18,61 +17,60 @@ module.exports = {
                 username: botName,
                 version: '1.21.1',
                 auth: 'offline',
-                checkTimeoutInterval: 120000, // Menghindari kick karena koneksi lambat
+                checkTimeoutInterval: 180000, // Diperlama agar tidak mudah timeout
                 disableChatSigning: true,
-                hideErrors: true
+                physicsEnabled: true
             });
 
-            // --- ANTI-IDLE PATROL (Micro Movement) ---
-            const preventKick = () => {
+            // --- SISTEM GERAK RANDOM (ANTI-KICK AGRESIF) ---
+            const keepAlive = () => {
                 const stayTask = setInterval(() => {
                     if (!botInstance || !botInstance.entity) return;
 
-                    // Bergerak maju 1 detik
+                    // 1. Putar arah pandangan secara acak (360 derajat)
+                    const randomYaw = Math.random() * Math.PI * 2;
+                    botInstance.look(randomYaw, 0);
+
+                    // 2. Berjalan maju sebentar ke arah baru tersebut
                     botInstance.setControlState('forward', true);
                     
                     setTimeout(() => {
                         if (botInstance && botInstance.setControlState) {
                             botInstance.setControlState('forward', false);
                             
-                            // Gerakan tambahan: Melompat dan menoleh
+                            // 3. Melompat sekali setelah berpindah tempat
                             botInstance.setControlState('jump', true);
                             setTimeout(() => { if(botInstance.setControlState) botInstance.setControlState('jump', false); }, 500);
-                            
-                            const yaw = (Math.random() - 0.5) * 2 * Math.PI;
-                            botInstance.look(yaw, 0);
                         }
-                    }, 1000);
+                    }, 1500); // Berjalan selama 1.5 detik
 
-                }, 30000); // Ulangi setiap 30 detik untuk mereset timer AFK server
+                }, 20000); // Ulangi setiap 20 detik (Sangat sering agar timer AFK tidak jalan)
 
                 botInstance.once('end', () => clearInterval(stayTask));
             };
 
             botInstance.on('login', () => {
-                console.log(`[MC-BOT] ✅ ${botName} berhasil masuk. Memulai sistem anti-kick...`);
-                setTimeout(preventKick, 5000);
+                console.log(`[MC-BOT] ✅ ${botName} JOIN. Mematikan sistem Idle server...`);
+                setTimeout(keepAlive, 5000);
             });
 
             botInstance.on('death', () => {
-                console.log(`[MC-BOT] ⚠️ Bot mati, respawning...`);
-                setTimeout(() => { if(botInstance && botInstance.respawn) botInstance.respawn(); }, 10000);
+                // Respawn cepat agar tidak dianggap AFK saat mati
+                setTimeout(() => { if(botInstance && botInstance.respawn) botInstance.respawn(); }, 5000);
             });
 
             botInstance.on('end', (reason) => {
-                console.log(`[MC-BOT] 🔌 Bot terputus (${reason}). Reconnecting dalam 60 detik...`);
+                console.log(`[MC-BOT] 🔌 Bot terputus karena: ${reason}. Masuk lagi dalam 30 detik...`);
                 botInstance = null;
-                // Reconnect otomatis jika terputus
-                setTimeout(startBot, 60000);
+                // Reconnect otomatis lebih cepat agar slot tidak diisi orang lain
+                setTimeout(startBot, 30000);
             });
 
             botInstance.on('error', (err) => {
-                console.log(`[MC-BOT] ❌ Error terdeteksi, mencoba menstabilkan...`);
+                // Error diabaikan agar bot tidak crash dan tetap mencoba stay
             });
         };
 
-        // Jalankan bot
         startBot();
     }
 };
-                              
