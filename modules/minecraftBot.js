@@ -2,7 +2,7 @@
 const mineflayer = require('mineflayer');
 
 const botName = 'RianGamerz';
-const passwordBot = 'rahasia123'; 
+const passwordBot = 'BananaSkiee'; 
 
 const startBot = () => {
     const bot = mineflayer.createBot({
