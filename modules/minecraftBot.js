@@ -11,63 +11,60 @@ module.exports = {
         const startBot = () => {
             if (botInstance) return;
 
-            console.log(`[MC] 🔄 Mencoba login ulang sebagai ${botName}...`);
+            console.log(`[MC] ⏳ Menunggu server stabil sebelum menghubungkan ${botName}...`);
 
-            botInstance = mineflayer.createBot({
-                host: 'empirebs.falixsrv.me',
-                port: 37152,
-                username: botName,
-                version: '1.21.1',
-                auth: 'offline',
-                viewDistance: 'tiny',
-                // Mencegah error timeout saat koneksi lambat di Falix
-                checkTimeoutInterval: 120000 
-            });
-
-            botInstance.on('resource_pack', () => botInstance.acceptResourcePack());
-
-            botInstance.on('spawn', () => {
-                console.log(`[MC] ✅ ${botName} berhasil masuk ke Lobby!`);
+            // JEDA PERTAMA: Beri waktu server 30 detik untuk menyelesaikan lag startup
+            setTimeout(() => {
+                console.log(`[MC] 🔄 Menghubungkan ke EmpireBS...`);
                 
-                // Jeda 3 detik agar server siap terima chat
-                setTimeout(() => {
-                    if (botInstance) {
-                        // Karena tadi sudah di-unregister, kita daftar ulang (register)
-                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
-                        // Dan langsung login juga untuk jaga-jaga
-                        botInstance.chat(`/login ${passwordBot}`);
-                        console.log(`[MC] 🔑 Perintah Register/Login dikirim.`);
-                    }
-                }, 3000);
+                botInstance = mineflayer.createBot({
+                    host: 'empirebs.falixsrv.me',
+                    port: 37152,
+                    username: botName,
+                    version: '1.21.1',
+                    auth: 'offline',
+                    // Menambah waktu tunggu paket agar tidak socketClosed saat server lag
+                    connectTimeout: 90000, 
+                    viewDistance: 'tiny'
+                });
 
-                // Anti-AFK Routine
-                const afkLoop = setInterval(() => {
-                    if (botInstance && botInstance.entity) {
-                        botInstance.swingArm('right');
-                        botInstance.look(botInstance.entity.yaw + 0.1, 0);
-                    }
-                }, 30000);
+                botInstance.on('resource_pack', () => botInstance.acceptResourcePack());
 
-                botInstance.once('end', () => clearInterval(afkLoop));
-            });
+                botInstance.on('spawn', () => {
+                    console.log(`[MC] ✅ ${botName} ONLINE!`);
+                    
+                    // JEDA LOGIN: Beri waktu 5 detik agar plugin AuthMe sudah siap
+                    setTimeout(() => {
+                        if (botInstance) {
+                            botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
+                            botInstance.chat(`/login ${passwordBot}`);
+                        }
+                    }, 5000);
 
-            botInstance.on('error', (err) => {
-                if (err.code === 'ECONNREFUSED') {
-                    console.log(`[MC-FIREWALL] IP Koyeb sedang diblokir sementara oleh Falix.`);
-                } else {
-                    console.log(`[MC-ERR] ${err.message}`);
-                }
-            });
+                    const afkLoop = setInterval(() => {
+                        if (botInstance && botInstance.entity) {
+                            botInstance.swingArm('right');
+                        }
+                    }, 30000);
 
-            botInstance.on('end', (reason) => {
-                console.log(`[MC-DC] Putus: ${reason}. Menunggu 100 detik (Anti-Duplicate)...`);
-                botInstance = null;
-                // Jeda 100 detik sangat penting agar 'Duplicate UUID' hilang dari ViaVersion
-                setTimeout(startBot, 100000); 
-            });
+                    botInstance.once('end', () => clearInterval(afkLoop));
+                });
+
+                botInstance.on('error', (err) => {
+                    console.log(`[MC-ERR] ⚠️ ${err.message}`);
+                });
+
+                botInstance.on('end', (reason) => {
+                    console.log(`[MC-DC] Putus (${reason}). Reconnect dalam 2 menit...`);
+                    botInstance = null;
+                    setTimeout(startBot, 120000); 
+                });
+
+            }, 30000); // Tunggu 30 detik sebelum mulai koneksi
         };
 
-        // Tunggu 15 detik saat bot Discord pertama kali nyala sebelum konek ke MC
-        setTimeout(startBot, 15000);
+        // Tunggu 60 detik saat pertama kali bot Akira nyala 
+        // agar tidak tabrakan dengan loading plugin server yang berat
+        setTimeout(startBot, 60000);
     }
 };
