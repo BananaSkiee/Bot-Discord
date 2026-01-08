@@ -1,60 +1,44 @@
-// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-const botName = 'RianGamerz';
-const passwordBot = 'BananaSkiee'; // Pastikan ini password yang benar di AuthMe
-
-module.exports = {
-    init: () => {
-        console.log(`[SYSTEM] 🚀 Memulai Bot ${botName} tanpa gangguan Anti-Cheat.`);
-
-        const runBot = () => {
-            const bot = mineflayer.createBot({
-                host: 'empirebs.falixsrv.me',
-                port: 37152,
-                username: botName,
-                version: '1.21.1',
-                auth: 'offline',
-                viewDistance: 'tiny', // Tetap pakai tiny supaya hemat RAM server & bot
-                checkTimeoutInterval: 90000
-            });
-
-            // 1. OTOMATIS LOGIN (Wajib karena ada AuthMe)
-            bot.on('spawn', () => {
-                console.log(`[LOGIN] ${botName} mendarat di world. Mengirim perintah login...`);
-                bot.chat(`/login ${passwordBot}`);
-                bot.chat(`/register ${passwordBot} ${passwordBot}`);
-                
-                // 2. ANTI-AFK SEDERHANA
-                // Cukup gerak sedikit setiap 45 detik agar tidak kena Anti-AFK bawaan server/essentials
-                const afkInterval = setInterval(() => {
-                    if (bot.entity) {
-                        bot.swingArm('right'); // Ayun tangan
-                        bot.setControlState('jump', true); // Lompat sekali
-                        setTimeout(() => bot.setControlState('jump', false), 500);
-                    }
-                }, 45000);
-
-                bot.once('end', () => clearInterval(afkInterval));
-            });
-
-            // 3. AUTO RECONNECT (Jika server restart atau crash)
-            bot.on('end', (reason) => {
-                console.log(`[DISCONNECT] Bot keluar (${reason}). Menyambung kembali dalam 10 detik...`);
-                setTimeout(runBot, 10000);
-            });
-
-            bot.on('error', (err) => {
-                console.log(`[ERROR] Terjadi masalah: ${err.message}`);
-            });
-
-            // Biar ga spam kalau bot dipukul atau mati
-            bot.on('death', () => {
-                console.log(`[DEATH] Bot mati, respawn otomatis...`);
-                bot.respawn();
-            });
-        };
-
-        runBot();
-    }
+const botOptions = {
+    host: 'empirebs.falixsrv.me',
+    port: 37152,
+    username: 'RianGamerz',
+    version: '1.21.1',
+    auth: 'offline',
+    // --- SETTING ANTI-BLOCK ---
+    viewDistance: 'tiny',          // Download data sangat sedikit
+    colorsEnabled: false,          // Matikan fitur warna chat
+    loadInternalScoreboards: false,// Kurangi trafik data
+    checkTimeoutInterval: 120000   // Beri waktu napas panjang bagi bot
 };
+
+let retryCount = 0;
+
+function startBot() {
+    console.log(`[SYSTEM] Mencoba koneksi ke- ${retryCount + 1}`);
+    const bot = mineflayer.createBot(botOptions);
+
+    bot.once('spawn', () => {
+        retryCount = 0; // Reset hitungan jika berhasil masuk
+        console.log("✅ Bot Berhasil Masuk! Mengirim login...");
+        bot.chat('/login BananaSkiee');
+    });
+
+    bot.on('error', (err) => {
+        if (err.code === 'ECONNREFUSED') {
+            console.log("⚠️ IP kamu mungkin sedang 'cool-down' oleh firewall Falix.");
+        }
+    });
+
+    bot.on('end', (reason) => {
+        retryCount++;
+        // Jeda Reconnect yang dinamis (makin sering gagal, makin lama nunggunya)
+        let waitTime = Math.min(1000 * 60 * 5, 30000 * retryCount); 
+        console.log(`🔌 Terputus: ${reason}. Nunggu ${waitTime/1000} detik biar ga di-ban...`);
+        
+        setTimeout(startBot, waitTime);
+    });
+}
+
+startBot();
