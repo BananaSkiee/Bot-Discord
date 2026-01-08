@@ -2,7 +2,6 @@
 const { ChannelType } = require("discord.js");
 const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
-const joinvoice = require("../modules/joinvoice");
 // Menghapus: const countValidator = require("../modules/countValidator");
 const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
@@ -151,13 +150,6 @@ try {
       }
     } else {
       console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
-    }
-
-    // 🎙️ Join voice channel saat ready
-    try {
-      await joinvoice(client);
-    } catch (err) {
-      console.error("❌ Gagal join voice channel:", err);
     }
 
        // --- LOGIKA MASS SCAN (TAMBAHKAN INI) ---
