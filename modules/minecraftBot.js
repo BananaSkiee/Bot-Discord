@@ -1,54 +1,56 @@
+//modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-const botOptions = {
-    host: 'empirebs.falixsrv.me',
-    port: 37152,
-    username: 'RianGamerz',
-    version: '1.21.1',
-    auth: 'offline',
-    // Skip resource pack agar bot tidak berat/crash saat join
-    skipValidation: true,
-    // Agar bot tidak dianggap idle oleh server
-    checkTimeoutInterval: 60000 
-};
+const botName = 'RianGamerz';
+const passwordBot = 'BananaSkiee'; 
 
-function startBot() {
-    const bot = mineflayer.createBot(botOptions);
-
-    // Otomatis terima resource pack kalau server maksa
-    bot.on('resource_pack', (url, hash) => {
-        bot.acceptResourcePack();
+const runBot = () => {
+    const bot = mineflayer.createBot({
+        host: 'empirebs.falixsrv.me',
+        port: 37152,
+        username: botName,
+        version: '1.21.1',
+        auth: 'offline',
+        // Matikan fitur yang tidak didukung bot agar koneksi stabil
+        loadInternalScoreboards: false,
+        viewDistance: 'tiny'
     });
 
-    bot.on('spawn', () => {
-        console.log("✅ RianGamerz (OP Level 4) Berhasil Masuk!");
-        
-        // Login AuthMe
-        bot.chat('/login BananaSkiee');
+    // Otomatis skip/terima paket resource pack dari EconomyShop/DeluxeHub
+    bot.on('resource_pack', () => bot.acceptResourcePack());
 
-        // ANTI-IDLE: Karena di server.properties timeout=10, 
-        // bot harus gerak setiap beberapa menit.
-        setInterval(() => {
+    bot.on('spawn', () => {
+        console.log(`[MC] ✅ ${botName} mendarat di Lobby.`);
+        
+        // Jeda 2 detik sebelum login agar AuthMe tidak error
+        setTimeout(() => {
+            bot.chat(`/login ${passwordBot}`);
+        }, 2000);
+
+        // Anti-AFK Khusus (Sesuai plugin Essentials/TAB)
+        const antiAfk = setInterval(() => {
             if (bot.entity) {
-                // Melompat dan menoleh sedikit
-                bot.setControlState('jump', true);
-                setTimeout(() => bot.setControlState('jump', false), 500);
-                bot.look(bot.entity.yaw + 0.5, 0);
+                bot.swingArm('right');
+                // Menoleh sedikit ke kanan-kiri
+                bot.look(bot.entity.yaw + 0.2, 0);
             }
-        }, 60000); // Gerak setiap 1 menit
+        }, 30000);
+
+        bot.once('end', () => clearInterval(antiAfk));
     });
 
     bot.on('error', (err) => {
-        console.log(`❌ Error: ${err.message}`);
-        if (err.code === 'ECONNREFUSED') {
-            console.log("⚠️ Server menolak koneksi. Coba ganti player-idle-timeout ke 0 di server.properties.");
+        console.log(`[ERR] Masalah Jaringan: ${err.message}`);
+        if (err.message.includes('ECONNREFUSED')) {
+            console.log(`[HINT] Coba Restart Server Minecraft & Tunggu 2 menit.`);
         }
     });
 
     bot.on('end', (reason) => {
-        console.log(`🔌 Terputus: ${reason}. Reconnect dalam 30 detik...`);
-        setTimeout(startBot, 30000);
+        console.log(`[DC] Bot Terputus: ${reason}. Nyambung lagi dalam 45 detik...`);
+        // Jeda lama agar tidak terkena ban IP dari AuthMe/Firewall
+        setTimeout(runBot, 45000); 
     });
-}
+};
 
-startBot();
+runBot();
