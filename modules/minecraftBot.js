@@ -1,56 +1,74 @@
 //modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-const botName = 'RianGamerz';
-const passwordBot = 'BananaSkiee'; 
+let botInstance = null;
 
-const runBot = () => {
-    const bot = mineflayer.createBot({
-        host: 'empirebs.falixsrv.me',
-        port: 37152,
-        username: botName,
-        version: '1.21.1',
-        auth: 'offline',
-        // Matikan fitur yang tidak didukung bot agar koneksi stabil
-        loadInternalScoreboards: false,
-        viewDistance: 'tiny'
-    });
+const minecraftBot = {
+    init: (client) => {
+        const botName = 'RianGamerz';
+        const passwordBot = 'BananaSkiee'; 
 
-    // Otomatis skip/terima paket resource pack dari EconomyShop/DeluxeHub
-    bot.on('resource_pack', () => bot.acceptResourcePack());
+        const startBot = () => {
+            if (botInstance) return;
 
-    bot.on('spawn', () => {
-        console.log(`[MC] ✅ ${botName} mendarat di Lobby.`);
-        
-        // Jeda 2 detik sebelum login agar AuthMe tidak error
-        setTimeout(() => {
-            bot.chat(`/login ${passwordBot}`);
-        }, 2000);
+            console.log(`[MC-SYSTEM] 🔄 Menghubungkan ${botName} ke EmpireBS...`);
 
-        // Anti-AFK Khusus (Sesuai plugin Essentials/TAB)
-        const antiAfk = setInterval(() => {
-            if (bot.entity) {
-                bot.swingArm('right');
-                // Menoleh sedikit ke kanan-kiri
-                bot.look(bot.entity.yaw + 0.2, 0);
-            }
-        }, 30000);
+            botInstance = mineflayer.createBot({
+                host: 'empirebs.falixsrv.me',
+                port: 37152,
+                username: botName,
+                version: '1.21.1',
+                auth: 'offline',
+                viewDistance: 'tiny',
+                checkTimeoutInterval: 60000,
+                hideErrors: true
+            });
 
-        bot.once('end', () => clearInterval(antiAfk));
-    });
+            // Otomatis terima resource pack (Penting buat server kamu)
+            botInstance.on('resource_pack', () => {
+                if (botInstance) botInstance.acceptResourcePack();
+            });
 
-    bot.on('error', (err) => {
-        console.log(`[ERR] Masalah Jaringan: ${err.message}`);
-        if (err.message.includes('ECONNREFUSED')) {
-            console.log(`[HINT] Coba Restart Server Minecraft & Tunggu 2 menit.`);
-        }
-    });
+            botInstance.on('spawn', () => {
+                console.log(`[MC-BOT] ✅ ${botName} Berhasil Masuk!`);
+                
+                // Login AuthMe
+                setTimeout(() => {
+                    if (botInstance) {
+                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
+                        botInstance.chat(`/login ${passwordBot}`);
+                    }
+                }, 3000);
 
-    bot.on('end', (reason) => {
-        console.log(`[DC] Bot Terputus: ${reason}. Nyambung lagi dalam 45 detik...`);
-        // Jeda lama agar tidak terkena ban IP dari AuthMe/Firewall
-        setTimeout(runBot, 45000); 
-    });
+                // Anti-AFK (Agar tidak kena idle-timeout)
+                const afkLoop = setInterval(() => {
+                    if (botInstance && botInstance.entity) {
+                        botInstance.swingArm('right');
+                        botInstance.setControlState('jump', true);
+                        setTimeout(() => { if(botInstance) botInstance.setControlState('jump', false) }, 500);
+                    }
+                }, 45000);
+
+                botInstance.once('end', () => clearInterval(afkLoop));
+            });
+
+            botInstance.on('error', (err) => {
+                // Log error tapi jangan biarkan aplikasi crash
+                if (!err.message.includes('ECONNREFUSED')) {
+                    console.log(`[MC-ERROR] ⚠️ ${err.message}`);
+                }
+            });
+
+            botInstance.on('end', (reason) => {
+                console.log(`[MC-DC] 🔌 Putus (${reason}). Reconnect dalam 60 detik...`);
+                botInstance = null;
+                // Jeda 1 menit agar IP Koyeb tidak di-blockir (ECONNREFUSED)
+                setTimeout(startBot, 60000);
+            });
+        };
+
+        startBot();
+    }
 };
 
-runBot();
+module.exports = minecraftBot;
