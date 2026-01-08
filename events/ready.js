@@ -12,6 +12,7 @@ const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 // const { sendInitialCard } = require('../modules/introCard');
 const minecraftBot = require("../modules/minecraftBot");
+const statusMC = require("../modules/statusMC");
 
 const verifySystem = new VerifySystem();
 
@@ -31,6 +32,14 @@ module.exports = {
     } catch (err) {
         console.error("❌ Gagal inisialisasi Minecraft bot:", err);
     }
+
+    // Tambahkan ini di bawah minecraftBot.init(client);
+try {
+    await statusMC.init(client);
+    console.log("✅ StatusMC Module Active (Channel: 1457830508867223626)");
+} catch (err) {
+    console.error("❌ Gagal inisialisasi StatusMC:", err);
+}
     
     // ✅ Verify System
     try {
