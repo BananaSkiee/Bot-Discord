@@ -1,23 +1,19 @@
 const mineflayer = require('mineflayer');
 
 const botData = [
-    { name: 'EmpireBS', stay: true, rank: 'owner' }, 
-    // STAFF (Helper, Mod, Dev, Build)
+    { name: 'EmpireBS', stay: true, rank: 'owner' }, // OWNER SELALU STAY
     { name: 'KaelZentic', stay: false, rank: 'helper' },
     { name: 'VortexNode', stay: false, rank: 'helper' },
     { name: 'RyuzakiKy', stay: false, rank: 'mod' },
     { name: 'Zandervic', stay: false, rank: 'dev' },
     { name: 'AxelBuilds', stay: false, rank: 'build' },
-    // MEDIA (YT & Twitch)
     { name: 'RianGamerz', stay: false, rank: 'yt' },
     { name: 'KiraZen', stay: false, rank: 'twitch' },
-    // DONATUR (Legend, Hero, Ultra, Mega, VIP)
     { name: 'NovaAstral', stay: false, rank: 'legend' },
     { name: 'BlazeForce', stay: false, rank: 'hero' },
     { name: 'NeonPulse', stay: false, rank: 'ultravip' },
     { name: 'StormVibe', stay: false, rank: 'megavip' },
     { name: 'FrostbyteKy', stay: false, rank: 'vip' },
-    // PLAYER (Member Biasa - Paling sering ganti-gantian)
     { name: 'SkyzFlare', stay: false, rank: 'player' },
     { name: 'Aetheris', stay: false, rank: 'player' },
     { name: 'ZenixPVP', stay: false, rank: 'player' },
@@ -43,34 +39,30 @@ module.exports = {
             });
 
             bot.on('spawn', () => {
-                console.log(`[SIM] 👤 ${data.name} Joined.`);
-                
                 const pw = "EmpireBSBananaSkiee";
                 setTimeout(() => {
                     if (bot) {
-                        bot.chat(`/register ${pw} ${pw}`);
                         bot.chat(`/login ${pw}`);
+                        bot.chat(`/register ${pw} ${pw}`);
                     }
-                }, 5000);
+                }, 8000); // Jeda lebih lama biar server siap
 
-                // Anti-AFK
+                // Gerakan sangat jarang biar nggak dikira bot spam
                 const moveInterval = setInterval(() => {
                     if (bot.entity) {
-                        if (Math.random() > 0.8) bot.setControlState('jump', true);
-                        setTimeout(() => bot.setControlState('jump', false), 500);
-                        bot.look(bot.entity.yaw + (Math.random() * 2 - 1), 0);
+                        bot.look(bot.entity.yaw + (Math.random() * 0.5 - 0.25), 0);
                     }
-                }, 30000);
+                }, 60000);
 
-                // Durasi Online Otomatis
+                // DURASI MAIN: 1 jam sampai 3 jam (Biar nggak bolak-balik join/quit)
                 if (!data.stay) {
-                    // Bot Player & Helper lebih lama (1-2 jam)
-                    // Rank tinggi lebih sebentar (30-60 menit) agar terkesan eksklusif
-                    const duration = ['player', 'helper'].includes(data.rank) 
-                        ? (Math.floor(Math.random() * 60) + 60) * 60000 
-                        : (Math.floor(Math.random() * 30) + 30) * 60000;
-
-                    setTimeout(() => { if (bot) bot.quit(); }, duration);
+                    const playDuration = (Math.floor(Math.random() * 120) + 60) * 60000;
+                    setTimeout(() => { 
+                        if (bot) {
+                            bot.quit();
+                            console.log(`[SIM] ${data.name} selesai bermain.`);
+                        }
+                    }, playDuration);
                 }
 
                 bot.once('end', () => clearInterval(moveInterval));
@@ -78,34 +70,31 @@ module.exports = {
 
             bot.on('end', () => {
                 delete activeBots[data.name];
-                if (data.stay) setTimeout(() => startBot(data), 20000);
+                // EmpireBS langsung join lagi, bot lain nunggu random panjang
+                if (data.stay) {
+                    setTimeout(() => startBot(data), 15000);
+                }
             });
 
             activeBots[data.name] = bot;
         };
 
-        // LOOP SISTEM POPULASI (Cek setiap 10 menit)
+        // CEK POPULASI (Setiap 30 Menit)
+        // Ini biar gak spam, dicek jarang-jarang
         setInterval(() => {
-            const onlineCount = Object.keys(activeBots).length;
-            botData.forEach((data, index) => {
-                setTimeout(() => {
-                    if (activeBots[data.name]) return;
+            botData.forEach((data) => {
+                if (data.stay || activeBots[data.name]) return;
 
-                    let chance = 0.2; // Default 20%
-                    if (data.rank === 'player') chance = 0.6; // Player dominan
-                    if (data.rank === 'helper' && onlineCount < 6) chance = 0.7; // Helper jaga server sepi
-                    if (['yt', 'twitch'].includes(data.rank) && onlineCount > 10) chance = 0.5; // Media muncul kalau rame
-
-                    if (Math.random() < chance) startBot(data);
-                }, index * 10000);
+                // Peluang join cuma 20% setiap 30 menit
+                // Jadi bot bakal jarang banget join, sangat random
+                if (Math.random() < 0.2) {
+                    const delayJoin = Math.floor(Math.random() * 600000); // Delay lagi 1-10 menit
+                    setTimeout(() => startBot(data), delayJoin);
+                }
             });
-        }, 600000);
+        }, 1800000); 
 
-        // Startup: Langsung masukkan 1 Admin + 3 Player + 1 Helper
-        botData.forEach((data, index) => {
-            if (data.stay || index < 5) {
-                setTimeout(() => startBot(data), index * 12000);
-            }
-        });
+        // Saat bot pertama kali jalan, cuma EmpireBS yang masuk
+        startBot(botData[0]); 
     }
 };
