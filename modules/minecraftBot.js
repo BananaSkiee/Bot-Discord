@@ -1,93 +1,64 @@
+//modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-const botData = [
-    { name: 'EmpireBS', stay: true, rank: 'owner' }, // OWNER SELALU STAY
-    { name: 'KaelZentic', stay: false, rank: 'helper' },
-    { name: 'VortexNode', stay: false, rank: 'helper' },
-    { name: 'RyuzakiKy', stay: false, rank: 'mod' },
-    { name: 'Zandervic', stay: false, rank: 'dev' },
-    { name: 'AxelBuilds', stay: false, rank: 'build' },
-    { name: 'RianGamerz', stay: false, rank: 'yt' },
-    { name: 'KiraZen', stay: false, rank: 'twitch' },
-    { name: 'NovaAstral', stay: false, rank: 'legend' },
-    { name: 'BlazeForce', stay: false, rank: 'hero' },
-    { name: 'NeonPulse', stay: false, rank: 'ultravip' },
-    { name: 'StormVibe', stay: false, rank: 'megavip' },
-    { name: 'FrostbyteKy', stay: false, rank: 'vip' },
-    { name: 'SkyzFlare', stay: false, rank: 'player' },
-    { name: 'Aetheris', stay: false, rank: 'player' },
-    { name: 'ZenixPVP', stay: false, rank: 'player' },
-    { name: 'LuminaRay', stay: false, rank: 'player' },
-    { name: 'DuskWalker', stay: false, rank: 'player' },
-    { name: 'VeloCity9', stay: false, rank: 'player' },
-    { name: 'HydraZen', stay: false, rank: 'player' }
-];
-
-let activeBots = {};
+let botInstance = null;
 
 module.exports = {
     init: (client) => {
-        const startBot = (data) => {
-            if (activeBots[data.name]) return;
+        // Nickname baru: EmpireBS
+        const botName = 'EmpireBS'; 
+        const passwordBot = 'BananaSkiee';
 
-            const bot = mineflayer.createBot({
+        const startBot = () => {
+            if (botInstance) return;
+
+            console.log(`[MC-SYSTEM] 🔄 Mencoba masuk sebagai ${botName} (v1.20.1)...`);
+
+            botInstance = mineflayer.createBot({
                 host: 'empirebs.falixsrv.me',
                 port: 37152,
-                username: data.name,
+                username: botName,
                 version: '1.20.1',
-                auth: 'offline'
+                auth: 'offline',
+                keepAlive: true
             });
 
-            bot.on('spawn', () => {
-                // PENYESUAIAN PASSWORD KHUSUS EMPIREBS
-                const pw = (data.name === 'EmpireBS') ? "BananaSkiee" : "EmpireBSBananaSkiee";
+            botInstance.on('spawn', () => {
+                console.log(`[MC-SUCCESS] ✅ ${botName} BERHASIL MASUK KE SERVER!`);
                 
+                // Jeda 5 detik agar plugin login siap
                 setTimeout(() => {
-                    if (bot) {
-                        bot.chat(`/login ${pw}`);
-                        bot.chat(`/register ${pw} ${pw}`);
+                    if (botInstance) {
+                        // Karena nick baru, otomatis daftar (register)
+                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
+                        botInstance.chat(`/login ${passwordBot}`);
+                        console.log(`[MC-INFO] Perintah Register/Login dikirim untuk ${botName}`);
                     }
-                }, 8000); 
+                }, 5000);
 
-                const moveInterval = setInterval(() => {
-                    if (bot.entity) {
-                        bot.look(bot.entity.yaw + (Math.random() * 0.5 - 0.25), 0);
+                // Anti-AFK
+                const afkLoop = setInterval(() => {
+                    if (botInstance && botInstance.entity) {
+                        botInstance.swingArm('right');
+                        botInstance.look(botInstance.entity.yaw + 0.1, 0);
                     }
-                }, 60000);
+                }, 20000);
 
-                if (!data.stay) {
-                    const playDuration = (Math.floor(Math.random() * 120) + 60) * 60000;
-                    setTimeout(() => { 
-                        if (bot) {
-                            bot.quit();
-                            console.log(`[SIM] ${data.name} selesai bermain.`);
-                        }
-                    }, playDuration);
-                }
-
-                bot.once('end', () => clearInterval(moveInterval));
+                botInstance.once('end', () => clearInterval(afkLoop));
             });
 
-            bot.on('end', () => {
-                delete activeBots[data.name];
-                if (data.stay) {
-                    setTimeout(() => startBot(data), 15000);
-                }
+            botInstance.on('error', (err) => {
+                console.log(`[MC-ERR] ⚠️ Terjadi masalah: ${err.message}`);
             });
 
-            activeBots[data.name] = bot;
+            botInstance.on('end', (reason) => {
+                console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Menghubungkan ulang dlm 30 detik...`);
+                botInstance = null;
+                setTimeout(startBot, 30000);
+            });
         };
 
-        setInterval(() => {
-            botData.forEach((data) => {
-                if (data.stay || activeBots[data.name]) return;
-                if (Math.random() < 0.2) {
-                    const delayJoin = Math.floor(Math.random() * 600000);
-                    setTimeout(() => startBot(data), delayJoin);
-                }
-            });
-        }, 1800000); 
-
-        startBot(botData[0]); 
+        // Mulai bot 10 detik setelah aplikasi nyala
+        setTimeout(startBot, 10000);
     }
 };
