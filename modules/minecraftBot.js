@@ -1,64 +1,81 @@
-//modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-let botInstance = null;
+const botData = [
+    { name: 'EmpireBS', stay: true },       // Admin/Owner
+    { name: 'SkyWarrior88', stay: false },  // UltraVIP
+    { name: 'NeonVibes', stay: false },     // MegaVIP
+    { name: 'ZexyQuantum', stay: false },   // VIP+
+    { name: 'LunarPanda', stay: false },    // VIP
+    { name: 'FrostByte', stay: false },     // Legend
+    { name: 'VortexChaser', stay: false },  // Player
+    { name: 'BlazeKnight', stay: false },   // Player
+    { name: 'MysticRune', stay: false },    // Hero
+    { name: 'ShadowStorm', stay: false }    // Player
+];
+
+let activeBots = {};
 
 module.exports = {
     init: (client) => {
-        // Nickname baru: EmpireBS
-        const botName = 'EmpireBS'; 
-        const passwordBot = 'BananaSkiee';
+        const startBot = (data) => {
+            if (activeBots[data.name]) return;
 
-        const startBot = () => {
-            if (botInstance) return;
-
-            console.log(`[MC-SYSTEM] 🔄 Mencoba masuk sebagai ${botName} (v1.20.1)...`);
-
-            botInstance = mineflayer.createBot({
+            const bot = mineflayer.createBot({
                 host: 'empirebs.falixsrv.me',
                 port: 37152,
-                username: botName,
+                username: data.name,
                 version: '1.20.1',
-                auth: 'offline',
-                keepAlive: true
+                auth: 'offline'
             });
 
-            botInstance.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ ${botName} BERHASIL MASUK KE SERVER!`);
+            bot.on('spawn', () => {
+                console.log(`[SIM] 👤 ${data.name} masuk.`);
                 
-                // Jeda 5 detik agar plugin login siap
                 setTimeout(() => {
-                    if (botInstance) {
-                        // Karena nick baru, otomatis daftar (register)
-                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
-                        botInstance.chat(`/login ${passwordBot}`);
-                        console.log(`[MC-INFO] Perintah Register/Login dikirim untuk ${botName}`);
+                    if (bot) {
+                        bot.chat(`/register BananaSkiee BananaSkiee`);
+                        bot.chat(`/login BananaSkiee`);
                     }
                 }, 5000);
 
-                // Anti-AFK
-                const afkLoop = setInterval(() => {
-                    if (botInstance && botInstance.entity) {
-                        botInstance.swingArm('right');
-                        botInstance.look(botInstance.entity.yaw + 0.1, 0);
+                // Gerakan natural saja tanpa chat
+                const movementInterval = setInterval(() => {
+                    if (bot.entity) {
+                        if (Math.random() > 0.7) bot.setControlState('jump', true);
+                        setTimeout(() => bot.setControlState('jump', false), 500);
+                        bot.look(bot.entity.yaw + (Math.random() * 1.2 - 0.6), 0);
                     }
-                }, 20000);
+                }, 35000);
 
-                botInstance.once('end', () => clearInterval(afkLoop));
+                if (!data.stay) {
+                    const playDuration = (Math.floor(Math.random() * 60) + 30) * 60000;
+                    setTimeout(() => { bot.quit(); }, playDuration);
+                }
+
+                bot.once('end', () => clearInterval(movementInterval));
             });
 
-            botInstance.on('error', (err) => {
-                console.log(`[MC-ERR] ⚠️ Terjadi masalah: ${err.message}`);
+            bot.on('end', () => {
+                delete activeBots[data.name];
+                if (data.stay) setTimeout(() => startBot(data), 15000);
             });
 
-            botInstance.on('end', (reason) => {
-                console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Menghubungkan ulang dlm 30 detik...`);
-                botInstance = null;
-                setTimeout(startBot, 30000);
-            });
+            activeBots[data.name] = bot;
         };
 
-        // Mulai bot 10 detik setelah aplikasi nyala
-        setTimeout(startBot, 10000);
+        // Cek Populasi
+        setInterval(() => {
+            botData.forEach((data, index) => {
+                setTimeout(() => {
+                    if (!activeBots[data.name] && Math.random() > 0.6) startBot(data);
+                }, index * 20000);
+            });
+        }, 600000);
+
+        botData.forEach((data, index) => {
+            if (data.stay || index < 4) {
+                setTimeout(() => startBot(data), index * 15000);
+            }
+        });
     }
 };
