@@ -39,22 +39,22 @@ module.exports = {
             });
 
             bot.on('spawn', () => {
-                const pw = "EmpireBSBananaSkiee";
+                // PENYESUAIAN PASSWORD KHUSUS EMPIREBS
+                const pw = (data.name === 'EmpireBS') ? "BananaSkiee123" : "EmpireBSBananaSkiee";
+                
                 setTimeout(() => {
                     if (bot) {
                         bot.chat(`/login ${pw}`);
                         bot.chat(`/register ${pw} ${pw}`);
                     }
-                }, 8000); // Jeda lebih lama biar server siap
+                }, 8000); 
 
-                // Gerakan sangat jarang biar nggak dikira bot spam
                 const moveInterval = setInterval(() => {
                     if (bot.entity) {
                         bot.look(bot.entity.yaw + (Math.random() * 0.5 - 0.25), 0);
                     }
                 }, 60000);
 
-                // DURASI MAIN: 1 jam sampai 3 jam (Biar nggak bolak-balik join/quit)
                 if (!data.stay) {
                     const playDuration = (Math.floor(Math.random() * 120) + 60) * 60000;
                     setTimeout(() => { 
@@ -70,7 +70,6 @@ module.exports = {
 
             bot.on('end', () => {
                 delete activeBots[data.name];
-                // EmpireBS langsung join lagi, bot lain nunggu random panjang
                 if (data.stay) {
                     setTimeout(() => startBot(data), 15000);
                 }
@@ -79,22 +78,16 @@ module.exports = {
             activeBots[data.name] = bot;
         };
 
-        // CEK POPULASI (Setiap 30 Menit)
-        // Ini biar gak spam, dicek jarang-jarang
         setInterval(() => {
             botData.forEach((data) => {
                 if (data.stay || activeBots[data.name]) return;
-
-                // Peluang join cuma 20% setiap 30 menit
-                // Jadi bot bakal jarang banget join, sangat random
                 if (Math.random() < 0.2) {
-                    const delayJoin = Math.floor(Math.random() * 600000); // Delay lagi 1-10 menit
+                    const delayJoin = Math.floor(Math.random() * 600000);
                     setTimeout(() => startBot(data), delayJoin);
                 }
             });
         }, 1800000); 
 
-        // Saat bot pertama kali jalan, cuma EmpireBS yang masuk
         startBot(botData[0]); 
     }
 };
