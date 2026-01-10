@@ -40,7 +40,7 @@ module.exports = {
 
             bot.on('spawn', () => {
                 // PENYESUAIAN PASSWORD KHUSUS EMPIREBS
-                const pw = (data.name === 'EmpireBS') ? "BananaSkiee123" : "EmpireBSBananaSkiee";
+                const pw = (data.name === 'EmpireBS') ? "BananaSkiee" : "EmpireBSBananaSkiee";
                 
                 setTimeout(() => {
                     if (bot) {
