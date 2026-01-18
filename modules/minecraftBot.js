@@ -6,8 +6,8 @@ let botSurvival = null;
 
 module.exports = {
     init: (client) => {
-        const host = 'empirebs.falixsrv.me';
-        const proxyPort = 32308; // Port Proxy Velocity
+        const host = 'dynamic-8.magmanode.com';
+        const proxyPort = 25643; // Port Proxy Velocity
         const passwordBot = 'BananaSkiee';
 
         const createMcBot = (username, target) => {
@@ -17,7 +17,7 @@ module.exports = {
                 host: host,
                 port: proxyPort,
                 username: username,
-                version: '1.21.1', // Sesuaikan dengan versi Paper kamu
+                version: '1.21.8', // Sesuaikan dengan versi Paper kamu
                 auth: 'offline',
                 keepAlive: true
             });
