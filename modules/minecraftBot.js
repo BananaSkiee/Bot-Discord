@@ -1,64 +1,68 @@
 //modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
-let botInstance = null;
+let botLobby = null;
+let botSurvival = null;
 
 module.exports = {
     init: (client) => {
-        // Nickname baru: EmpireBS
-        const botName = 'EmpireBS'; 
+        const host = 'empirebs.falixsrv.me';
+        const proxyPort = 32308; // Port Proxy Velocity
         const passwordBot = 'BananaSkiee';
 
-        const startBot = () => {
-            if (botInstance) return;
+        const createMcBot = (username, target) => {
+            console.log(`[MC-SYSTEM] 🔄 Bot ${username} sedang menuju Proxy...`);
 
-            console.log(`[MC-SYSTEM] 🔄 Mencoba masuk sebagai ${botName} (v1.20.1)...`);
-
-            botInstance = mineflayer.createBot({
-                host: 'empirebs.falixsrv.me',
-                port: 37152,
-                username: botName,
-                version: '1.20.1',
+            const bot = mineflayer.createBot({
+                host: host,
+                port: proxyPort,
+                username: username,
+                version: '1.21.1', // Sesuaikan dengan versi Paper kamu
                 auth: 'offline',
                 keepAlive: true
             });
 
-            botInstance.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ ${botName} BERHASIL MASUK KE SERVER!`);
+            bot.on('spawn', () => {
+                console.log(`[MC-SUCCESS] ✅ ${username} berhasil mendarat di Lobby!`);
                 
-                // Jeda 5 detik agar plugin login siap
+                // Proses Login & Perpindahan Server
                 setTimeout(() => {
-                    if (botInstance) {
-                        // Karena nick baru, otomatis daftar (register)
-                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
-                        botInstance.chat(`/login ${passwordBot}`);
-                        console.log(`[MC-INFO] Perintah Register/Login dikirim untuk ${botName}`);
+                    if (bot) {
+                        bot.chat(`/register ${passwordBot} ${passwordBot}`);
+                        bot.chat(`/login ${passwordBot}`);
+                        
+                        // Jika ini bot khusus survival, dia akan pindah server
+                        if (target === 'survival') {
+                            setTimeout(() => {
+                                bot.chat('/server survival');
+                                console.log(`[MC-INFO] ${username} sedang berpindah ke server Survival...`);
+                            }, 3000);
+                        }
                     }
                 }, 5000);
-
-                // Anti-AFK
-                const afkLoop = setInterval(() => {
-                    if (botInstance && botInstance.entity) {
-                        botInstance.swingArm('right');
-                        botInstance.look(botInstance.entity.yaw + 0.1, 0);
-                    }
-                }, 20000);
-
-                botInstance.once('end', () => clearInterval(afkLoop));
             });
 
-            botInstance.on('error', (err) => {
-                console.log(`[MC-ERR] ⚠️ Terjadi masalah: ${err.message}`);
+            // Anti-AFK agar tidak kena kick oleh sistem internal Minecraft
+            setInterval(() => {
+                if (bot && bot.entity) {
+                    bot.swingArm('right');
+                }
+            }, 20000);
+
+            bot.on('end', (reason) => {
+                console.log(`[MC-RETRY] ${username} terputus: ${reason}. Login ulang dalam 30 detik...`);
+                setTimeout(() => createMcBot(username, target), 30000);
             });
 
-            botInstance.on('end', (reason) => {
-                console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Menghubungkan ulang dlm 30 detik...`);
-                botInstance = null;
-                setTimeout(startBot, 30000);
-            });
+            bot.on('error', (err) => console.log(`[MC-ERR] ${username} Error: ${err.message}`));
+
+            return bot;
         };
 
-        // Mulai bot 10 detik setelah aplikasi nyala
-        setTimeout(startBot, 10000);
+        // Menjalankan 2 Bot: Satu stay di Lobby, satu pergi ke Survival
+        setTimeout(() => {
+            botLobby = createMcBot('LobbyBS', 'lobby');
+            botSurvival = createMcBot('SurvivalBS', 'survival');
+        }, 10000);
     }
 };
