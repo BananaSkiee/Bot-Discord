@@ -17,7 +17,7 @@ module.exports = {
                 host: host,
                 port: proxyPort,
                 username: username,
-                version: '1.21.8', // Sesuaikan dengan versi Paper kamu
+                version: '1.20.1', // Sesuaikan dengan versi Paper kamu
                 auth: 'offline',
                 keepAlive: true
             });
