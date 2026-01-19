@@ -21,37 +21,40 @@ module.exports = {
             let spamInterval = null;
 
             bot.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ ${username} masuk ke server.`);
+                console.log(`[MC-SUCCESS] ✅ ${username} mendarat di Proxy.`);
                 
-                // Login awal tetap butuh jeda singkat biar gak error (5 detik)
+                // 1. Login (Kasih jeda 5 detik setelah spawn)
                 setTimeout(() => {
                     bot.chat(`/register ${passwordBot} ${passwordBot}`);
                     bot.chat(`/login ${passwordBot}`);
-                }, 5000);
+                    console.log(`[MC-AUTH] ${username} mencoba login...`);
 
-                // Spam command /server survival setiap 2 menit
-                if (target === 'survival' && !spamInterval) {
-                    spamInterval = setInterval(() => {
-                        if (bot && bot.entity) {
+                    // 2. Khusus bot survival, kasih jeda LAGI (10 detik) setelah login baru pindah server
+                    if (target === 'survival' && !spamInterval) {
+                        setTimeout(() => {
+                            console.log(`[MC-MOVE] ${username} pindah ke Survival...`);
                             bot.chat('/server survival');
-                            console.log(`[MC-SPAM] ${username} mengirim /server survival (Interval 2 menit)`);
-                        }
-                    }, 120000); // 2 Menit
-                }
+                        }, 10000); // Jeda biar gak kena 'void future'
+
+                        // 3. Spam command setiap 2 menit (tetap jalan)
+                        spamInterval = setInterval(() => {
+                            if (bot && bot.entity) {
+                                bot.chat('/server survival');
+                                console.log(`[MC-SPAM] ${username} memastikan masih di Survival.`);
+                            }
+                        }, 120000);
+                    }
+                }, 5000);
             });
 
             bot.on('end', (reason) => {
                 console.log(`[MC-RETRY] 🔌 ${username} terputus: ${reason}.`);
-                
-                // Bersihkan interval biar gak numpuk di RAM
                 if (spamInterval) {
                     clearInterval(spamInterval);
                     spamInterval = null;
                 }
-
-                // Jeda 1 menit sebelum paksa masuk lagi (biar gak dianggap spam attack)
-                console.log(`[MC-WAIT] ${username} menunggu 1 menit sebelum mencoba masuk lagi...`);
-                setTimeout(() => createMcBot(username, target), 60000); // 1 Menit
+                // Cooldown 1 menit biar RAM Koyeb aman & gak kena temp-ban IP
+                setTimeout(() => createMcBot(username, target), 60000);
             });
 
             bot.on('error', (err) => {
@@ -59,11 +62,11 @@ module.exports = {
             });
         };
 
-        // Delay awal saat bot pertama kali jalan (1 menit)
+        // Mulai bot Lobby (Setelah 1 menit)
         setTimeout(() => {
             createMcBot('LobbyBS', 'lobby');
             
-            // Jeda 2 menit sebelum bot kedua masuk
+            // Bot Survival masuk 2 menit kemudian
             setTimeout(() => {
                 createMcBot('SurvivalBS', 'survival');
             }, 120000); 
