@@ -1,3 +1,4 @@
+//modules/iconAnim.js
 const fs = require("fs");
 const path = require("path");
 
@@ -22,30 +23,27 @@ async function updateIcon(guild) {
 
   try {
     await guild.setIcon(iconBuffer);
-    console.log(`✅ Icon server diubah ke: ${icons[currentIndex]}`);
+    // Log di sini dihapus agar tidak spam konsol setiap ganti frame
     currentIndex = (currentIndex + 1) % icons.length;
   } catch (err) {
-    // Error 50035 (Invalid Form Body) atau 40003 (Rate Limit) sering terjadi
+    // Error tetap ditampilkan untuk memantau jika terkena Rate Limit
     console.error("❌ Gagal ubah icon:", err.message);
   }
 }
 
 async function startAutoAnimation(client) {
-  // Hanya jalankan jika ada icon dan belum berjalan
   if (isRunning || icons.length === 0) return;
   isRunning = true;
 
   try {
-    // 💡 KRITIS: Dapatkan ID Guild dari environment variable
     const guildId = process.env.GUILD_ID; 
 
     if (!guildId) {
-        console.error("❌ GUILD_ID tidak ditemukan di environment variable. Animasi dihentikan.");
+        console.error("❌ GUILD_ID tidak ditemukan di environment variable.");
         isRunning = false;
         return;
     }
     
-    // Dapatkan Guild yang spesifik menggunakan ID
     const guild = client.guilds.cache.get(guildId); 
     
     if (!guild) {
@@ -54,9 +52,12 @@ async function startAutoAnimation(client) {
       return;
     }
 
-    await updateIcon(guild); // update pertama
-    interval = setInterval(() => updateIcon(guild), 30 * 1000); // tiap 30 detik
-    console.log("▶️ Auto animation icon dimulai...");
+    await updateIcon(guild); 
+    interval = setInterval(() => updateIcon(guild), 30 * 1000); 
+    
+    // Ini satu-satunya log yang akan muncul saat program dijalankan
+    console.log(`▶️ Auto animation icon dimulai (${icons.length} frame ditemukan).`);
+    
   } catch (err) {
     console.error("❌ Gagal start auto animation:", err.message);
     isRunning = false;
