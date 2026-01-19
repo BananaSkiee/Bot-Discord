@@ -1,68 +1,55 @@
-//modules/minecraftBot.js
+// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
-
-let botLobby = null;
-let botSurvival = null;
 
 module.exports = {
     init: (client) => {
         const host = 'dynamic-9.magmanode.com';
-        const proxyPort = 25952; // Port Proxy Velocity
+        const proxyPort = 25952;
         const passwordBot = 'BananaSkiee';
 
         const createMcBot = (username, target) => {
-            console.log(`[MC-SYSTEM] 🔄 Bot ${username} sedang menuju Proxy...`);
+            console.log(`[MC-SYSTEM] 🔄 Bot ${username} masuk via Bungeecord...`);
 
             const bot = mineflayer.createBot({
                 host: host,
                 port: proxyPort,
                 username: username,
-                version: '1.20.1', // Sesuaikan dengan versi Paper kamu
-                auth: 'offline',
-                keepAlive: true
+                version: '1.20.1', // Bungeecord lebih stabil pake versi spesifik
+                auth: 'offline'
             });
 
             bot.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ ${username} berhasil mendarat di Lobby!`);
-                
-                // Proses Login & Perpindahan Server
+                console.log(`[MC-SUCCESS] ✅ ${username} mendarat di Bungee!`);
                 setTimeout(() => {
-                    if (bot) {
-                        bot.chat(`/register ${passwordBot} ${passwordBot}`);
-                        bot.chat(`/login ${passwordBot}`);
-                        
-                        // Jika ini bot khusus survival, dia akan pindah server
-                        if (target === 'survival') {
-                            setTimeout(() => {
-                                bot.chat('/server survival');
-                                console.log(`[MC-INFO] ${username} sedang berpindah ke server Survival...`);
-                            }, 3000);
-                        }
+                    bot.chat(`/register ${passwordBot} ${passwordBot}`);
+                    bot.chat(`/login ${passwordBot}`);
+                    
+                    if (target === 'survival') {
+                        // Kasih jeda lebih lama (8 detik) biar Bungee gak bingung
+                        setTimeout(() => {
+                            bot.chat('/server survival');
+                            console.log(`[MC-INFO] ${username} pindah ke Survival.`);
+                        }, 8000);
                     }
                 }, 5000);
             });
 
-            // Anti-AFK agar tidak kena kick oleh sistem internal Minecraft
-            setInterval(() => {
-                if (bot && bot.entity) {
-                    bot.swingArm('right');
-                }
-            }, 20000);
-
             bot.on('end', (reason) => {
-                console.log(`[MC-RETRY] ${username} terputus: ${reason}. Login ulang dalam 30 detik...`);
+                console.log(`[MC-RETRY] ${username} exit: ${reason}. Reconnect 30s...`);
                 setTimeout(() => createMcBot(username, target), 30000);
             });
 
-            bot.on('error', (err) => console.log(`[MC-ERR] ${username} Error: ${err.message}`));
-
-            return bot;
+            bot.on('error', (err) => console.log(`[MC-ERR] ${username}: ${err.message}`));
         };
 
-        // Menjalankan 2 Bot: Satu stay di Lobby, satu pergi ke Survival
+        // START BOT BERTAHAP
         setTimeout(() => {
-            botLobby = createMcBot('LobbyBS', 'lobby');
-            botSurvival = createMcBot('SurvivalBS', 'survival');
+            createMcBot('LobbyBS', 'lobby');
+            
+            // Bot survival masuk 20 detik kemudian
+            setTimeout(() => {
+                createMcBot('SurvivalBS', 'survival');
+            }, 20000);
         }, 10000);
     }
 };
