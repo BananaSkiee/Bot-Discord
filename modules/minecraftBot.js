@@ -6,8 +6,8 @@ let botSurvival = null;
 
 module.exports = {
     init: (client) => {
-        const host = 'dynamic-8.magmanode.com';
-        const proxyPort = 25643; // Port Proxy Velocity
+        const host = 'dynamic-9.magmanode.com';
+        const proxyPort = 25952; // Port Proxy Velocity
         const passwordBot = 'BananaSkiee';
 
         const createMcBot = (username, target) => {
