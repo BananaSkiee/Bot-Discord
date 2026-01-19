@@ -3,7 +3,7 @@ const mineflayer = require('mineflayer');
 
 module.exports = {
     init: (client) => {
-        const host = 'dynamic-9.magmanode.com';
+        const host = 'legacybs.elixirno.de';
         const proxyPort = 25952;
         const passwordBot = 'BananaSkiee';
 
