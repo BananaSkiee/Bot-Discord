@@ -1,6 +1,6 @@
 // events/ready.js
 const { ChannelType } = require("discord.js");
-const stickyHandler = require("../sticky");
+// const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
 // Menghapus: const countValidator = require("../modules/countValidator");
 const autoSendMeme = require("../modules/autoMeme");
@@ -53,12 +53,12 @@ try {
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
     
-    /* 🌈 Rainbow role (interval aman 45 detik)
+    /🌈 Rainbow role (interval aman 45 detik)
     try {
       rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
     } catch (err) {
       console.error("❌ Rainbow role error:", err);
-    } */
+    }
 
     // 🏆 Activity System (Leaderboard)
 /* try {
@@ -83,12 +83,12 @@ try {
         console.error("❌ Intro Card gagal dipicu:", err.message);
     } */
     
-    // 🧷 Sticky handler
+/*    // 🧷 Sticky handler
     try {
       stickyHandler(client);
     } catch (err) {
       console.error("❌ Sticky handler error:", err);
-    }
+    } */
 
     // 👋 Auto greeting
     try {
@@ -118,7 +118,7 @@ try {
       console.error("❌ Auto berita error:", err);
     }
 
-    // 🟡 Auto status rotasi tiap 1 menit
+/*    // 🟡 Auto status rotasi tiap 1 menit
     const statuses = [
       "🌌 Menjaga BananaSkiee Community",
       "📖 Memandu member baru",
@@ -145,7 +145,7 @@ try {
       }
     };
     updateStatus();
-    setInterval(updateStatus, 60_000);
+    setInterval(updateStatus, 60_000); */
 
     // 🤣 Auto meme tiap 3 jam
     const memeChannelId = process.env.MEME_CHANNEL_ID;
