@@ -257,30 +257,6 @@ Pilih salah satu opsi di bawah ini: 👇`,
         }
     }
 
-    // ========== JOIN VC ==============
-    if (contentLower === "!join") {
-        const voiceChannel = message.member.voice.channel;
-        if (!voiceChannel) return message.reply("❌ Join voice channel dulu.");
-
-        try {
-            const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
-            const oldConnection = getVoiceConnection(message.guild.id);
-            if (oldConnection) oldConnection.destroy();
-
-            joinVoiceChannel({
-                channelId: voiceChannel.id,
-                guildId: voiceChannel.guild.id,
-                adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-                selfDeaf: false,
-            });
-
-            return message.reply(`✅ Bot join ke VC **${voiceChannel.name}**`);
-        } catch (err) {
-            console.error("❌ Gagal join VC:", err);
-            return message.reply("❌ Bot gagal join VC. Cek permission.");
-        }
-    }
-
     // ========== HAPUS TAG ============
     if (contentLower.startsWith("!hapustag")) {
         return handleHapusTag(message);
