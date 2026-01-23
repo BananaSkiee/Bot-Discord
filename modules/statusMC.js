@@ -1,8 +1,8 @@
 const util = require('minecraft-server-util');
 
 const CONFIG = {
-    host: 'serverbs.elixir.host',
-    port: 37152,
+    host: 'emerald.magmanode.com',
+    port: 33096,
     bedrockHost: 'empirebs.elixirno.de',
     channelId: '1457830508867223626',
     uptimeStart: 1767646200
