@@ -53,12 +53,12 @@ try {
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
     
-/*    //🌈 Rainbow role (interval aman 45 detik)
+    //🌈 Rainbow role (interval aman 45 detik)
     try {
       rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
     } catch (err) {
       console.error("❌ Rainbow role error:", err);
-    } */
+    }
 
     // 🏆 Activity System (Leaderboard)
 /* try {
