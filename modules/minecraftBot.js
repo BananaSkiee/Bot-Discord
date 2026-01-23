@@ -5,7 +5,7 @@ module.exports = {
     init: (client) => {
         // IP Proxy Utama (MagmaNode)
         const host = 'legacybs.funserver.top';
-        const proxyPort = 25566;
+        const proxyPort = 33096;
         const passwordBot = 'BananaSkiee';
 
         const createMcBot = (username, target) => {
