@@ -4,8 +4,8 @@ const mineflayer = require('mineflayer');
 module.exports = {
     init: (client) => {
         // IP Proxy Utama (MagmaNode)
-        const host = 'legacybs.elixirno.de';
-        const proxyPort = 25952;
+        const host = 'legacybs.funserver.top';
+        const proxyPort = 25566;
         const passwordBot = 'BananaSkiee';
 
         const createMcBot = (username, target) => {
