@@ -3,83 +3,59 @@ const mineflayer = require('mineflayer');
 
 module.exports = {
     init: (client) => {
-        // IP Proxy Utama (MagmaNode)
         const host = 'emerald.magmanode.com';
         const proxyPort = 33096;
         const passwordBot = 'BananaSkiee';
+        let reconnectTimeout = null;
 
-        const createMcBot = (username, target) => {
-            // Log awal saat mulai
-            console.log(`[MC-SYSTEM] 🔄 Menghubungkan ${username}...`);
+        const createMcBot = () => {
+            console.log(`[MC-SYSTEM] 🔄 Mencoba menghubungkan EmpireBS...`);
 
             const bot = mineflayer.createBot({
                 host: host,
                 port: proxyPort,
-                username: username,
+                username: 'EmpireBS',
                 version: '1.20.1',
                 auth: 'offline'
             });
 
-            let spamInterval = null;
+            // Handler agar tidak spam di console saat server offline
+            bot.on('error', (err) => {
+                if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
+                    // Diam saja, tidak perlu log ribuan baris
+                } else {
+                    console.log(`[MC-ERR] Terjadi kendala koneksi.`);
+                }
+            });
 
             bot.on('spawn', () => {
-                // Log sukses join saja
-                console.log(`[MC-SUCCESS] ✅ ${username} Berhasil Join!`);
+                console.log(`[MC-SUCCESS] ✅ EmpireBS berhasil masuk ke server!`);
                 
+                // Urutan eksekusi command agar tidak dianggap spamming oleh server
                 setTimeout(() => {
                     bot.chat(`/register ${passwordBot} ${passwordBot}`);
                     bot.chat(`/login ${passwordBot}`);
-
-                    // Logic pindah server untuk Survival & Creative
-                    if ((target === 'survival' || target === 'creative') && !spamInterval) {
-                        setTimeout(() => {
-                            bot.chat(`/server ${target}`);
-                        }, 15000); // Jeda 15 detik setelah login baru pindah
-
-                        // Spam setiap 5 menit (300.000 ms) - Tanpa log di console
-                        spamInterval = setInterval(() => {
-                            if (bot && bot.entity) {
-                                bot.chat(`/server ${target}`);
-                            }
-                        }, 300000); 
-                    }
+                    
+                    // Pindah-pindah server secara bertahap (Total delay 30 detik)
+                    setTimeout(() => bot.chat('/server lobby'), 5000);
+                    setTimeout(() => bot.chat('/server survival'), 15000);
+                    setTimeout(() => bot.chat('/server creative'), 25000);
                 }, 5000);
             });
 
-            bot.on('end', (reason) => {
-                console.log(`[MC-RETRY] 🔌 ${username} Terputus. Mencoba lagi dalam 1 menit...`);
-                if (spamInterval) {
-                    clearInterval(spamInterval);
-                    spamInterval = null;
-                }
-                setTimeout(() => createMcBot(username, target), 60000);
-            });
-
-            // Error tetap ditampilkan sedikit buat jaga-jaga kalau IP mati
-            bot.on('error', (err) => {
-                if (!err.message.includes('ECONNREFUSED')) {
-                    console.log(`[MC-ERR] ${username}: Error terdeteksi.`);
+            bot.on('end', () => {
+                // Jika terputus, tunggu 2 menit baru coba lagi (biar Koyeb gak panas/limit)
+                if (!reconnectTimeout) {
+                    console.log(`[MC-RETRY] 🔌 Terputus. Mencoba reconnect dalam 2 menit...`);
+                    reconnectTimeout = setTimeout(() => {
+                        reconnectTimeout = null;
+                        createMcBot();
+                    }, 120000); 
                 }
             });
         };
 
-        // Urutan Login Bot (Bertahap agar RAM Koyeb stabil)
-        
-        // 1. Bot Lobby (Muncul setelah 1 Menit)
-        setTimeout(() => {
-            createMcBot('LobbyBS', 'lobby');
-            
-            // 2. Bot Survival (Muncul 2 Menit setelah Lobby)
-            setTimeout(() => {
-                createMcBot('SurvivalBS', 'survival');
-                
-                // 3. Bot Creative (Muncul 2 Menit setelah Survival)
-                setTimeout(() => {
-                    createMcBot('CreativeBS', 'creative');
-                }, 120000);
-
-            }, 120000); 
-
-        }, 60000);
+        // Jalankan bot pertama kali setelah 30 detik startup
+        setTimeout(createMcBot, 30000);
     }
 };
