@@ -6,7 +6,7 @@ const express = require("express");
 const config = require("./config");
 
 // 🧠 Custom modules & data log
-const stickyHandler = require("./sticky");
+// const stickyHandler = require("./sticky");
 const autoGreeting = require("./modules/autoGreeting");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
@@ -89,7 +89,7 @@ client.on("messageCreate", async (message) => {
   if (!message.guild || !message.member) return;
 
   // 1. Jalankan Sticky Handler (Tetap Simpan ini)
-  stickyHandler(client, message);
+//  stickyHandler(client, message);
   
   const member = message.member;
   const content = message.content.toLowerCase();
