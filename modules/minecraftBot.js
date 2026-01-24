@@ -7,55 +7,72 @@ module.exports = {
         const proxyPort = 33096;
         const passwordBot = 'BananaSkiee';
         let reconnectTimeout = null;
+        let rotationInterval = null;
 
         const createMcBot = () => {
-            console.log(`[MC-SYSTEM] 🔄 Mencoba menghubungkan EmpireBS...`);
+            console.log(`[MC-SYSTEM] 🔄 EmpireBS sedang mencoba masuk...`);
 
             const bot = mineflayer.createBot({
                 host: host,
                 port: proxyPort,
                 username: 'EmpireBS',
-                version: '1.20.1',
-                auth: 'offline'
+                version: '1.20.1', // Sesuaikan dengan versi servermu
+                auth: 'offline',
+                checkTimeoutInterval: 60000 // Menambah batas waktu agar tidak gampang timeout
             });
 
-            // Handler agar tidak spam di console saat server offline
+            // Mencegah spam error di console saat server offline
             bot.on('error', (err) => {
-                if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT') {
-                    // Diam saja, tidak perlu log ribuan baris
-                } else {
-                    console.log(`[MC-ERR] Terjadi kendala koneksi.`);
+                if (err.code !== 'ECONNREFUSED') {
+                    // Hanya log jika bukan error koneksi biasa
                 }
             });
 
             bot.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ EmpireBS berhasil masuk ke server!`);
+                console.log(`[MC-SUCCESS] ✅ EmpireBS Online di Server!`);
                 
-                // Urutan eksekusi command agar tidak dianggap spamming oleh server
+                // 1. REGISTER & LOGIN (Hanya 1x di awal)
                 setTimeout(() => {
                     bot.chat(`/register ${passwordBot} ${passwordBot}`);
                     bot.chat(`/login ${passwordBot}`);
-                    
-                    // Pindah-pindah server secara bertahap (Total delay 30 detik)
-                    setTimeout(() => bot.chat('/server lobby'), 5000);
-                    setTimeout(() => bot.chat('/server survival'), 15000);
-                    setTimeout(() => bot.chat('/server creative'), 25000);
                 }, 5000);
+
+                // 2. ROTASI SERVER (Setiap 2 Menit pindah server)
+                // Kita pakai 2 menit supaya lebih aman dari kick BungeeGuard
+                const servers = ['lobby', 'survival', 'creative'];
+                let index = 0;
+
+                if (!rotationInterval) {
+                    rotationInterval = setInterval(() => {
+                        if (bot && bot.entity) {
+                            const targetServer = servers[index];
+                            console.log(`[MC-INFO] EmpireBS pindah ke: ${targetServer}`);
+                            bot.chat(`/server ${targetServer}`);
+                            
+                            index = (index + 1) % servers.length;
+                        }
+                    }, 120000); // 120.000 ms = 2 Menit
+                }
             });
 
-            bot.on('end', () => {
-                // Jika terputus, tunggu 2 menit baru coba lagi (biar Koyeb gak panas/limit)
+            bot.on('end', (reason) => {
+                // Hentikan rotasi jika bot DC
+                if (rotationInterval) {
+                    clearInterval(rotationInterval);
+                    rotationInterval = null;
+                }
+
+                // Reconnect otomatis tapi jangan nyepam (Jeda 1 menit)
                 if (!reconnectTimeout) {
-                    console.log(`[MC-RETRY] 🔌 Terputus. Mencoba reconnect dalam 2 menit...`);
+                    console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Reconnect dalam 1 menit...`);
                     reconnectTimeout = setTimeout(() => {
                         reconnectTimeout = null;
                         createMcBot();
-                    }, 120000); 
+                    }, 60000);
                 }
             });
         };
 
-        // Jalankan bot pertama kali setelah 30 detik startup
-        setTimeout(createMcBot, 30000);
+        createMcBot();
     }
 };
