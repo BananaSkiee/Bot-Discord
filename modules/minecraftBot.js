@@ -6,39 +6,40 @@ module.exports = {
         const host = 'emerald.magmanode.com';
         const proxyPort = 33096;
         const passwordBot = 'BananaSkiee';
-        let reconnectTimeout = null;
         let rotationInterval = null;
+        let isReconnecting = false;
 
         const createMcBot = () => {
-            console.log(`[MC-SYSTEM] 🔄 EmpireBS sedang mencoba masuk...`);
+            if (isReconnecting) return;
+            console.log(`[MC-SYSTEM] 🔄 EmpireBS sedang bersiap...`);
 
             const bot = mineflayer.createBot({
                 host: host,
                 port: proxyPort,
                 username: 'EmpireBS',
-                version: '1.20.1', // Sesuaikan dengan versi servermu
+                version: '1.20.1',
                 auth: 'offline',
-                checkTimeoutInterval: 60000 // Menambah batas waktu agar tidak gampang timeout
+                keepAlive: true, // Penting agar tidak gampang Time Out
+                checkTimeoutInterval: 90000 // Menunggu lebih lama sebelum menyerah
             });
 
-            // Mencegah spam error di console saat server offline
+            // Mencegah console penuh kalau server mati
             bot.on('error', (err) => {
-                if (err.code !== 'ECONNREFUSED') {
-                    // Hanya log jika bukan error koneksi biasa
-                }
+                // Diam tanpa spam log
             });
 
             bot.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ EmpireBS Online di Server!`);
+                console.log(`[MC-SUCCESS] ✅ EmpireBS Online!`);
                 
-                // 1. REGISTER & LOGIN (Hanya 1x di awal)
+                // Jeda 7 detik setelah masuk baru Login (Biar gak IllegalStateException)
                 setTimeout(() => {
-                    bot.chat(`/register ${passwordBot} ${passwordBot}`);
-                    bot.chat(`/login ${passwordBot}`);
-                }, 5000);
+                    if (bot && bot.entity) {
+                        bot.chat(`/register ${passwordBot} ${passwordBot}`);
+                        bot.chat(`/login ${passwordBot}`);
+                    }
+                }, 7000);
 
-                // 2. ROTASI SERVER (Setiap 2 Menit pindah server)
-                // Kita pakai 2 menit supaya lebih aman dari kick BungeeGuard
+                // Rotasi Server setiap 3 menit (Pilih 3 menit agar RAM Koyeb tetap dingin)
                 const servers = ['lobby', 'survival', 'creative'];
                 let index = 0;
 
@@ -46,27 +47,26 @@ module.exports = {
                     rotationInterval = setInterval(() => {
                         if (bot && bot.entity) {
                             const targetServer = servers[index];
-                            console.log(`[MC-INFO] EmpireBS pindah ke: ${targetServer}`);
+                            console.log(`[MC-INFO] Memindahkan bot ke: ${targetServer}`);
                             bot.chat(`/server ${targetServer}`);
-                            
                             index = (index + 1) % servers.length;
                         }
-                    }, 120000); // 120.000 ms = 2 Menit
+                    }, 180000); // 180.000ms = 3 Menit
                 }
             });
 
             bot.on('end', (reason) => {
-                // Hentikan rotasi jika bot DC
                 if (rotationInterval) {
                     clearInterval(rotationInterval);
                     rotationInterval = null;
                 }
 
-                // Reconnect otomatis tapi jangan nyepam (Jeda 1 menit)
-                if (!reconnectTimeout) {
-                    console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Reconnect dalam 1 menit...`);
-                    reconnectTimeout = setTimeout(() => {
-                        reconnectTimeout = null;
+                if (!isReconnecting) {
+                    isReconnecting = true;
+                    // Jeda 1 Menit baru masuk lagi (Mencegah Spam & Lag di Koyeb)
+                    console.log(`[MC-RETRY] 🔌 Terputus. Menunggu 1 menit...`);
+                    setTimeout(() => {
+                        isReconnecting = false;
                         createMcBot();
                     }, 60000);
                 }
