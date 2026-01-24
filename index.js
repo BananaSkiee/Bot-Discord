@@ -15,6 +15,7 @@ const srvName = require("./modules/srvName.js");
 const { startAutoAnimation } = require("./modules/iconAnim");
 const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
 const { handleIntroInteractions } = require('./modules/introCard');
+const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
 
 const client = new Client({
   intents: [
@@ -55,18 +56,28 @@ const server = app.listen(PORT, () => {
   console.log("🌐 Web server hidup di port " + PORT);
 });
 
-// 🔄 Self-ping system
-function startSelfPing() {
+// 🔄 Self-ping system (Log Status)
+async function startSelfPing() {
+  const LOG_CHANNEL_ID = "1352800131933802547";
   const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
   const PING_INTERVAL = 3 * 60 * 1000; 
   
-  console.log(`🔄 Starting self-ping system to: ${SELF_PING_URL}`);
-  
   setInterval(async () => {
     try {
-      await fetch(SELF_PING_URL);
+      const response = await fetch(SELF_PING_URL);
+      const channel = await client.channels.fetch(LOG_CHANNEL_ID);
+      
+      if (channel && response.ok) {
+        await channel.send({
+          embeds: [{
+            color: 0x2ecc71, // Hijau (Berhasil Ping)
+            description: "📡 **Berhasil Ping:** Sistem tetap terjaga.",
+            timestamp: new Date()
+          }]
+        });
+      }
     } catch (error) {
-      console.log('❌ Self-ping failed:', error.message);
+      console.log('❌ Ping gagal:', error.message);
     }
   }, PING_INTERVAL);
 }
@@ -132,6 +143,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     // Cek apakah yang berubah HANYA role
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
+    await handleVerificationUpdate(oldMember, newMember);
 
     if (oldRoles.size === newRoles.size) return; // Tidak ada perubahan jumlah role
 
@@ -180,6 +192,7 @@ client.on('inviteDelete', invite => {
 // 🚀 Log ketika user join (Event nyata)
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
+  await handleInitialRoles(member);
   
   let inviteUsed = null;
 
