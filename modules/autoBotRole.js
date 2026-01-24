@@ -1,67 +1,70 @@
-// File: modules/autoBotRole.js
+/**
+ * File: modules/autoBotRole.js
+ * Menangani Auto Role untuk Bot dan Member Baru (Non-Verify)
+ */
+
+const ROLE_BOT_ID = '1401061819195592785';
+const ROLE_NON_VERIFY_ID = '1444248589051367435';
+const ROLE_MEMBER_ID = '1352286235233620108';
 
 /**
- * Fungsi untuk memberikan role tertentu kepada semua BOT di server yang sudah ada.
- * Juga berfungsi sebagai handler untuk BOT yang baru bergabung.
+ * Fungsi utama untuk memberikan role saat member/bot masuk
  */
-async function handleBotRoles(member) {
-    const targetRoleId = '1401061819195592785';
-
-    // Pastikan ini adalah BOT
-    if (!member.user.bot) {
-        return;
-    }
-    
-    // Pastikan BOT belum memiliki role tersebut (hanya untuk penghematan resource)
-    if (member.roles.cache.has(targetRoleId)) {
-        // console.log(`[SKIP] BOT ${member.user.tag} sudah memiliki role ${targetRoleId}.`);
-        return;
-    }
-
-    const targetRole = member.guild.roles.cache.get(targetRoleId);
-
-    if (!targetRole) {
-        console.error(`Role dengan ID ${targetRoleId} tidak ditemukan di server ${member.guild.name}.`);
-        return;
-    }
-
+async function handleInitialRoles(member) {
     try {
-        await member.roles.add(targetRole);
-        console.log(`[SUKSES] Memberikan role ${targetRoleId} kepada BOT: ${member.user.tag} di server ${member.guild.name}.`);
+        if (member.user.bot) {
+            // JIKA BOT: Kasih role khusus Bot
+            if (!member.roles.cache.has(ROLE_BOT_ID)) {
+                await member.roles.add(ROLE_BOT_ID);
+                console.log(`[BOT] ${member.user.tag} diberikan role Bot.`);
+            }
+        } else {
+            // JIKA MEMBER: Kasih role Non-Verify
+            if (!member.roles.cache.has(ROLE_NON_VERIFY_ID)) {
+                await member.roles.add(ROLE_NON_VERIFY_ID);
+                console.log(`[MEMBER] ${member.user.tag} diberikan role Non-Verify.`);
+            }
+        }
     } catch (error) {
-        // Ini sering terjadi jika role bot Anda tidak lebih tinggi dari role yang ingin diberikan
-        console.error(`[GAGAL] Gagal memberikan role kepada BOT ${member.user.tag} di ${member.guild.name}. Pastikan hierarki role bot Anda lebih tinggi! Error:`, error.message);
+        console.error(`[ERROR] Gagal memberikan role awal:`, error.message);
     }
 }
 
 /**
- * Fungsi yang dijalankan saat bot READY untuk memberikan role kepada BOT yang sudah ada.
+ * Fungsi untuk menghapus Non-Verify jika sudah punya role Member (Verifikasi Berhasil)
+ */
+async function handleVerificationUpdate(oldMember, newMember) {
+    try {
+        const hasMemberRole = newMember.roles.cache.has(ROLE_MEMBER_ID);
+        const hasNonVerifyRole = newMember.roles.cache.has(ROLE_NON_VERIFY_ID);
+
+        // Jika dia baru dapet role Member, hapus Non-Verify-nya
+        if (hasMemberRole && hasNonVerifyRole) {
+            await newMember.roles.remove(ROLE_NON_VERIFY_ID);
+            console.log(`[VERIFY] ${newMember.user.tag} berhasil verifikasi. Role Non-Verify dihapus.`);
+        }
+    } catch (error) {
+        console.error(`[ERROR] Gagal update role verifikasi:`, error.message);
+    }
+}
+
+/**
+ * Scan saat bot baru nyala (hanya jika diperlukan)
  */
 async function setInitialBotRoles(client) {
-    console.log('--- Memulai Pengecekan dan Pemberian Role BOT (ID: 1401061819195592785) ---');
-    
-    // Iterasi melalui semua guild (server) tempat bot berada
-    for (const [guildId, guild] of client.guilds.cache) {
+    console.log('--- Menjalankan Sync Role Bot & Member ---');
+    for (const [id, guild] of client.guilds.cache) {
         try {
-            // Ambil semua anggota dari server
             const members = await guild.members.fetch();
-            
-            // Iterasi melalui semua anggota
-            for (const [memberId, member] of members) {
-                // Gunakan fungsi handleBotRoles untuk memproses setiap bot yang ditemukan
-                if (member.user.bot) {
-                    await handleBotRoles(member);
-                }
+            for (const [mId, member] of members) {
+                await handleInitialRoles(member);
             }
-        } catch (error) {
-            console.error(`Gagal memproses anggota di server ${guild.name} (ID: ${guildId}):`, error.message);
-        }
+        } catch (e) { console.error(`Gagal sync di ${guild.name}`); }
     }
-    console.log('--- Selesai Pengecekan dan Pemberian Role BOT ---');
 }
 
-
 module.exports = {
-    handleBotRoles,
+    handleInitialRoles,
+    handleVerificationUpdate,
     setInitialBotRoles
 };
