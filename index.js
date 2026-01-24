@@ -56,28 +56,16 @@ const server = app.listen(PORT, () => {
   console.log("🌐 Web server hidup di port " + PORT);
 });
 
-// 🔄 Self-ping system (Log Status)
-async function startSelfPing() {
-  const LOG_CHANNEL_ID = "1352800131933802547";
+// 🔄 Self-ping system (Tanpa Chat)
+function startSelfPing() {
   const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
-  const PING_INTERVAL = 3 * 60 * 1000; 
+  const PING_INTERVAL = 5 * 60 * 1000; // Cukup tiap 5 menit
   
   setInterval(async () => {
     try {
-      const response = await fetch(SELF_PING_URL);
-      const channel = await client.channels.fetch(LOG_CHANNEL_ID);
-      
-      if (channel && response.ok) {
-        await channel.send({
-          embeds: [{
-            color: 0x2ecc71, // Hijau (Berhasil Ping)
-            description: "📡 **Berhasil Ping:** Sistem tetap terjaga.",
-            timestamp: new Date()
-          }]
-        });
-      }
+      await fetch(SELF_PING_URL);
     } catch (error) {
-      console.log('❌ Ping gagal:', error.message);
+      console.log('❌ Ping internal gagal:', error.message);
     }
   }, PING_INTERVAL);
 }
@@ -246,11 +234,27 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 Received SIGTERM, shutting down gracefully');
+process.on('SIGTERM', async () => {
+  console.log('🛑 Received SIGTERM');
+  
+  try {
+    // Gunakan fetch supaya pasti dapet channel-nya walaupun cache lagi kosong
+    const logChannel = await client.channels.fetch("1352800131933802547");
+    if (logChannel) {
+      await logChannel.send({
+        embeds: [{
+          color: 0xe74c3c, 
+          description: "🛑 **Status:** Offline / Sedang Restart.",
+          timestamp: new Date()
+        }]
+      });
+    }
+  } catch (err) {
+    console.error("Gagal kirim log shutdown:", err.message);
+  }
+
   client.destroy();
   server.close(() => {
-    console.log('✅ Server closed');
     process.exit(0);
   });
 });
