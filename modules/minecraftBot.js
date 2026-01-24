@@ -1,4 +1,4 @@
-// modules/minecraftBot.js
+// modules/minecraftBot.js.
 const mineflayer = require('mineflayer');
 
 module.exports = {
