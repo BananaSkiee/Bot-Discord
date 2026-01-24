@@ -146,6 +146,18 @@ try {
     };
     updateStatus();
     setInterval(updateStatus, 60_000); */
+    
+const logChannel = client.channels.cache.get("1352800131933802547");
+if (logChannel) {
+  logChannel.send({
+    embeds: [{
+      color: 0x3498db, // Biru (Reload/Online)
+      title: "🔄 Sistem Reload",
+      description: "✅ **Status:** Online & Siap Melayani.",
+      timestamp: new Date()
+    }]
+  });
+}
 
     // 🤣 Auto meme tiap 3 jam
     const memeChannelId = process.env.MEME_CHANNEL_ID;
