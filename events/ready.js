@@ -161,31 +161,6 @@ try {
       console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
     }
 
-       // --- LOGIKA MASS SCAN (TAMBAHKAN INI) ---
-    console.log("🔍 Melakukan pengecekan role seluruh member...");
-    client.guilds.cache.forEach(async (guild) => {
-      try {
-        const members = await guild.members.fetch();
-        members.forEach(member => {
-          if (member.user.bot) return;
-
-          const hasMemberRole = member.roles.cache.has(ROLE_MEMBER);
-          const hasNonVerifyRole = member.roles.cache.has(ROLE_NON_VERIFY);
-
-          // Jika tidak punya role Member dan belum punya Non-Verify
-          if (!hasMemberRole && !hasNonVerifyRole) {
-            member.roles.add(ROLE_NON_VERIFY).catch(() => {});
-          }
-          // Jika sudah punya Member tapi Non-Verify masih nempel
-          if (hasMemberRole && hasNonVerifyRole) {
-            member.roles.remove(ROLE_NON_VERIFY).catch(() => {});
-          }
-        });
-      } catch (err) {
-        console.error(`Gagal scan di guild: ${guild.name}`);
-      }
-    });
-
             // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
     try {
         await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
