@@ -1,5 +1,4 @@
 //modules/rainbowRole.js
-Modules/rainbowRole.js
 require("dotenv").config();
 const { schedule } = require("./apiLimiter");
 
