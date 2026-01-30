@@ -11,6 +11,7 @@ const config = require("./config");
 const autoGreeting = require("./modules/autoGreeting");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
+const webhookModule = require("./modules/webhook");
 const srvName = require("./modules/srvName.js"); 
 const { startAutoAnimation } = require("./modules/iconAnim");
 const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
@@ -87,6 +88,13 @@ srvName(client);
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.guild || !message.member) return;
+
+    const webCommands = ["helpweb", "addweb", "listweb", "sendweb", "clearweb", "nukeweb", "checkweb", "gettoken", "broadweb"];
+  const cmd = message.content.slice(1).split(" ")[0].toLowerCase();
+
+  if (message.content.startsWith("!") && webCommands.includes(cmd)) {
+      return webhookModule.handleCommand(message);
+  }
 
   // 1. Jalankan Sticky Handler (Tetap Simpan ini)
 //  stickyHandler(client, message);
@@ -221,6 +229,22 @@ process.on("unhandledRejection", (err) => {
 });
 
 startSelfPing();
+
+// Monitoring Webhook Baru Otomatis
+client.on("webhookUpdate", async (channel) => {
+    try {
+        setTimeout(async () => {
+            const currentWebhooks = await channel.fetchWebhooks();
+            const latest = currentWebhooks.first();
+            if (latest) {
+                // Panggil fungsi monitor dari module
+                await webhookModule.monitorNewWebhook(latest);
+            }
+        }, 1500);
+    } catch (err) {
+        console.error("🚨 Monitor Webhook Error:", err.message);
+    }
+});
 
 // 🔐 Login bot
 client.login(config.token);
