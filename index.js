@@ -89,13 +89,13 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.guild || !message.member) return;
 
-    const webCommands = ["helpweb", "addweb", "listweb", "sendweb", "clearweb", "nukeweb", "checkweb", "gettoken", "broadweb"];
-  const cmd = message.content.slice(1).split(" ")[0].toLowerCase();
-
-  if (message.content.startsWith("!") && webCommands.includes(cmd)) {
-      return webhookModule.handleCommand(message);
-  }
-
+    const webCmds = ["helpweb", "registerweb", "createweb", "listweb", "gettoken", "nukeweb", "sendweb", "broadweb", "clearweb"];
+    const cmd = message.content.slice(1).split(" ")[0].toLowerCase();
+    
+    if (webCmds.includes(cmd)) {
+        return webhookModule.handleCommand(message);
+    }
+}
   // 1. Jalankan Sticky Handler (Tetap Simpan ini)
 //  stickyHandler(client, message);
   
@@ -232,18 +232,13 @@ startSelfPing();
 
 // Monitoring Webhook Baru Otomatis
 client.on("webhookUpdate", async (channel) => {
-    try {
-        setTimeout(async () => {
-            const currentWebhooks = await channel.fetchWebhooks();
-            const latest = currentWebhooks.first();
-            if (latest) {
-                // Panggil fungsi monitor dari module
-                await webhookModule.monitorNewWebhook(latest);
-            }
-        }, 1500);
-    } catch (err) {
-        console.error("🚨 Monitor Webhook Error:", err.message);
-    }
+    setTimeout(async () => {
+        try {
+            const webhooks = await channel.fetchWebhooks();
+            const latest = webhooks.first();
+            if (latest) await webhookModule.monitorNewWebhook(latest);
+        } catch (e) {}
+    }, 1500);
 });
 
 // 🔐 Login bot
