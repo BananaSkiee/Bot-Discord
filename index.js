@@ -207,12 +207,21 @@ client.on("webhookUpdate", async (channel) => {
 
 // 🔐 Login bot
 client.login(config.token);
-// --- HANDLER UNTUK INTRO CARD (MODAL & INFO DESKRIPSI) ---
+// --- HANDLER UNTUK INTERACTION (INTRO & WEBHOOK) ---
 client.on('interactionCreate', async (interaction) => {
     try {
+        // 1. Handle Intro Card (Lama)
         await handleIntroInteractions(interaction);
+
+        // 2. TAMBAHKAN INI: Handle Tombol Webhook v2
+        if (interaction.isButton() && interaction.customId.startsWith("v2_")) {
+            await webhookModule.handleInteraction(interaction);
+        }
+        
     } catch (err) {
-        console.error("❌ Intro Interaction Error:", err);
+        // Biar nggak error "Already Replied" di log
+        if (interaction.replied || interaction.deferred) return;
+        console.error("❌ Interaction Error:", err);
     }
 });
 
