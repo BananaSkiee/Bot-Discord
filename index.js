@@ -212,11 +212,6 @@ client.on('interactionCreate', async (interaction) => {
     try {
         // 1. Handle Intro Card (Lama)
         await handleIntroInteractions(interaction);
-
-        // 2. TAMBAHKAN INI: Handle Tombol Webhook v2
-        if (interaction.isButton() && interaction.customId.startsWith("v2_")) {
-            await webhookModule.handleInteraction(interaction);
-        }
         
     } catch (err) {
         // Biar nggak error "Already Replied" di log
