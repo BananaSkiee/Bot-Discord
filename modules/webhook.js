@@ -1,211 +1,140 @@
 // modules/webhook.js
-const { 
-  EmbedBuilder, 
-  PermissionFlagsBits, 
-  WebhookClient, 
-  ActionRowBuilder, 
-  ButtonBuilder, 
-  ButtonStyle, 
-  ComponentType 
-} = require("discord.js");
+const { WebhookClient, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require("discord.js");
 
 // --- KONFIGURASI PRIVATE ---
-const AUTHORIZED_USER = "1346964077309595658"; // Hanya ID ini yang bisa pakai command
-const LOG_CHANNEL_ID = "1352800131933802547";  // Channel Log Webhook
-const ADMIN_ROLE_ID = "1346964077309595658";   // Role yang di-tag jika ada penyusup
+const AUTHORIZED_USER = "1346964077309595658"; 
+const LOG_CHANNEL_ID = "1352800131933802547";  
 
 module.exports = {
   async handleCommand(message) {
-    // PROTEKSI: Cuma Lu (Owner) yang bisa akses
     if (message.author.id !== AUTHORIZED_USER) return;
 
     const args = message.content.slice(1).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // --- 1. COMMAND: !helpweb ---
+    // 1. HELP WEB (Layout v2)
     if (command === "helpweb") {
-      const helpEmbed = new EmbedBuilder()
-        .setTitle("🔱 Akira Webhook God-Mode v2")
-        .setColor(0x00FFFF)
-        .setThumbnail(message.client.user.displayAvatarURL())
-        .setDescription("Sistem kontrol penuh webhook server. **Owner Access Only.**")
-        .addFields(
-          { name: "🛠️ Management", value: "`!createweb [Nama] [AvatarURL] [ChannelID]`\n`!registerweb [URL] [Nama] [AvatarURL]`", inline: false },
-          { name: "🔍 Intelligence", value: "`!listweb [ChannelID]` (Dismiss Message)\n`!gettoken [URL]` (Dismiss Message)", inline: false },
-          { name: "📡 Delivery", value: "`!sendweb [URL] [Pesan]`\n`!broadweb [Pesan]`", inline: false },
-          { name: "☢️ Destructive", value: "`!clearweb [ChannelID]`\n`!nukeweb` - Hapus Total", inline: false }
-        )
-        .setFooter({ text: "BananaSkiee Community Protection", iconURL: message.guild.iconURL() });
-
-      return message.reply({ embeds: [helpEmbed] });
+      return message.reply({
+        components: [{
+          type: 1,
+          components: [{
+            type: 10,
+            content: "### 🔱 Akira Webhook God-Mode v2\n- `!listweb [ID]` : Intip semua webhook\n- `!createweb [Nama] [Avatar]` : Buat baru\n- `!registerweb [URL] [Nama]` : Edit webhook ada\n- `!gettoken [URL]` : Ambil ID & Token\n- `!sendweb [URL] [Pesan]` : Kirim via Hook\n- `!nukeweb` : Hapus Total Server\n\n> -# © BananaSkiee Protection System"
+          }]
+        }]
+      });
     }
 
-    // --- 2. COMMAND: !listweb [ChannelID] (DENGAN DISMISS MESSAGE) ---
+    // 2. LIST WEBHOOK
     if (command === "listweb") {
       const targetId = args[0] || message.channel.id;
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`view_list_${targetId}`)
-          .setLabel("Lihat Daftar Webhook (Private)")
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji("🔍")
+        new ButtonBuilder().setCustomId(`v2_view_${targetId}`).setLabel("Buka Database").setStyle(ButtonStyle.Success).setEmoji("🔎")
       );
-
-      const msg = await message.reply({
-        content: `Mempersiapkan data untuk channel <#${targetId}>...`,
-        components: [row]
+      return message.reply({ 
+        content: `### 📂 Accessing Database...\nTarget: <#${targetId}>`, 
+        components: [row] 
       });
-
-      const collector = msg.createMessageComponentCollector({ 
-        componentType: ComponentType.Button, 
-        time: 60000 
-      });
-
-      collector.on('collect', async (i) => {
-        if (i.user.id !== AUTHORIZED_USER) return i.reply({ content: "❌ Lu bukan Owner!", ephemeral: true });
-        
-        try {
-          const channel = await i.guild.channels.fetch(targetId);
-          const webhooks = await channel.fetchWebhooks();
-
-          if (webhooks.size === 0) return i.reply({ content: "❌ Tidak ada webhook di channel ini.", ephemeral: true });
-
-          const listEmbed = new EmbedBuilder()
-            .setTitle(`📋 List Webhook: #${channel.name}`)
-            .setColor(0x2B2D31)
-            .setDescription(webhooks.map(w => 
-              `**Nama:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** ||${w.token}||\n**URL:** [Copy Link](${w.url})\n───────────────`
-            ).join("\n"));
-
-          await i.reply({ embeds: [listEmbed], ephemeral: true });
-        } catch (e) {
-          await i.reply({ content: "❌ Gagal fetch data. ID Channel salah?", ephemeral: true });
-        }
-      });
-      return;
     }
 
-    // --- 3. COMMAND: !gettoken [URL] (DISMISS MESSAGE) ---
+    // 3. GET TOKEN (Dismiss Message v2)
     if (command === "gettoken") {
       const url = args[0];
-      if (!url) return message.reply("⚠️ Masukkan URL Webhook!");
-
-      try {
-        const wc = new WebhookClient({ url: url });
-        return message.reply({
-          content: `🔑 **Data Webhook Ditemukan:**\n**ID:** \`${wc.id}\`\n**Token:** ||${wc.token}||\n*Pesan ini hanya bisa dilihat oleh lu.*`,
-          ephemeral: true
-        });
-      } catch (e) {
-        return message.reply("❌ Link Webhook tidak valid.");
-      }
-    }
-
-    // --- 4. COMMAND: !createweb [Nama] [AvatarURL] [ChannelID] ---
-    if (command === "createweb") {
-      const name = args[0] || "Akira Webhook";
-      const avatar = args[1] || null;
-      const channelId = args[2] || message.channel.id;
-
-      try {
-        const channel = await message.guild.channels.fetch(channelId);
-        const webhook = await channel.createWebhook({
-          name: name,
-          avatar: avatar,
-          reason: `Created by Owner (${message.author.tag})`
-        });
-
-        const embed = new EmbedBuilder()
-          .setTitle("✨ Webhook Berhasil Dibuat")
-          .setColor(0x00FF00)
-          .addFields(
-            { name: "Nama", value: name, inline: true },
-            { name: "Channel", value: `<#${channel.id}>`, inline: true },
-            { name: "URL (Private)", value: `||${webhook.url}||`, inline: false }
-          );
-
-        return message.reply({ embeds: [embed] });
-      } catch (e) { return message.reply(`❌ Gagal: ${e.message}`); }
-    }
-
-    // --- 5. COMMAND: !registerweb [URL] [NamaBaru] [AvatarBaru] ---
-    if (command === "registerweb") {
-      const [url, newName, newAvatar] = args;
-      if (!url) return message.reply("⚠️ Masukkan URL Webhook!");
-
+      if (!url) return message.reply("⚠️ Masukkan URL!");
       try {
         const wc = new WebhookClient({ url });
-        await wc.edit({
-          name: newName || undefined,
-          avatar: newAvatar || undefined
+        return message.reply({
+          flags: 64,
+          components: [{
+            type: 1,
+            components: [{
+              type: 10,
+              content: `### 🔑 Credential Found\n- **ID:** \`${wc.id}\`\n- **Token:** \`${wc.token}\`\n\n-# Peringatan: Data ini sangat sensitif.`
+            }]
+          }]
         });
-        return message.reply("✅ Webhook berhasil di-update dan di-register ulang.");
-      } catch (e) { return message.reply("❌ Gagal mengedit webhook."); }
+      } catch (e) { return message.reply("❌ URL tidak valid."); }
     }
 
-    // --- 6. COMMAND: !nukeweb (Hapus Semua) ---
+    // 4. CREATE WEBHOOK
+    if (command === "createweb") {
+      const name = args[0] || "Akira-System";
+      const avatar = args[1] || null;
+      try {
+        const wb = await message.channel.createWebhook({ name, avatar });
+        return message.reply({ 
+          flags: 64, 
+          content: `### ✅ Webhook Created\n**URL:** \`${wb.url}\`` 
+        });
+      } catch (e) { return message.reply("❌ Gagal membuat webhook."); }
+    }
+
+    // 5. REGISTER/EDIT WEBHOOK
+    if (command === "registerweb") {
+      const [url, newName] = args;
+      if (!url) return message.reply("⚠️ Format: `!registerweb [URL] [NamaBaru]`");
+      try {
+        const wc = new WebhookClient({ url });
+        await wc.edit({ name: newName });
+        return message.reply("✅ Webhook berhasil di-update.");
+      } catch (e) { return message.reply("❌ Gagal mengedit."); }
+    }
+
+    // 6. SEND WEBHOOK
+    if (command === "sendweb") {
+      const url = args[0];
+      const text = args.slice(1).join(" ");
+      if (!url || !text) return message.reply("⚠️ Format: `!sendweb [URL] [Pesan]`");
+      try {
+        const wc = new WebhookClient({ url });
+        await wc.send({ content: text });
+        return message.reply("✅ Pesan terkirim.");
+      } catch (e) { return message.reply("❌ Gagal kirim."); }
+    }
+
+    // 7. NUKE WEBHOOK
     if (command === "nukeweb") {
-      const confirmRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId("nuke_yes").setLabel("YA, HAPUS SEMUA").setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId("nuke_no").setLabel("BATAL").setStyle(ButtonStyle.Secondary)
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("v2_nuke_confirm").setLabel("YA, HAPUS SEMUA").setStyle(ButtonStyle.Danger)
       );
-
-      const msg = await message.reply({
-        content: "☢️ **PERINGATAN KERAS!** Lu mau hapus SEMUA webhook di server ini?",
-        components: [confirmRow]
-      });
-
-      const coll = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 15000 });
-      coll.on('collect', async (i) => {
-        if (i.user.id !== AUTHORIZED_USER) return;
-        if (i.customId === "nuke_yes") {
-          const all = await message.guild.fetchWebhooks();
-          for (const w of all.values()) await w.delete();
-          await i.update({ content: `☢️ **${all.size}** Webhook telah dimusnahkan.`, components: [] });
-        } else {
-          await i.update({ content: "❌ Nuke dibatalkan.", components: [] });
-        }
+      return message.reply({ 
+        content: "### ☢️ Peringatan Nuke\nKlik tombol di bawah untuk menghapus **SEMUA** webhook di server ini.", 
+        components: [row] 
       });
     }
   },
 
-  // --- FITUR AUTO MONITORING ---
-  async monitorNewWebhook(webhook) {
-    const logChannel = webhook.guild.channels.cache.get(LOG_CHANNEL_ID);
-    if (!logChannel) return;
+  // HANDLER INTERAKSI (Tombol & Dismiss)
+  async handleInteraction(interaction) {
+    if (!interaction.isButton() || interaction.user.id !== AUTHORIZED_USER) return;
 
-    const alertEmbed = new EmbedBuilder()
-      .setTitle("🚨 WEBHOOK ILEGAL TERDETEKSI!")
-      .setColor(0xFF0000)
-      .setDescription(`Dibuat di channel <#${webhook.channelId}>`)
-      .addFields(
-        { name: "Nama Webhook", value: `\`${webhook.name}\``, inline: true },
-        { name: "ID", value: `\`${webhook.id}\``, inline: true }
-      )
-      .setTimestamp();
+    // View List Handler
+    if (interaction.customId.startsWith("v2_view_")) {
+      const targetId = interaction.customId.replace("v2_view_", "");
+      try {
+        const channel = await interaction.guild.channels.fetch(targetId);
+        const webhooks = await channel.fetchWebhooks();
+        const data = webhooks.map(w => `- **${w.name}**\n  URL: \`${w.url}\``).join("\n\n") || "Tidak ada webhook.";
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`deny_${webhook.id}`).setLabel("HAPUS").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(`view_${webhook.id}`).setLabel("LIHAT TOKEN").setStyle(ButtonStyle.Secondary)
-    );
+        return interaction.reply({
+          flags: 64,
+          components: [{
+            type: 1,
+            components: [
+              { type: 10, content: `### 📋 List Webhook (#${channel.name})\n${data}` },
+              { type: 14 },
+              { type: 10, content: "-# © Database System by BananaSkiee" }
+            ]
+          }]
+        });
+      } catch (e) { return interaction.reply({ content: "❌ Error fetch data.", flags: 64 }); }
+    }
 
-    const msg = await logChannel.send({
-      content: `<@&${ADMIN_ROLE_ID}>`,
-      embeds: [alertEmbed],
-      components: [row]
-    });
-
-    const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button });
-
-    collector.on("collect", async (i) => {
-      if (i.user.id !== AUTHORIZED_USER) return i.reply({ content: "Cuma OWNER yang boleh eksekusi!", ephemeral: true });
-
-      if (i.customId === `deny_${webhook.id}`) {
-        await webhook.delete().catch(() => {});
-        await i.update({ content: "🗑️ Webhook telah dihapus.", embeds: [], components: [] });
-      } else if (i.customId === `view_${webhook.id}`) {
-        await i.reply({ content: `🔑 **Token:** \`${webhook.token}\``, ephemeral: true });
-      }
-    });
+    // Nuke Handler
+    if (interaction.customId === "v2_nuke_confirm") {
+      const all = await interaction.guild.fetchWebhooks();
+      for (const w of all.values()) await w.delete().catch(() => {});
+      return interaction.update({ content: `✅ **${all.size} Webhook** dimusnahkan.`, components: [] });
+    }
   }
 };
