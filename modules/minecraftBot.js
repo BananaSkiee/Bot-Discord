@@ -1,78 +1,64 @@
-// modules/minecraftBot.js.
+//modules/minecraftBot.js
 const mineflayer = require('mineflayer');
+
+let botInstance = null;
 
 module.exports = {
     init: (client) => {
-        const host = 'emerald.magmanode.com';
-        const proxyPort = 33096;
+        // Nickname baru: EmpireBS
+        const botName = 'EmpireBS'; 
         const passwordBot = 'BananaSkiee';
-        let rotationInterval = null;
-        let isReconnecting = false;
 
-        const createMcBot = () => {
-            if (isReconnecting) return;
-            console.log(`[MC-SYSTEM] 🔄 EmpireBS sedang bersiap...`);
+        const startBot = () => {
+            if (botInstance) return;
 
-            const bot = mineflayer.createBot({
-                host: host,
-                port: proxyPort,
-                username: 'EmpireBS',
+            console.log(`[MC-SYSTEM] 🔄 Mencoba masuk sebagai ${botName} (v1.20.1)...`);
+
+            botInstance = mineflayer.createBot({
+                host: 'emerald.magmanode.com',
+                port: 33096,
+                username: botName,
                 version: '1.20.1',
                 auth: 'offline',
-                keepAlive: true, // Penting agar tidak gampang Time Out
-                checkTimeoutInterval: 90000 // Menunggu lebih lama sebelum menyerah
+                keepAlive: true
             });
 
-            // Mencegah console penuh kalau server mati
-            bot.on('error', (err) => {
-                // Diam tanpa spam log
-            });
-
-            bot.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ EmpireBS Online!`);
+            botInstance.on('spawn', () => {
+                console.log(`[MC-SUCCESS] ✅ ${botName} BERHASIL MASUK KE SERVER!`);
                 
-                // Jeda 7 detik setelah masuk baru Login (Biar gak IllegalStateException)
+                // Jeda 5 detik agar plugin login siap
                 setTimeout(() => {
-                    if (bot && bot.entity) {
-                        bot.chat(`/register ${passwordBot} ${passwordBot}`);
-                        bot.chat(`/login ${passwordBot}`);
+                    if (botInstance) {
+                        // Karena nick baru, otomatis daftar (register)
+                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
+                        botInstance.chat(`/login ${passwordBot}`);
+                        console.log(`[MC-INFO] Perintah Register/Login dikirim untuk ${botName}`);
                     }
-                }, 7000);
+                }, 5000);
 
-                // Rotasi Server setiap 3 menit (Pilih 3 menit agar RAM Koyeb tetap dingin)
-                const servers = ['lobby', 'survival', 'creative'];
-                let index = 0;
+                // Anti-AFK
+                const afkLoop = setInterval(() => {
+                    if (botInstance && botInstance.entity) {
+                        botInstance.swingArm('right');
+                        botInstance.look(botInstance.entity.yaw + 0.1, 0);
+                    }
+                }, 20000);
 
-                if (!rotationInterval) {
-                    rotationInterval = setInterval(() => {
-                        if (bot && bot.entity) {
-                            const targetServer = servers[index];
-                            console.log(`[MC-INFO] Memindahkan bot ke: ${targetServer}`);
-                            bot.chat(`/server ${targetServer}`);
-                            index = (index + 1) % servers.length;
-                        }
-                    }, 180000); // 180.000ms = 3 Menit
-                }
+                botInstance.once('end', () => clearInterval(afkLoop));
             });
 
-            bot.on('end', (reason) => {
-                if (rotationInterval) {
-                    clearInterval(rotationInterval);
-                    rotationInterval = null;
-                }
+            botInstance.on('error', (err) => {
+                console.log(`[MC-ERR] ⚠️ Terjadi masalah: ${err.message}`);
+            });
 
-                if (!isReconnecting) {
-                    isReconnecting = true;
-                    // Jeda 1 Menit baru masuk lagi (Mencegah Spam & Lag di Koyeb)
-                    console.log(`[MC-RETRY] 🔌 Terputus. Menunggu 1 menit...`);
-                    setTimeout(() => {
-                        isReconnecting = false;
-                        createMcBot();
-                    }, 60000);
-                }
+            botInstance.on('end', (reason) => {
+                console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Menghubungkan ulang dlm 30 detik...`);
+                botInstance = null;
+                setTimeout(startBot, 30000);
             });
         };
 
-        createMcBot();
+        // Mulai bot 10 detik setelah aplikasi nyala
+        setTimeout(startBot, 10000);
     }
 };
