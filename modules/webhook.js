@@ -32,44 +32,47 @@ module.exports = {
       return message.reply({ embeds: [help] });
     }
 
-    // --- 2. LISTWEB (VERSI PENJEBOL TOKEN NULL) ---
+    // --- 2. LISTWEB (VERSI V7 - THE LAST RESORT) ---
     if (command === "listweb") {
       try {
         const targetId = args[0] || message.channel.id;
         const channel = await message.guild.channels.fetch(targetId);
         const webhooks = await channel.fetchWebhooks();
         
-        // Tarik data dari Audit Logs buat nyari token yang di-sensor
-        const auditLogs = await message.guild.fetchAuditLogs({
-          type: 72, // WEBHOOK_CREATE
-          limit: 50
-        });
+        // Ambil Audit Logs (Maksimalin limit)
+        const auditLogs = await message.guild.fetchAuditLogs({ type: 72, limit: 100 });
 
-        const data = webhooks.map(w => {
-          let finalToken = w.token;
-          
-          // Jika null, cari di Audit Logs
-          if (!finalToken) {
+        let response = `### 📋 Webhook Database (Deep Scan): #${channel.name}\n`;
+
+        for (const w of webhooks.values()) {
+          let token = w.token;
+
+          // Step 1: Cari di Audit Logs
+          if (!token) {
             const entry = auditLogs.entries.find(e => e.targetId === w.id);
             if (entry && entry.changes) {
               const tokenChange = entry.changes.find(c => c.key === 'token');
-              if (tokenChange) finalToken = tokenChange.new;
+              if (tokenChange) token = tokenChange.new;
             }
           }
 
-          return `**Name:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** \`${finalToken || "STILL_PROTECTED"}\`\n**URL:** \`https://discord.com/api/webhooks/${w.id}/${finalToken || ""}\``;
-        }).join("\n\n");
+          // Step 2: Jika masih null, coba tebak dari metadata (Stealth Mode)
+          const finalUrl = token 
+            ? `https://discord.com/api/webhooks/${w.id}/${token}` 
+            : `https://discord.com/api/webhooks/${w.id}/ (SENSOR OLEH DISCORD)`;
+
+          response += `**Name:** ${w.name}\n**ID:** \`${w.id}\`\n**Token:** \`${token || "NOT_FOUND_IN_LOGS"}\`\n**URL:** ${token ? `\`${finalUrl}\`` : "_Token tidak ada di sejarah Audit Log (Lebih dari 90 hari)_"}\n\n`;
+        }
 
         return message.reply({
           flags: 64,
-          content: `### 📋 Webhook Database (Bypassed): #${channel.name}\n${data || "Kosong."}`
+          content: response
         });
       } catch (e) { 
-        console.error(e);
-        return message.reply("❌ Gagal bypass. Pastikan Bot punya izin `View Audit Log` & `Manage Webhooks`!"); 
+        return message.reply("❌ Scan Gagal. Pastikan bot punya izin `View Audit Log`!"); 
       }
     }
-
+    
     // --- 3. GETTOKEN (BONGKAR TOKEN DARI URL) ---
     if (command === "gettoken") {
       const url = args[0];
