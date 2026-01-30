@@ -83,56 +83,20 @@ fs.readdirSync("./events").forEach((file) => {
 
 srvName(client);
 
-
-// 📌 Sticky Message Handler & Custom Commands
+// 📌 Message Handler
 client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  if (!message.guild || !message.member) return;
+  if (message.author.bot || !message.guild) return;
 
-    const webCmds = ["helpweb", "registerweb", "createweb", "listweb", "gettoken", "nukeweb", "sendweb", "broadweb", "clearweb"];
+  const webCmds = ["helpweb", "registerweb", "createweb", "listweb", "gettoken", "nukeweb", "sendweb", "broadweb", "clearweb"];
+  
+  if (message.content.startsWith("!")) {
     const cmd = message.content.slice(1).split(" ")[0].toLowerCase();
     
     if (webCmds.includes(cmd)) {
         return webhookModule.handleCommand(message);
     }
-}
-  // 1. Jalankan Sticky Handler (Tetap Simpan ini)
-//  stickyHandler(client, message);
-  
-  const member = message.member;
-  const content = message.content.toLowerCase();
-  
-  // 2. Log First Message (BAGIAN INI SUDAH DIHAPUS SUPAYA GAK CRASH)
-
-  // 3. COMMAND SIMULASI LOG: !1, !2, !3 (Tetap Simpan ini kalau lo masih butuh ngetes log)
-  if (content === "!1" || content === "!2" || content === "!3") {
-      const isOwnerOrAdmin = member?.permissions.has("ADMINISTRATOR") || member?.guild.ownerId === member.id;
-      
-      if (!isOwnerOrAdmin) {
-          return message.reply({ content: "❌ Perintah simulasi ini hanya bisa digunakan oleh Administrator/Owner.", ephemeral: true });
-      }
-      
-      let logTypeText;
-      if (content === '!1') { logTypeText = 'Simulasi: Member Bergabung'; }
-      else if (content === '!2') { logTypeText = 'Simulasi: Member Keluar'; }
-      else if (content === '!3') { logTypeText = 'Simulasi: Member Masuk Kembali'; }
-
-      try {
-          const confirmationEmbed = await createLogEntryEmbed(member, 'CMD_SIM', { command: content });
-          await logMemberAction(member, 'CMD_SIM', { command: content }); 
-
-          await message.channel.send({ 
-              content: `**[KONFIRMASI]** ${member.user.tag} memicu simulasi: ${logTypeText}`,
-              embeds: [confirmationEmbed] 
-          });
-      } catch (err) {
-          console.error("❌ Log Forum Error:", err.message);
-      }
-      
-      if (message.deletable) await message.delete().catch(() => {});
-      return;
-  }
-});
+  } // Tutup blok IF Startswith
+}); // Tutup event MessageCreate
 
 // 🔄 LOG: Perubahan Role (Penting!)
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
