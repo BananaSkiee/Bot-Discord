@@ -2,17 +2,17 @@
 const mineflayer = require('mineflayer');
 
 let botInstance = null;
+let reconnectTimeout = null;
 
 module.exports = {
     init: (client) => {
-        // Nickname baru: EmpireBS
         const botName = 'EmpireBS'; 
         const passwordBot = 'BananaSkiee';
 
         const startBot = () => {
             if (botInstance) return;
 
-            console.log(`[MC-SYSTEM] 🔄 Mencoba masuk sebagai ${botName} (v1.20.1)...`);
+            console.log(`[MC-SYSTEM] 🔄 Menghubungkan ke ${botName}...`);
 
             botInstance = mineflayer.createBot({
                 host: 'emerald.magmanode.com',
@@ -20,45 +20,73 @@ module.exports = {
                 username: botName,
                 version: '1.20.1',
                 auth: 'offline',
-                keepAlive: true
+                keepAlive: true,
+                hideErrors: true // Mengurangi spam error mentah di konsol
             });
 
-            botInstance.on('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ ${botName} BERHASIL MASUK KE SERVER!`);
+            // Logika pindah server yang aman
+            const navigateTo = (target) => {
+                if (botInstance && botInstance.entity) {
+                    botInstance.chat(`/server ${target}`);
+                    console.log(`[MC-MOVE] ✈️  Berpindah ke server: ${target}`);
+                }
+            };
+
+            botInstance.once('spawn', () => {
+                console.log(`[MC-SUCCESS] ✅ Bot aktif di Proxy/Lobby.`);
                 
-                // Jeda 5 detik agar plugin login siap
+                // Login Sequence - Dibuat santai agar tidak terbaca spam oleh AuthMe
                 setTimeout(() => {
-                    if (botInstance) {
-                        // Karena nick baru, otomatis daftar (register)
-                        botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
-                        botInstance.chat(`/login ${passwordBot}`);
-                        console.log(`[MC-INFO] Perintah Register/Login dikirim untuk ${botName}`);
-                    }
+                    if (!botInstance) return;
+                    
+                    // Coba login (AuthMe otomatis handle jika belum register)
+                    botInstance.chat(`/login ${passwordBot}`);
+                    botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
+                    
+                    // Jeda 8 detik setelah login baru pindah ke survival
+                    // Memberikan waktu server untuk memproses session login
+                    setTimeout(() => navigateTo('survival'), 8000);
                 }, 5000);
 
-                // Anti-AFK
+                // Anti-AFK yang sangat ringan (setiap 45 detik)
+                // Cukup untuk menahan kick tapi tidak membebani hosting
                 const afkLoop = setInterval(() => {
                     if (botInstance && botInstance.entity) {
                         botInstance.swingArm('right');
-                        botInstance.look(botInstance.entity.yaw + 0.1, 0);
                     }
-                }, 20000);
+                }, 45000);
 
                 botInstance.once('end', () => clearInterval(afkLoop));
             });
 
+            // Handler Error agar tidak spam
             botInstance.on('error', (err) => {
-                console.log(`[MC-ERR] ⚠️ Terjadi masalah: ${err.message}`);
+                if (err.code === 'ECONNREFUSED') {
+                    // Hanya muncul sekali, tidak spam tiap detik
+                } else {
+                    console.log(`[MC-WARN] Masalah koneksi terdeteksi.`);
+                }
             });
 
             botInstance.on('end', (reason) => {
-                console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Menghubungkan ulang dlm 30 detik...`);
+                console.log(`[MC-RETRY] 🔌 Terputus (${reason}). Mencoba kembali dalam 60 detik...`);
+                
+                // Bersihkan instance lama
+                botInstance.removeAllListeners();
                 botInstance = null;
-                setTimeout(startBot, 30000);
+
+                // Reconnect lebih lama (60 detik) agar hosting tidak panas/kena rate limit
+                if (reconnectTimeout) clearTimeout(reconnectTimeout);
+                reconnectTimeout = setTimeout(startBot, 60000);
+            });
+
+            botInstance.on('kicked', (reason) => {
+                const cleanReason = JSON.parse(reason).text || reason;
+                console.log(`[MC-KICK] Keluar server: ${cleanReason}`);
             });
         };
 
-        // Mulai bot 10 detik setelah aplikasi nyala
-        setTimeout(startBot, 10000);
+        // Mulai pertama kali 15 detik setelah aplikasi nyala
+        setTimeout(startBot, 15000);
     }
 };
