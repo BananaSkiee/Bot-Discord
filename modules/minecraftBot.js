@@ -6,7 +6,7 @@ let reconnectTimeout = null;
 
 module.exports = {
     init: (client) => {
-        const botName = 'PersonaBS'; // Nama bot sementara diubah dari EmpireBS menjadi PersonaBS
+        const botName = 'PersonaBS';
         const passwordBot = 'BananaSkiee';
 
         const startBot = () => {
@@ -18,50 +18,52 @@ module.exports = {
                 host: 'emerald.magmanode.com',
                 port: 33096,
                 username: botName,
-                // version: '1.20.1',  // Dihapus - biarkan auto-negotiate
                 auth: 'offline',
                 keepAlive: true,
-                hideErrors: true // Mengurangi spam error mentah di konsol
+                hideErrors: true,
+                // Tambah timeout lebih panjang
+                checkTimeoutInterval: 60000, // 60 detik (default 30 detik)
+                // Kurangi packet loss
+                maxRetries: 10
             });
 
-            // Logika pindah server yang aman
             const navigateTo = (target) => {
                 if (botInstance && botInstance.entity) {
                     botInstance.chat(`/server ${target}`);
-                    console.log(`[MC-MOVE] ✈️  Berpindah ke server: ${target}`);
+                    console.log(`[MC-MOVE] ✈️  Berpindah ke server: ${target} dalam 10 detik...`);
                 }
             };
 
             botInstance.once('spawn', () => {
                 console.log(`[MC-SUCCESS] ✅ Bot aktif di Proxy/Lobby.`);
                 
-                // JANGAN LANGSUNG PINDAH KE SURVIVAL!
-                // Tunggu di lobby dulu 15 detik
+                // JEDA LEBIH PANJANG SEBELUM PINDAH KE SURVIVAL
+                // 30 detik di lobby dulu
                 setTimeout(() => {
                     if (!botInstance) return;
                     
-                    // Kirim perintah kosong untuk test koneksi
-                    botInstance.chat('/');
-                    console.log('[MC-TEST] 📤 Mengirim test command...');
+                    console.log(`[MC-WAIT] ⏱️ Menunggu server survival siap...`);
                     
-                    // Tunggu 5 detik lagi sebelum pindah server
+                    // Test koneksi dengan command ringan
+                    botInstance.chat('/ping');
+                    
+                    // Tunggu 10 detik lagi
                     setTimeout(() => {
                         if (!botInstance) return;
-                        // Baru pindah ke survival
                         navigateTo('survival');
-                    }, 5000);
-                }, 15000);
+                    }, 10000);
+                    
+                }, 30000); // 30 detik di lobby
                 
-                // Login ke AuthMe (jika ada) - dengan jeda 5 detik setelah spawn
+                // Login ke AuthMe
                 setTimeout(() => {
                     if (!botInstance) return;
-                    console.log('[MC-LOGIN] 🔐 Mencoba login ke server...');
+                    console.log('[MC-LOGIN] 🔐 Mencoba login...');
                     botInstance.chat(`/login ${passwordBot}`);
                     botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
                 }, 5000);
 
-                // Anti-AFK yang sangat ringan (setiap 45 detik)
-                // Cukup untuk menahan kick tapi tidak membebani hosting
+                // Anti-AFK
                 const afkLoop = setInterval(() => {
                     if (botInstance && botInstance.entity) {
                         botInstance.swingArm('right');
@@ -71,58 +73,58 @@ module.exports = {
                 botInstance.once('end', () => clearInterval(afkLoop));
             });
 
-            // Handler Error agar tidak spam
+            // Handler Error yang Lebih Informatif
             botInstance.on('error', (err) => {
                 if (err.code === 'ECONNREFUSED') {
-                    // Hanya muncul sekali, tidak spam tiap detik
-                    console.log(`[MC-ERROR] 🔌 Koneksi ditolak: ${err.code}`);
+                    console.log(`[MC-ERROR] 🔌 Koneksi ditolak. Pastikan BungeeCord online.`);
+                } else if (err.code === 'ETIMEDOUT' || err.message.includes('timeout')) {
+                    console.log(`[MC-ERROR] ⏱️ Timeout - Server terlalu lambat merespons.`);
                 } else {
-                    console.log(`[MC-WARN] ⚠️ Masalah koneksi terdeteksi: ${err.code || 'unknown'}`);
+                    console.log(`[MC-WARN] ⚠️ Error: ${err.message || err.code}`);
                 }
             });
 
-            // Handler Kicked yang dimodifikasi sesuai permintaan
+            // Handler Kicked
             botInstance.on('kicked', (reason) => {
                 let cleanReason = reason;
                 try {
                     cleanReason = JSON.parse(reason).text || reason;
-                } catch (e) {
-                    // use original
-                }
+                } catch (e) {}
                 
                 console.log(`[MC-KICK] Keluar server: ${cleanReason}`);
                 
-                // Jika error IP forwarding, coba dengan delay lebih panjang
-                if (cleanReason.includes('Unexpected disconnect') || cleanReason.includes('IP forwarding')) {
-                    console.log('[MC-FIX] 🔧 Mencoba strategi reconnect khusus...');
-                    console.log('[MC-FIX] ⏱️ Akan reconnect dengan delay lebih panjang dan nama bot baru');
-                    // Bersihkan cache local dengan mengakhiri koneksi
+                // Jika ReadTimeout, tambah delay reconnect
+                if (cleanReason.includes('ReadTimeoutException')) {
+                    console.log('[MC-FIX] 🔧 Server terlalu lambat. Akan reconnect dengan delay lebih panjang (120 detik)...');
                     if (botInstance) {
-                        botInstance.end('Reconnecting with fix');
+                        botInstance.end('Timeout - server lambat');
                     }
+                    // Override reconnect delay
+                    setTimeout(() => {
+                        console.log('[MC-FIX] Mencoba reconnect setelah delay panjang...');
+                        startBot();
+                    }, 120000); // 2 menit
+                    return; // Jangan lanjut ke handler end
                 }
                 
-                // Bersihkan instance
                 botInstance.removeAllListeners();
                 botInstance = null;
             });
 
             botInstance.on('end', (reason) => {
-                console.log(`[MC-RETRY] 🔌 Terputus (${reason || 'socketClosed'}). Mencoba kembali dalam 60 detik...`);
+                console.log(`[MC-RETRY] 🔌 Terputus. Mencoba kembali dalam 60 detik...`);
                 
-                // Bersihkan instance lama
                 if (botInstance) {
                     botInstance.removeAllListeners();
                     botInstance = null;
                 }
 
-                // Reconnect lebih lama (60 detik) agar hosting tidak panas/kena rate limit
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
                 reconnectTimeout = setTimeout(startBot, 60000);
             });
         };
 
-        // Mulai pertama kali 15 detik setelah aplikasi nyala
+        // Mulai 15 detik setelah app nyala
         setTimeout(startBot, 15000);
     }
 };
