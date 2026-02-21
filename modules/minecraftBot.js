@@ -18,7 +18,6 @@ module.exports = {
                 host: 'emerald.magmanode.com',
                 port: 33096,
                 username: botName,
-                version: '1.20.1',
                 auth: 'offline',
                 keepAlive: true,
                 hideErrors: true // Mengurangi spam error mentah di konsol
