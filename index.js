@@ -119,9 +119,9 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         console.log(`✅ LOG ROLE: ${newMember.user.tag} - Ditambah: ${added.join(', ')} | Dicabut: ${removed.join(', ')}`);
 
         // Log aksi ke Forum
-        /* await logMemberAction(newMember, 'ROLE_UPDATE', { 🔥
-            roleChanges: { added, removed }🔥
-        });🔥
+        /* await logMemberAction(newMember, 'ROLE_UPDATE', { 
+            roleChanges: { added, removed }
+        });
       */
     }
 });
@@ -197,14 +197,14 @@ startSelfPing();
 
 // Monitoring Webhook Baru Otomatis
 client.on("webhookUpdate", async (channel) => {
-   /* setTimeout(async () => {🔥
-        try {🔥
-            const webhooks = await channel.fetchWebhooks();🔥
-            const latest = webhooks.first();🔥
-            if (latest) await webhookModule.monitorNewWebhook(latest);🔥
-        } catch (e) {}🔥
-    }, 1500);🔥
-  */🔥
+   /* setTimeout(async () => {
+        try {
+            const webhooks = await channel.fetchWebhooks();
+            const latest = webhooks.first();
+            if (latest) await webhookModule.monitorNewWebhook(latest);
+        } catch (e) {}
+    }, 1500);
+  */
 });
 
 // 🔐 Login bot
