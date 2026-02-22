@@ -1,4 +1,4 @@
-// modules/translate.js
+// modules/translate.js, Update Fitur Translate 2026
 const translate = require('@vitalets/google-translate-api');
 
 const languageMap = {
