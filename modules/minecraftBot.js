@@ -1,8 +1,8 @@
-// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
 let botInstance = null;
 let reconnectTimeout = null;
+let isLooping = false; // Kunci agar loop tidak ganda
 
 module.exports = {
     init: (client) => {
@@ -10,11 +10,13 @@ module.exports = {
         const passwordBot = 'BananaSkiee';
 
         const startBot = () => {
+            // Bersihkan segalanya sebelum mulai baru
             if (botInstance) {
                 botInstance.removeAllListeners();
                 try { botInstance.end(); } catch (e) {}
                 botInstance = null;
             }
+            isLooping = false; 
 
             console.log(`[MC-SYSTEM] 🔄 Menghubungkan ke ${botName}...`);
 
@@ -25,9 +27,9 @@ module.exports = {
                 auth: 'offline',
                 version: "1.21.1",
                 keepAlive: true,
-                checkTimeoutInterval: 60000,
                 viewDistance: "tiny",
-                colorsEnabled: false
+                disableChatSigning: true,
+                checkTimeoutInterval: 60000
             });
 
             const moveServer = (serverName, delay) => {
@@ -42,11 +44,10 @@ module.exports = {
                 });
             };
 
-            // Menggunakan ONCE agar loop tidak bertumpuk saat pindah world/dimensi
             botInstance.once('spawn', async () => {
-                console.log(`[MC-SUCCESS] ✅ Bot aktif. Memulai rutinitas keliling...`);
+                console.log(`[MC-SUCCESS] ✅ Bot aktif di server.`);
                 
-                // Login satu kali saja saat pertama spawn
+                // Login Handler
                 setTimeout(() => {
                     if (botInstance && botInstance.entity) {
                         botInstance.chat(`/login ${passwordBot}`);
@@ -54,54 +55,50 @@ module.exports = {
                     }
                 }, 5000);
 
-                // --- LOOP KELILING SELAMANYA ---
-                while (botInstance && botInstance.entity) {
-                    await moveServer('survival', 30000); // Tunggu 30 detik di server sebelumnya lalu ke survival
-                    await moveServer('creative', 30000); // Tunggu 30 detik di survival lalu ke creative
-                    await moveServer('lobby', 30000);    // Tunggu 30 detik di creative lalu ke lobby
-                    
-                    console.log(`[MC-LOOP] 🔄 Putaran selesai. Mengulang dari awal...`);
-                }
-            });
+                // CEK: Jika sudah ada loop yang jalan, jangan buat lagi!
+                if (isLooping) return;
+                isLooping = true;
 
-            const afkInterval = setInterval(() => {
-                if (botInstance && botInstance.entity) {
-                    botInstance.swingArm('right');
-                }
-            }, 30000);
+                try {
+                    while (botInstance && botInstance.entity) {
+                        await moveServer('survival', 30000);
+                        if (!botInstance) break; // Cek jika bot disconnect saat nunggu
 
-            botInstance.on('error', (err) => {
-                console.log(`[MC-ERROR] ⚠️ ${err.message}`);
+                        await moveServer('creative', 30000);
+                        if (!botInstance) break;
+
+                        await moveServer('lobby', 30000);
+                        if (!botInstance) break;
+
+                        console.log(`[MC-LOOP] 🔄 Putaran selesai. Mengulang...`);
+                    }
+                } catch (e) {
+                    console.log("[MC-LOOP] Loop dihentikan.");
+                } finally {
+                    isLooping = false;
+                }
             });
 
             botInstance.on('kicked', (reason) => {
-                let cleanReason = "";
-                try {
-                    if (typeof reason === 'object') {
-                        cleanReason = JSON.stringify(reason);
-                    } else {
-                        cleanReason = reason.toString();
-                    }
-                } catch (e) { cleanReason = "Unknown Kick"; }
+                console.log(`[MC-KICK] Keluar: Terjadi kendala koneksi/paket.`);
+                if (botInstance) botInstance.end();
+            });
 
-                console.log(`[MC-KICK] Keluar: ${cleanReason}`);
-                
-                if (cleanReason.includes('BadPacketException') || cleanReason.includes('DecoderException')) {
-                    if (botInstance) botInstance.end();
-                    if (reconnectTimeout) clearTimeout(reconnectTimeout);
-                    reconnectTimeout = setTimeout(startBot, 10000);
+            botInstance.on('error', (err) => {
+                if (!err.message.includes('BadPacket')) {
+                    console.log(`[MC-ERROR] ⚠️ ${err.message}`);
                 }
             });
 
             botInstance.on('end', () => {
-                console.log(`[MC-RETRY] 🔌 Terputus. Reconnect dalam 60 detik...`);
-                clearInterval(afkInterval);
+                console.log(`[MC-RETRY] 🔌 Reconnect dalam 60 detik...`);
                 botInstance = null;
+                isLooping = false;
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
                 reconnectTimeout = setTimeout(startBot, 60000);
             });
         };
 
-        setTimeout(startBot, 10000);
+        setTimeout(startBot, 5000);
     }
 };
