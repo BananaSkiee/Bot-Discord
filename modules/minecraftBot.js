@@ -1,4 +1,3 @@
-// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
 let botInstance = null;
@@ -10,8 +9,9 @@ module.exports = {
         const passwordBot = 'BananaSkiee';
 
         const startBot = () => {
-            // Hindari duplikasi instance bot
             if (botInstance) {
+                console.log("[MC-CLEAN] Membersihkan instance bot lama...");
+                botInstance.removeAllListeners();
                 try { botInstance.end(); } catch (e) {}
                 botInstance = null;
             }
@@ -23,14 +23,15 @@ module.exports = {
                 port: 33096,
                 username: botName,
                 auth: 'offline',
+                version: "1.21.1", // WAJIB spesifik untuk 1.21.1
                 keepAlive: true,
-                hideErrors: true,
-                checkTimeoutInterval: 60000, // 60 detik
-                maxRetries: 10,
-                version: "1.21.1" // Sesuaikan dengan versi servermu
+                hideErrors: false, // Set false sebentar untuk debug jika masih error
+                checkTimeoutInterval: 90000,
+                // Penambahan setting untuk 1.21.1 agar tidak kick saat pindah server:
+                viewDistance: "tiny", 
+                wait_for_chunks: true
             });
 
-            // Fungsi Helper untuk pindah server dengan sistem antrian (Promise)
             const moveServer = (serverName, delay) => {
                 return new Promise((resolve) => {
                     setTimeout(() => {
@@ -44,80 +45,60 @@ module.exports = {
             };
 
             botInstance.once('spawn', async () => {
-                console.log(`[MC-SUCCESS] ✅ Bot berhasil masuk ke Proxy/Lobby.`);
+                console.log(`[MC-SUCCESS] ✅ Bot aktif di Proxy/Lobby.`);
                 
-                // 1. Proses Login/Register (3 detik setelah spawn)
+                // Jeda 5 detik untuk login
                 setTimeout(() => {
                     if (botInstance) {
-                        console.log('[MC-LOGIN] 🔐 Mengirim perintah auth...');
                         botInstance.chat(`/register ${passwordBot} ${passwordBot}`);
                         botInstance.chat(`/login ${passwordBot}`);
                     }
-                }, 3000);
+                }, 5000);
 
-                // 2. LOGIKA NAVIGASI BERURUTAN
-                // Beri waktu bot benar-benar stabil di lobby sebelum mulai pindah
-                await moveServer('survival', 15000); 
-                
-                await moveServer('creative', 25000); // 25 detik kemudian ke creative
-                
-                await moveServer('lobby', 25000);    // 25 detik kemudian balik ke lobby
+                // --- URUTAN PINDAH SERVER ---
+                // Beri jeda lebih lama (30 detik) karena DeluxeHub kamu sedang error
+                await moveServer('survival', 30000); 
+                await moveServer('creative', 30000);
+                await moveServer('lobby', 30000);
 
-                // 3. Anti-AFK (Tetap berjalan di server manapun bot berada)
                 const afkLoop = setInterval(() => {
-                    if (botInstance && botInstance.entity) {
-                        botInstance.swingArm('right');
-                    }
+                    if (botInstance && botInstance.entity) botInstance.swingArm('right');
                 }, 45000);
 
                 botInstance.once('end', () => clearInterval(afkLoop));
             });
 
-            // Handler Error
             botInstance.on('error', (err) => {
-                console.log(`[MC-ERROR] ⚠️ ${err.message || err.code}`);
+                console.log(`[MC-ERROR] ⚠️ ${err.message}`);
             });
 
-            // Handler Kicked (VERSI ANTI-CRASH)
             botInstance.on('kicked', (reason) => {
-                let cleanReason = '';
-                
+                // Konversi reason (bisa objek/string) ke string murni
+                let msg = "";
                 try {
-                    // Cek jika reason adalah JSON string dari Minecraft
-                    if (typeof reason === 'string' && reason.startsWith('{')) {
-                        const parsed = JSON.parse(reason);
-                        cleanReason = parsed.text || (parsed.extra && parsed.extra[0] ? parsed.extra[0].text : reason);
-                    } else {
-                        cleanReason = reason.toString();
-                    }
+                    msg = typeof reason === 'string' ? reason : JSON.stringify(reason);
                 } catch (e) {
-                    cleanReason = "Terjadi kesalahan saat membaca alasan kick.";
+                    msg = "Unknown kick reason";
                 }
 
-                console.log(`[MC-KICK] Keluar server: ${cleanReason}`);
+                console.log(`[MC-KICK] Keluar server: ${msg}`);
 
-                // Filter error spesifik untuk reconnect lebih lama
-                const msg = cleanReason.toLowerCase();
-                if (msg.includes('timeout') || msg.includes('void future') || msg.includes('bungeecord')) {
-                    console.log('[MC-FIX] 🔧 Masalah internal server terdeteksi. Cooldown 90 detik...');
-                    
-                    if (botInstance) botInstance.end();
+                // Jika terdeteksi masalah protokol atau timeout
+                if (msg.includes('IllegalStateException') || msg.includes('timeout')) {
+                    console.log("[MC-FIX] Restarting dalam 90 detik karena masalah protokol...");
                     if (reconnectTimeout) clearTimeout(reconnectTimeout);
                     reconnectTimeout = setTimeout(startBot, 90000);
                 }
             });
 
-            // Handler End (Terputus biasa)
             botInstance.on('end', () => {
-                console.log(`[MC-RETRY] 🔌 Koneksi terputus. Mencoba kembali dalam 60 detik...`);
+                console.log(`[MC-RETRY] 🔌 Terputus. Reconnect dalam 60 detik...`);
                 botInstance = null;
-                
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
                 reconnectTimeout = setTimeout(startBot, 60000);
             });
         };
 
-        // Jalankan bot pertama kali
         setTimeout(startBot, 10000);
     }
 };
