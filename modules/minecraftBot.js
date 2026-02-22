@@ -2,7 +2,7 @@ const mineflayer = require('mineflayer');
 
 let botInstance = null;
 let reconnectTimeout = null;
-let isLooping = false;
+let currentAbortController = null;
 
 module.exports = {
     init: (client) => {
@@ -10,12 +10,19 @@ module.exports = {
         const passwordBot = 'BananaSkiee';
 
         const startBot = () => {
+            // 1. Matikan loop lama jika ada sebelum buat baru
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+            currentAbortController = new AbortController();
+            const { signal } = currentAbortController;
+
+            // 2. Bersihkan instance bot lama secara total
             if (botInstance) {
                 botInstance.removeAllListeners();
-                try { botInstance.end(); } catch (e) {}
+                try { botInstance.quit(); } catch (e) {}
                 botInstance = null;
             }
-            isLooping = false;
 
             console.log(`[MC-SYSTEM] 🔄 Menghubungkan ke ${botName}...`);
 
@@ -25,70 +32,51 @@ module.exports = {
                 username: botName,
                 auth: 'offline',
                 version: "1.21.1",
-                keepAlive: true,
-                viewDistance: "tiny", 
-                disableChatSigning: true,
+                checkTimeoutInterval: 60000 // Menambah batas timeout agar tidak gampang ECONNRESET
             });
 
-            // Fungsi simulasi aktifitas manusia
-            const doActivity = async () => {
-                if (!botInstance || !botInstance.entity) return;
-                
-                // Lompat sekali
-                botInstance.setControlState('jump', true);
-                setTimeout(() => botInstance.setControlState('jump', false), 500);
-                
-                // Jalan ke depan sebentar
-                botInstance.setControlState('forward', true);
-                setTimeout(() => botInstance.setControlState('forward', false), 1000);
-            };
-
-            const moveServer = async (serverName) => {
-                if (!botInstance || !botInstance.entity) return;
-                
-                console.log(`[MC-MOVE] ✈️  Berpindah ke: ${serverName}`);
-                botInstance.chat(`/server ${serverName}`);
-                
-                // Beri jeda setelah pindah server untuk stabilisasi paket
-                await new Promise(res => setTimeout(res, 5000));
-                await doActivity(); 
-            };
+            // Helper delay yang aman & bisa di-cancel
+            const safeWait = (ms) => new Promise(resolve => {
+                const timer = setTimeout(resolve, ms);
+                signal.addEventListener('abort', () => clearTimeout(timer));
+            });
 
             botInstance.once('spawn', async () => {
                 console.log(`[MC-SUCCESS] ✅ Bot aktif di server.`);
                 
-                // Login
-                setTimeout(() => {
-                    if (botInstance && botInstance.entity) {
-                        botInstance.chat(`/login ${passwordBot}`);
-                    }
-                }, 5000);
+                await safeWait(5000);
+                if (signal.aborted || !botInstance) return;
+                
+                botInstance.chat(`/login ${passwordBot}`);
+                await safeWait(10000); // Jeda extra setelah login
 
-                if (isLooping) return;
-                isLooping = true;
-
+                // --- MAIN LOOP ---
                 try {
-                    while (botInstance && botInstance.entity) {
-                        // Tunggu 45 detik sebelum pindah (lebih lama = lebih aman)
-                        await new Promise(res => setTimeout(res, 45000));
-                        await moveServer('survival');
-                        
-                        await new Promise(res => setTimeout(res, 45000));
-                        await moveServer('creative');
-                        
-                        await new Promise(res => setTimeout(res, 45000));
-                        await moveServer('lobby');
+                    while (!signal.aborted && botInstance) {
+                        // SURVIVAL
+                        if (!signal.aborted) {
+                            console.log(`[MC-MOVE] ✈️  Berpindah ke: survival`);
+                            botInstance.chat('/server survival');
+                        }
+                        await safeWait(60000); // Stay 1 menit
 
-                        console.log(`[MC-LOOP] 🔄 Putaran selesai.`);
+                        // CREATIVE
+                        if (!signal.aborted) {
+                            console.log(`[MC-MOVE] ✈️  Berpindah ke: creative`);
+                            botInstance.chat('/server creative');
+                        }
+                        await safeWait(60000); // Stay 1 menit
+
+                        // LOBBY
+                        if (!signal.aborted) {
+                            console.log(`[MC-MOVE] ✈️  Berpindah ke: lobby`);
+                            botInstance.chat('/server lobby');
+                            console.log(`[MC-LOOP] 🔄 Putaran selesai.`);
+                        }
+                        await safeWait(60000); // Stay 1 menit
                     }
-                } catch (e) {
-                    isLooping = false;
-                }
-            });
-
-            botInstance.on('error', (err) => {
-                if (err.code === 'ECONNREFUSED') {
-                    console.log("[MC-ERROR] Koneksi ditolak. IP mungkin cooldown.");
+                } catch (err) {
+                    // Loop berhenti dengan aman
                 }
             });
 
@@ -96,15 +84,24 @@ module.exports = {
                 console.log(`[MC-KICK] Keluar: Terputus dari Proxy.`);
             });
 
+            botInstance.on('error', (err) => {
+                // Menangani ECONNRESET atau EPIPE secara halus
+                if (err.code === 'ECONNRESET' || err.code === 'EPIPE') {
+                    console.log(`[MC-ERROR] Koneksi diputus oleh server (Socket Error).`);
+                } else {
+                    console.log(`[MC-ERROR] Kendala: ${err.message}`);
+                }
+            });
+
             botInstance.on('end', () => {
-                isLooping = false;
-                botInstance = null;
+                if (currentAbortController) currentAbortController.abort();
                 console.log(`[MC-RETRY] 🔌 Reconnect dalam 60 detik...`);
+                
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
                 reconnectTimeout = setTimeout(startBot, 60000);
             });
         };
 
-        setTimeout(startBot, 5000);
+        startBot();
     }
 };
