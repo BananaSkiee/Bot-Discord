@@ -6,9 +6,9 @@ const autoGreeting = require("../modules/autoGreeting");
 const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const beritaModule = require("../modules/autoNews");
-const rainbowRole = require("../modules/rainbowRole");
+// const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
-const { startAutoAnimation } = require("../modules/iconAnim");
+// const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 // const { sendInitialCard } = require('../modules/introCard');
 const minecraftBot = require("../modules/minecraftBot");
@@ -60,22 +60,8 @@ try {
       console.error("❌ Rainbow role error:", err);
     }
 
-    // 🏆 Activity System (Leaderboard)
-/* try {
-    activitySystem(client);
-    console.log("✅ Activity & Leaderboard system active");
-} catch (err) {
-    console.error("❌ Activity system error:", err);
-}
-
-try {
-    tracker(client);
-    console.log("✅ Tracker & Leaderboard System Active");
-} catch (err) {
-    console.error("❌ Tracker system error:", err);
-} */
+// Leaderboard voice dan massage
     
-// ... di bagian paling bawah execute(client)
 /*    try {
         // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
         await sendInitialCard(client, ''); 
@@ -97,12 +83,12 @@ try {
       console.error("❌ Auto greeting error:", err);
     }
 
-    // 🧠 Auto animasi icon server
+/*    // 🧠 Auto animasi icon server
     try {
       startAutoAnimation(client);
     } catch (err) {
       console.error("❌ Icon anim error:", err);
-    }
+    }.  */
 
     // 📝 Slash command register
     try {
