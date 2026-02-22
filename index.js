@@ -11,10 +11,10 @@ const config = require("./config");
 const autoGreeting = require("./modules/autoGreeting");
 const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
-const webhookModule = require("./modules/webhook");
-const srvName = require("./modules/srvName.js"); 
-const { startAutoAnimation } = require("./modules/iconAnim");
-const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
+// const webhookModule = require("./modules/webhook");
+// const srvName = require("./modules/srvName.js"); 
+// const { startAutoAnimation } = require("./modules/iconAnim");
+// const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
 const { handleIntroInteractions } = require('./modules/introCard');
 const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
 
@@ -81,7 +81,7 @@ fs.readdirSync("./events").forEach((file) => {
   }
 });
 
-srvName(client);
+// srvName(client); 🔥
 
 // 📌 Message Handler
 client.on("messageCreate", async (message) => {
@@ -93,7 +93,7 @@ client.on("messageCreate", async (message) => {
     const cmd = message.content.slice(1).split(" ")[0].toLowerCase();
     
     if (webCmds.includes(cmd)) {
-        return webhookModule.handleCommand(message);
+       // return webhookModule.handleCommand(message);🔥
     }
   } // Tutup blok IF Startswith
 }); // Tutup event MessageCreate
@@ -119,9 +119,10 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         console.log(`✅ LOG ROLE: ${newMember.user.tag} - Ditambah: ${added.join(', ')} | Dicabut: ${removed.join(', ')}`);
 
         // Log aksi ke Forum
-        await logMemberAction(newMember, 'ROLE_UPDATE', {
-            roleChanges: { added, removed }
-        });
+        /* await logMemberAction(newMember, 'ROLE_UPDATE', { 🔥
+            roleChanges: { added, removed }🔥
+        });🔥
+      */
     }
 });
 
@@ -176,7 +177,7 @@ client.on("guildMemberAdd", async (member) => {
   const extraData = {
     invite: inviteUsed ? { code: inviteUsed.code, inviter: inviteUsed.inviter } : null
   };
-  await logMemberAction(member, 'JOIN', extraData); 
+//  await logMemberAction(member, 'JOIN', extraData); 🔥
 });
 
 // 🚪 Log ketika user leave (Event nyata)
@@ -184,7 +185,7 @@ client.on("guildMemberRemove", async (member) => {
     // Hapus dari cache pesan pertama
     firstMessageCache.delete(member.id);
     // Log event Leave nyata ke Forum
-    await logMemberAction(member, 'LEAVE'); 
+//    await logMemberAction(member, 'LEAVE'); 🔥
 });
 
 // 🧯 Global Error Handler
@@ -196,13 +197,14 @@ startSelfPing();
 
 // Monitoring Webhook Baru Otomatis
 client.on("webhookUpdate", async (channel) => {
-    setTimeout(async () => {
-        try {
-            const webhooks = await channel.fetchWebhooks();
-            const latest = webhooks.first();
-            if (latest) await webhookModule.monitorNewWebhook(latest);
-        } catch (e) {}
-    }, 1500);
+   /* setTimeout(async () => {🔥
+        try {🔥
+            const webhooks = await channel.fetchWebhooks();🔥
+            const latest = webhooks.first();🔥
+            if (latest) await webhookModule.monitorNewWebhook(latest);🔥
+        } catch (e) {}🔥
+    }, 1500);🔥
+  */🔥
 });
 
 // 🔐 Login bot
