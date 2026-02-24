@@ -1,4 +1,4 @@
-//modules/minecraftBot.js
+// modules/minecraftBot.js
 const mineflayer = require('mineflayer');
 
 let botInstance = null;
@@ -12,6 +12,7 @@ module.exports = {
         let currentServerIndex = 0;
 
         const startBot = () => {
+            // Bersihkan instance lama jika ada
             if (botInstance) {
                 try { botInstance.quit(); } catch (e) {}
                 botInstance.removeAllListeners();
@@ -20,12 +21,15 @@ module.exports = {
 
             console.log(`[MC-SYSTEM] 🔄 Menghubungkan ke ${botName}...`);
 
+            // KONFIGURASI BOT (Disesuaikan untuk BungeeCord/FalixNodes)
             botInstance = mineflayer.createBot({
                 host: 'emerald.magmanode.com',
                 port: 33096,
                 username: botName,
                 version: "1.21.1",
-                checkTimeoutInterval: 90000
+                fakeHost: 'emerald.magmanode.com', // Penting: Biar Bungee tidak menolak koneksi
+                checkTimeoutInterval: 120000,      // Lebih tinggi agar tidak mudah timeout
+                hideErrors: true                   // Sembunyikan error spam di konsol
             });
 
             // --- FUNGSI GERAKAN (ANTI-AFK) ---
@@ -35,10 +39,10 @@ module.exports = {
                 const actions = ['forward', 'back', 'left', 'right', 'jump'];
                 const randomAction = actions[Math.floor(Math.random() * actions.length)];
                 
-                // Bot melakukan gerakan selama 2 detik
+                // Bot gerak selama 2 detik
                 botInstance.setControlState(randomAction, true);
                 
-                // Bot memutar badan secara acak
+                // Putar badan acak
                 const yaw = (Math.random() * Math.PI * 2);
                 const pitch = ((Math.random() - 0.5) * Math.PI);
                 botInstance.look(yaw, pitch);
@@ -46,7 +50,7 @@ module.exports = {
                 setTimeout(() => {
                     if (botInstance) {
                         botInstance.clearControlStates();
-                        // --- JEDA MINIMAL 5 DETIK SEBELUM GERAK LAGI ---
+                        // JEDA MINIMAL 5 DETIK SESUAI REQUEST
                         setTimeout(startMoving, 5000); 
                     }
                 }, 2000);
@@ -63,8 +67,9 @@ module.exports = {
             });
 
             botInstance.once('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ Bot aktif (Rotasi 1 Menit | Jeda Gerak 5 Detik)`);
+                console.log(`[MC-SUCCESS] ✅ Bot aktif di server.`);
                 
+                // Login otomatis setelah 3 detik spawn
                 setTimeout(() => {
                     if (botInstance) botInstance.chat(`/login ${passwordBot}`);
                 }, 3000);
@@ -79,12 +84,18 @@ module.exports = {
                         console.log(`[MC-MOVE] ✈️  Pindah ke: ${target}`);
                         botInstance.chat(`/server ${target}`);
                     }
-                }, 60000); 
+                }, 60000); // 1 Menit
             });
 
+            // Handler jika di-kick
             botInstance.on('kicked', (reason) => {
-                const cleanReason = reason.toString().replace(/"/g, '');
-                console.log(`[MC-KICK] Keluar: ${cleanReason}`);
+                const cleanReason = reason.toString();
+                // Jika server offline, infokan di konsol
+                if (cleanReason.includes("OFFLINE")) {
+                    console.log(`[MC-KICK] ❌ Server Target Offline (Cek FalixNodes!)`);
+                } else {
+                    console.log(`[MC-KICK] Keluar: ${cleanReason}`);
+                }
             });
 
             botInstance.on('error', (err) => {
@@ -94,8 +105,8 @@ module.exports = {
             });
 
             botInstance.on('end', () => {
-                // --- JOIN ULANG SETIAP 30 DETIK ---
-                console.log(`[MC-RETRY] 🔌 Reconnect dalam 30 detik...`);
+                // JOIN ULANG SETIAP 30 DETIK SESUAI REQUEST
+                console.log(`[MC-RETRY] 🔌 Mencoba masuk kembali dalam 30 detik...`);
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
                 reconnectTimeout = setTimeout(startBot, 30000);
             });
