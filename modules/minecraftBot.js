@@ -35,8 +35,10 @@ module.exports = {
                 const actions = ['forward', 'back', 'left', 'right', 'jump'];
                 const randomAction = actions[Math.floor(Math.random() * actions.length)];
                 
+                // Bot melakukan gerakan selama 2 detik
                 botInstance.setControlState(randomAction, true);
                 
+                // Bot memutar badan secara acak
                 const yaw = (Math.random() * Math.PI * 2);
                 const pitch = ((Math.random() - 0.5) * Math.PI);
                 botInstance.look(yaw, pitch);
@@ -44,11 +46,13 @@ module.exports = {
                 setTimeout(() => {
                     if (botInstance) {
                         botInstance.clearControlStates();
-                        setTimeout(startMoving, 2000); // Jeda antar gerakan dipercepat
+                        // --- JEDA MINIMAL 5 DETIK SEBELUM GERAK LAGI ---
+                        setTimeout(startMoving, 5000); 
                     }
-                }, 1500);
+                }, 2000);
             };
 
+            // --- LOGIKA AUTO-JUMP ---
             botInstance.on('physicsTick', () => {
                 if (!botInstance || !botInstance.entity) return;
                 if (botInstance.entity.isCollidedHorizontally) {
@@ -59,7 +63,7 @@ module.exports = {
             });
 
             botInstance.once('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ Bot aktif & Anti-AFK Mode ON.`);
+                console.log(`[MC-SUCCESS] ✅ Bot aktif (Rotasi 1 Menit | Jeda Gerak 5 Detik)`);
                 
                 setTimeout(() => {
                     if (botInstance) botInstance.chat(`/login ${passwordBot}`);
@@ -67,21 +71,15 @@ module.exports = {
 
                 startMoving();
 
-                // --- SIKLUS PINDAH SERVER (DIPERCEPAT KE 30 DETIK) ---
-                // Agar server tidak mati, bot akan pindah-pindah terus setiap 30 detik
+                // --- SIKLUS PINDAH SERVER SETIAP 1 MENIT ---
                 setInterval(() => {
                     if (botInstance) {
                         currentServerIndex = (currentServerIndex + 1) % servers.length;
                         const target = servers[currentServerIndex];
-                        console.log(`[MC-MOVE] ✈️  Mencegah Server Mati: Pindah ke ${target}`);
+                        console.log(`[MC-MOVE] ✈️  Pindah ke: ${target}`);
                         botInstance.chat(`/server ${target}`);
-                        
-                        // Opsional: Chat random supaya terdeteksi aktif
-                        setTimeout(() => {
-                            if (botInstance) botInstance.chat('!keepalive');
-                        }, 5000);
                     }
-                }, 30000); // 30.000 ms = 30 Detik
+                }, 60000); 
             });
 
             botInstance.on('kicked', (reason) => {
@@ -96,9 +94,10 @@ module.exports = {
             });
 
             botInstance.on('end', () => {
-                console.log(`[MC-RETRY] 🔌 Reconnect dalam 15 detik...`);
+                // --- JOIN ULANG SETIAP 30 DETIK ---
+                console.log(`[MC-RETRY] 🔌 Reconnect dalam 30 detik...`);
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
-                reconnectTimeout = setTimeout(startBot, 15000); // Reconnect lebih cepat (15 detik)
+                reconnectTimeout = setTimeout(startBot, 30000);
             });
         };
 
