@@ -12,7 +12,6 @@ module.exports = {
         let currentServerIndex = 0;
 
         const startBot = () => {
-            // Bersihkan instance lama jika ada
             if (botInstance) {
                 try { botInstance.quit(); } catch (e) {}
                 botInstance.removeAllListeners();
@@ -21,44 +20,35 @@ module.exports = {
 
             console.log(`[MC-SYSTEM] 🔄 Menghubungkan ke ${botName}...`);
 
-            // KONFIGURASI BOT (Disesuaikan untuk BungeeCord/FalixNodes)
             botInstance = mineflayer.createBot({
                 host: 'emerald.magmanode.com',
                 port: 33096,
                 username: botName,
                 version: "1.21.1",
-                fakeHost: 'emerald.magmanode.com', // Penting: Biar Bungee tidak menolak koneksi
-                checkTimeoutInterval: 120000,      // Lebih tinggi agar tidak mudah timeout
-                hideErrors: true                   // Sembunyikan error spam di konsol
+                checkTimeoutInterval: 90000
             });
 
-            // --- FUNGSI GERAKAN (ANTI-AFK) ---
-            const startMoving = () => {
+            // --- ANTI-AFK RINGAN ---
+            // Gerakan sederhana: mengayunkan tangan dan memutar kepala secara periodik
+            const startAntiAFK = () => {
                 if (!botInstance || !botInstance.entity) return;
 
-                const actions = ['forward', 'back', 'left', 'right', 'jump'];
-                const randomAction = actions[Math.floor(Math.random() * actions.length)];
+                // Ayun tangan kanan
+                botInstance.swingArm('right');
                 
-                // Bot gerak selama 2 detik
-                botInstance.setControlState(randomAction, true);
-                
-                // Putar badan acak
-                const yaw = (Math.random() * Math.PI * 2);
-                const pitch = ((Math.random() - 0.5) * Math.PI);
+                // Putar kepala sedikit agar tidak diam total
+                const yaw = botInstance.entity.yaw + (Math.random() - 0.5) * 0.5;
+                const pitch = botInstance.entity.pitch + (Math.random() - 0.5) * 0.2;
                 botInstance.look(yaw, pitch);
 
-                setTimeout(() => {
-                    if (botInstance) {
-                        botInstance.clearControlStates();
-                        // JEDA MINIMAL 5 DETIK SESUAI REQUEST
-                        setTimeout(startMoving, 5000); 
-                    }
-                }, 2000);
+                // Ulangi setiap 10 detik
+                setTimeout(startAntiAFK, 10000);
             };
 
-            // --- LOGIKA AUTO-JUMP ---
+            // --- AUTO-JUMP (hanya jika nyangkut) ---
             botInstance.on('physicsTick', () => {
                 if (!botInstance || !botInstance.entity) return;
+                // Lompat jika menabrak blok di depan
                 if (botInstance.entity.isCollidedHorizontally) {
                     botInstance.setControlState('jump', true);
                 } else {
@@ -67,35 +57,35 @@ module.exports = {
             });
 
             botInstance.once('spawn', () => {
-                console.log(`[MC-SUCCESS] ✅ Bot aktif di server.`);
-                
-                // Login otomatis setelah 3 detik spawn
+                console.log(`[MC-SUCCESS] ✅ Bot aktif.`);
+
+                // Login setelah 3 detik
                 setTimeout(() => {
-                    if (botInstance) botInstance.chat(`/login ${passwordBot}`);
+                    if (botInstance) {
+                        botInstance.chat(`/login ${passwordBot}`);
+                        console.log(`[MC-LOGIN] 🔐 Mengirim perintah login.`);
+                    }
                 }, 3000);
 
-                startMoving();
+                // Mulai anti-AFK ringan
+                startAntiAFK();
 
-                // --- SIKLUS PINDAH SERVER SETIAP 1 MENIT ---
+                // Siklus pindah server setiap 30 detik
                 setInterval(() => {
-                    if (botInstance) {
+                    if (botInstance && botInstance.entity) {
                         currentServerIndex = (currentServerIndex + 1) % servers.length;
                         const target = servers[currentServerIndex];
-                        console.log(`[MC-MOVE] ✈️  Pindah ke: ${target}`);
+                        console.log(`[MC-MOVE] ✈️  Pindah ke: ${target} (siklus 30 detik)`);
                         botInstance.chat(`/server ${target}`);
+                    } else {
+                        console.log(`[MC-MOVE] ⚠️ Bot tidak siap, lewati perpindahan.`);
                     }
-                }, 60000); // 1 Menit
+                }, 30000); // 30 detik
             });
 
-            // Handler jika di-kick
             botInstance.on('kicked', (reason) => {
-                const cleanReason = reason.toString();
-                // Jika server offline, infokan di konsol
-                if (cleanReason.includes("OFFLINE")) {
-                    console.log(`[MC-KICK] ❌ Server Target Offline (Cek FalixNodes!)`);
-                } else {
-                    console.log(`[MC-KICK] Keluar: ${cleanReason}`);
-                }
+                const cleanReason = reason.toString().replace(/"/g, '');
+                console.log(`[MC-KICK] Keluar: ${cleanReason}`);
             });
 
             botInstance.on('error', (err) => {
@@ -105,8 +95,7 @@ module.exports = {
             });
 
             botInstance.on('end', () => {
-                // JOIN ULANG SETIAP 30 DETIK SESUAI REQUEST
-                console.log(`[MC-RETRY] 🔌 Mencoba masuk kembali dalam 30 detik...`);
+                console.log(`[MC-RETRY] 🔌 Reconnect dalam 30 detik...`);
                 if (reconnectTimeout) clearTimeout(reconnectTimeout);
                 reconnectTimeout = setTimeout(startBot, 30000);
             });
