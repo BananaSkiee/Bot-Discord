@@ -6,7 +6,7 @@ let reconnectTimeout = null;
 
 module.exports = {
     init: (client) => {
-        const botName = 'EmpireBS';
+        const botName = 'EmpireMC';
         const passwordBot = 'BananaSkiee';
         const servers = ['survival', 'creative', 'lobby'];
         let currentServerIndex = 0;
