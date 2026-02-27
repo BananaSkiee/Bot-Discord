@@ -11,12 +11,12 @@ module.exports = {
                 bot = null;
             }
 
-            console.log('[MC] Menghubungkan EmpireSV...');
+            console.log('[MC] Menghubungkan EmpireBS...');
             
             bot = mineflayer.createBot({
                 host: 'emerald.magmanode.com',
                 port: 33096,
-                username: 'EmpireSV',
+                username: 'EmpireBS',
                 version: '1.21.1',
                 viewDistance: 'tiny'
             });
