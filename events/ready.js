@@ -11,7 +11,7 @@ const VerifySystem = require("../modules/verify");
 // const { startAutoAnimation } = require("../modules/iconAnim");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
 // const { sendInitialCard } = require('../modules/introCard');
-// const minecraftBot = require("../modules/minecraftBot");
+const minecraftBot = require("../modules/minecraftBot");
 // const statusMC = require("../modules/statusMC");
 
 const verifySystem = new VerifySystem();
@@ -25,13 +25,13 @@ module.exports = {
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
     
-  /*      // ⛏️ Minecraft bot init (New Module)
+        // ⛏️ Minecraft bot init (New Module)
     try {
         minecraftBot.init(client); 
       console.log("✅ Minecraft Bot Module Active");
     } catch (err) {
         console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    } *)
+    } 
 
     // Tambahkan ini di bawah minecraftBot.init(client);
 /* try {
