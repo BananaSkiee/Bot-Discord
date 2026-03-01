@@ -5,8 +5,8 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder, EmbedBu
 const handleHapusTag = require("../modules/hapusTagCommand");
 const translateHandler = require("../modules/translate");
 const memeCommand = require("../modules/memeCommand");
-const generateWelcomeCard = require("../modules/welcomeCard");
-const getRandomQuote = require("../modules/welcomeQuotes");
+// const generateWelcomeCard = require("../modules/welcomeCard");
+// const getRandomQuote = require("../modules/welcomeQuotes");
 const beritaCmd = require("../modules/beritaCmd.js");
 const autoEmoji = require("../modules/autoEmoji");
 const autoReactEmoji = require("../modules/autoReactEmoji");
@@ -87,7 +87,7 @@ await verifySystem.detectFirstMessage(message);
     }
 
     // GANTI BLOK LAMA !testwelcome DI messageCreate.js ANDA DENGAN INI
-    if (command === 'testwelcome') {
+    /* if (command === 'testwelcome') {
         if (message.author.bot) return;
 
         const member = message.member;
@@ -168,7 +168,7 @@ Total Members   : ${member.guild.memberCount}`,
             message.reply('❌ Terjadi kesalahan saat membuat kartu tes.');
         }
         return;
-    }
+    } */
     
     // ====== !testdm command ======
     if (contentLower.startsWith("!testdm")) {
