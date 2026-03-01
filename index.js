@@ -9,7 +9,7 @@ const config = require("./config");
 // 🧠 Custom modules & data log
 // const stickyHandler = require("./sticky");
 const autoGreeting = require("./modules/autoGreeting");
-const welcomecard = require("./modules/welcomeCard");
+// const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
 // const webhookModule = require("./modules/webhook");
 // const srvName = require("./modules/srvName.js"); 
