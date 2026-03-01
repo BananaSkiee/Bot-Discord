@@ -89,6 +89,6 @@ Total Members : ${member.guild.memberCount}`,
 
         } catch (error) {
             console.error("ERROR SAAT MEMBUAT WELCOME EMBED DENGAN TOMBOL:", error);
-        }
+        } */
     },
-}; */
+};
