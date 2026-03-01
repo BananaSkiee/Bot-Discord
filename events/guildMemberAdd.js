@@ -2,8 +2,8 @@
 
 // PERUBAHAN: Tambahkan ActionRowBuilder, ButtonBuilder, dan ButtonStyle
 const { AttachmentBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const generateWelcomeCard = require('../modules/welcomeCard.js');
-const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-nya
+// const generateWelcomeCard = require('../modules/welcomeCard.js');
+// const getRandomQuote = require("../modules/welcomeQuotes"); // sesuaikan path-nya
 const { handleBotRoles } = require('../modules/autoBotRole'); 
 
 module.exports = {
@@ -27,7 +27,7 @@ module.exports = {
         const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
         if (!welcomeChannel) return;
 
-        try {
+       /* try {
             const imageBuffer = await generateWelcomeCard(member);
             const attachment = new AttachmentBuilder(imageBuffer, { name: 'welcome-card.png' });
 
@@ -91,4 +91,4 @@ Total Members : ${member.guild.memberCount}`,
             console.error("ERROR SAAT MEMBUAT WELCOME EMBED DENGAN TOMBOL:", error);
         }
     },
-};
+}; */
