@@ -17,6 +17,7 @@ const invitesTracker = require("./modules/invitesTracker");
 // const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
 const { handleIntroInteractions } = require('./modules/introCard');
 const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
+const shotgunModule = require('./modules/shotgunDuels'); 
 
 const client = new Client({
   intents: [
@@ -214,6 +215,8 @@ client.on('interactionCreate', async (interaction) => {
     try {
         // 1. Handle Intro Card (Lama)
         await handleIntroInteractions(interaction);
+
+        await shotgunModule.handleShotgunInteractions(interaction);
         
     } catch (err) {
         // Biar nggak error "Already Replied" di log
