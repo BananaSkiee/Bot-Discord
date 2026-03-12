@@ -26,8 +26,11 @@ class ShotgunDuels {
     }
 
     generateChambers() {
-        const empty = Math.floor(Math.random() * 4) + 2; // Minimal 2 kosong, maksimal 5 kosong
-        const loaded = 8 - empty;
+        // Logika Buckshot: Minimal 2 peluru, maksimal 8 total.
+        const total = 8;
+        const loaded = Math.floor(Math.random() * 3) + 2; // 2-4 peluru tajam
+        const empty = total - loaded;
+        
         return [
             ...Array(loaded).fill('💥'),
             ...Array(empty).fill('⚪')
@@ -59,12 +62,12 @@ class ShotgunDuels {
                     [players[1].id]: { doubleDamage: false, skipTurn: false }
                 },
                 channel: channel,
-                messageId: null,
-                logMessageId: null
+                gameMessage: null,
+                isProcessing: false // Lock biar gak spam klik
             };
 
             this.games.set(gameId, game);
-            await this.startGachaSequence(game, interaction);
+            await this.startNewRound(game);
             return gameId;
         } catch (error) {
             console.error('❌ Error in startGame:', error);
@@ -72,52 +75,34 @@ class ShotgunDuels {
         }
     }
 
-    async startGachaSequence(game, interaction) {
-        const p1 = game.players[0];
-        const p2 = game.players[1];
-
-        // Gacha untuk Player 1
-        game.items[p1.id] = this.generateItems();
-        // Gacha untuk Player 2
-        game.items[p2.id] = this.generateItems();
-
-        const gachaEmbed = new EmbedBuilder()
-            .setTitle('🎯 GACHA ITEMS SELESAI')
-            .setColor(0x00FF00)
-            .setDescription(`**${p1.username}** dan **${p2.username}** telah menerima item mereka!`)
-            .addFields(
-                { name: `🎒 ${p1.username}`, value: game.items[p1.id].join(' ') || 'Kosong', inline: true },
-                { name: `🎒 ${p2.username}`, value: game.items[p2.id].join(' ') || 'Kosong', inline: true }
-            );
-
-        await interaction.editReply({ embeds: [gachaEmbed], components: [] });
+    async startNewRound(game) {
+        // Kasih item baru setiap round peluru diisi
+        game.items[game.players[0].id] = [...game.items[game.players[0].id], ...this.generateItems()].slice(0, 8);
+        game.items[game.players[1].id] = [...game.items[game.players[1].id], ...this.generateItems()].slice(0, 8);
         
-        // Jeda sebentar sebelum reveal chamber
-        setTimeout(async () => {
-            await this.revealChamber(game.id, interaction);
-        }, 3000);
-    }
-
-    async revealChamber(gameId, interaction) {
-        const game = this.games.get(gameId);
-        if (!game) return;
-
         game.chambers = this.generateChambers();
+        game.currentChamber = 0;
+
         const loaded = game.chambers.filter(c => c === '💥').length;
         const empty = game.chambers.filter(c => c === '⚪').length;
 
         const chamberEmbed = new EmbedBuilder()
             .setTitle('🔫 CHAMBER RELOADED')
             .setColor(0xFF6B6B)
-            .setDescription(`Shotgun telah diisi!\n\n**💥 ${loaded} Peluru Tajam**\n**⚪ ${empty} Peluru Kosong**\n\nGame dimulai sekarang!`);
+            .setDescription(`Shotgun telah diisi ulang!\n\n**💥 ${loaded} Peluru Tajam**\n**⚪ ${empty} Peluru Kosong**\n\nMenyiapkan arena...`);
 
-        await game.channel.send({ embeds: [chamberEmbed] });
-        await this.sendGameState(game);
+        const msg = await game.channel.send({ embeds: [chamberEmbed] });
+        
+        setTimeout(async () => {
+            await msg.delete().catch(() => null);
+            await this.sendGameState(game);
+        }, 4000);
     }
 
     async sendGameState(game) {
+        // Jika peluru habis, reload
         if (game.currentChamber >= game.chambers.length) {
-            return await this.revealChamber(game.id);
+            return await this.startNewRound(game);
         }
 
         const player = game.players[game.currentPlayer];
@@ -126,137 +111,167 @@ class ShotgunDuels {
         const embed = new EmbedBuilder()
             .setTitle('🎯 SHOTGUN DUELS - BATTLE PHASE')
             .setColor(0x2F3136)
-            .setDescription(`### ${player.username} vs ${opponent.username}`)
+            .setThumbnail('https://cdn.discordapp.com/emojis/1093993933549457448.webp')
+            .setDescription(`Giliran: **${player.username}**`)
             .addFields(
                 {
-                    name: '❤️ DARAH',
-                    value: `**${player.username}:** ${'❤️'.repeat(game.health[player.id])}\n**${opponent.username}:** ${'❤️'.repeat(game.health[opponent.id])}`,
+                    name: `❤️ HP ${player.username}`,
+                    value: `${'❤️'.repeat(game.health[player.id])} (${game.health[player.id]})`,
                     inline: true
                 },
                 {
-                    name: '🔫 INFO',
-                    value: `Peluru ke: **${game.currentChamber + 1}/8**\nSisa Tajam: **${game.chambers.slice(game.currentChamber).filter(c => c === '💥').length}**`,
+                    name: `❤️ HP ${opponent.username}`,
+                    value: `${'❤️'.repeat(game.health[opponent.id])} (${game.health[opponent.id]})`,
                     inline: true
+                },
+                {
+                    name: '🔫 STATS CHAMBER',
+                    value: `Sisa Peluru: **${game.chambers.length - game.currentChamber}**\nNext DMG: **${game.effects[player.id].doubleDamage ? '2x 🔪' : '1x'}**`,
+                    inline: false
                 },
                 {
                     name: '🎒 INVENTORY KAMU',
-                    value: game.items[player.id].map((item, i) => `\`${i + 1}\` ${item} ${this.ITEMS[item].name}`).join('\n') || 'Tidak ada item',
+                    value: game.items[player.id].map((item, i) => `\`${i + 1}\` ${item} ${this.ITEMS[item].name}`).join('\n') || '*Kosong*',
                     inline: false
                 }
             )
-            .setFooter({ text: `Giliran: ${player.username}` });
+            .setFooter({ text: `Gunakan tombol di bawah untuk bertindak!` });
 
-        const itemButtons = game.items[player.id].slice(0, 5).map((item, index) => 
-            new ButtonBuilder()
-                .setCustomId(`item_${game.id}_${index}`)
-                .setEmoji(item)
-                .setStyle(ButtonStyle.Primary)
-        );
+        // Tombol Items (Max 5 per row)
+        const itemRows = [];
+        if (game.items[player.id].length > 0) {
+            const itemButtons = game.items[player.id].slice(0, 5).map((item, index) => 
+                new ButtonBuilder()
+                    .setCustomId(`item_${game.id}_${index}`)
+                    .setEmoji(item)
+                    .setStyle(ButtonStyle.Primary)
+            );
+            itemRows.push(new ActionRowBuilder().addComponents(itemButtons));
+        }
 
+        // Tombol Action
         const actionRow = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`shoot_self_${game.id}`).setLabel('Tembak Diri').setEmoji('🎯').setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId(`shoot_opponent_${game.id}`).setLabel('Tembak Lawan').setEmoji('🔫').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`surrender_${game.id}`).setLabel('Menyerah').setStyle(ButtonStyle.Secondary)
+            new ButtonBuilder().setCustomId(`surrender_${game.id}`).setLabel('🏳️').setStyle(ButtonStyle.Secondary)
         );
 
-        const components = itemButtons.length > 0 ? [new ActionRowBuilder().addComponents(itemButtons), actionRow] : [actionRow];
+        const components = [...itemRows, actionRow];
 
-        if (game.messageId) {
-            const oldMsg = await game.channel.messages.fetch(game.messageId).catch(() => null);
-            if (oldMsg) await oldMsg.delete();
+        // LOGIC ANTI-SPAM: Gunakan edit pesan jika pesan sudah ada
+        if (game.gameMessage) {
+            await game.gameMessage.edit({ content: `${player}`, embeds: [embed], components }).catch(async () => {
+                game.gameMessage = await game.channel.send({ content: `${player}`, embeds: [embed], components });
+            });
+        } else {
+            game.gameMessage = await game.channel.send({ content: `${player}`, embeds: [embed], components });
         }
-
-        const msg = await game.channel.send({ content: `${player}`, embeds: [embed], components });
-        game.messageId = msg.id;
+        game.isProcessing = false;
     }
 
     async shoot(gameId, playerId, target, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
+        if (!game || game.isProcessing) return;
+        game.isProcessing = true;
 
         const isLive = game.chambers[game.currentChamber] === '💥';
         const shooter = game.players[game.currentPlayer];
         const opponent = game.players[1 - game.currentPlayer];
         const dmg = game.effects[shooter.id].doubleDamage ? 2 : 1;
 
-        let msg = "";
+        let resultMsg = "";
         if (isLive) {
             const targetId = target === 'self' ? shooter.id : opponent.id;
-            game.health[targetId] -= dmg;
-            msg = `💥 **DOOR!** ${target === 'self' ? shooter : opponent} tertembak peluru tajam! (-${dmg} HP)`;
+            game.health[targetId] = Math.max(0, game.health[targetId] - dmg);
+            resultMsg = `💥 **DOOR!** ${target === 'self' ? shooter : opponent} kena peluru tajam! **-${dmg} HP**`;
             game.effects[shooter.id].doubleDamage = false;
         } else {
-            msg = `⚪ **KLIK...** Peluru kosong.`;
+            resultMsg = `⚪ **KLIK...** Peluru kosong.`;
         }
 
         game.currentChamber++;
-        await game.channel.send(msg);
+        await game.channel.send(resultMsg);
 
-        // Cek Game Over
+        // Cek Mati
         if (game.health[shooter.id] <= 0 || game.health[opponent.id] <= 0) {
             const winner = game.health[shooter.id] > 0 ? shooter : opponent;
-            await game.channel.send(`🏆 **DUEL SELESAI!** ${winner} adalah pemenangnya!`);
+            const winEmbed = new EmbedBuilder()
+                .setTitle('🏆 DUEL BERAKHIR')
+                .setColor(0xF1C40F)
+                .setDescription(`Selamat kepada **${winner.username}** yang berhasil bertahan hidup!`);
+            
+            await game.channel.send({ embeds: [winEmbed] });
+            if (game.gameMessage) await game.gameMessage.delete().catch(() => null);
             return this.games.delete(gameId);
         }
 
-        // Giliran
-        if (!(target === 'self' && !isLive)) {
+        // Penentuan Giliran
+        let extraTurn = false;
+        if (target === 'self' && !isLive) {
+            extraTurn = true;
+            await game.channel.send(`✨ **${shooter.username}** beruntung! Karena nembak diri pakai peluru kosong, dapat giliran lagi.`);
+        } else {
             if (game.effects[opponent.id].skipTurn) {
                 game.effects[opponent.id].skipTurn = false;
-                await game.channel.send(`🔗 ${opponent.username} tidak bisa bergerak karena borgol! Giliran ${shooter.username} lagi.`);
+                await game.channel.send(`🔗 **${opponent.username}** masih diborgol! Giliran **${shooter.username}** lagi.`);
+                extraTurn = true;
             } else {
                 game.currentPlayer = 1 - game.currentPlayer;
             }
-        } else {
-            await game.channel.send(`✨ Karena nembak diri sendiri pakai peluru kosong, **${shooter.username}** dapat giliran lagi!`);
         }
 
-        await this.sendGameState(game);
+        // Reset damage effect if it was used or if turn changes
+        game.effects[shooter.id].doubleDamage = false;
+
+        setTimeout(() => this.sendGameState(game), 2000);
     }
 
     async useItem(gameId, playerId, itemIndex, interaction) {
         const game = this.games.get(gameId);
+        if (!game || game.isProcessing) return;
+        
         const item = game.items[playerId][itemIndex];
         const shooter = game.players[game.currentPlayer];
         const opponent = game.players[1 - game.currentPlayer];
 
         game.items[playerId].splice(itemIndex, 1);
+        game.isProcessing = true;
 
         let effectMsg = "";
         switch (item) {
             case '🚬':
                 game.health[playerId] = Math.min(game.health[playerId] + 1, 5);
-                effectMsg = `🚬 **${shooter.username}** merokok dan merasa lebih sehat! (+1 HP)`;
+                effectMsg = `🚬 **${shooter.username}** ngerokok. HP nambah jadi ${game.health[playerId]}!`;
                 break;
             case '🍺':
                 const ejected = game.chambers[game.currentChamber];
                 game.currentChamber++;
-                effectMsg = `🍺 **${shooter.username}** minum bir dan membuang peluru: **${ejected}**`;
+                effectMsg = `🍺 **${shooter.username}** minum bir. Peluru **${ejected}** dibuang keluar!`;
                 break;
             case '🔎':
                 const next = game.chambers[game.currentChamber];
-                await interaction.followUp({ content: `🔎 Peluru saat ini adalah: **${next}**`, ephemeral: true });
-                return await this.sendGameState(game);
+                game.isProcessing = false;
+                return await interaction.followUp({ content: `🔎 Kamu ngintip... peluru berikutnya adalah: **${next}**`, ephemeral: true });
             case '🔪':
                 game.effects[playerId].doubleDamage = true;
-                effectMsg = `🔪 **${shooter.username}** menggergaji shotgunnya! Damage berikutnya menjadi 2!`;
+                effectMsg = `🔪 **${shooter.username}** motong laras shotgun! Damage berikutnya **2x lipat**!`;
                 break;
             case '🔗':
                 game.effects[opponent.id].skipTurn = true;
-                effectMsg = `🔗 **${shooter.username}** memborgol **${opponent.username}**!`;
+                effectMsg = `🔗 **${shooter.username}** masang borgol ke **${opponent.username}**!`;
                 break;
         }
 
         await game.channel.send(effectMsg);
-        await this.sendGameState(game);
+        setTimeout(() => this.sendGameState(game), 1500);
     }
 
-    async surrender(gameId, playerId, interaction) {
+    async surrender(gameId, playerId) {
         const game = this.games.get(gameId);
         if (!game) return;
-        const loser = game.players.find(p => p.id === playerId);
         const winner = game.players.find(p => p.id !== playerId);
-        await game.channel.send(`🏳️ **${loser.username}** menyerah! **${winner.username}** menang!`);
+        await game.channel.send(`🏳️ Duel dibubarkan karena salah satu pemain menyerah. **${winner.username}** menang lewat WO!`);
+        if (game.gameMessage) await game.gameMessage.delete().catch(() => null);
         this.games.delete(gameId);
     }
 }
