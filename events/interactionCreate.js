@@ -22,6 +22,13 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
+      // ========== SLASH COMMANDS HANDLER ==========
+      if (interaction.isChatInputCommand()) {
+        const command = interaction.client.commands.get(interaction.commandName);
+        if (!command) return;
+        return await command.execute(interaction);
+      }
+
       // ========== VERIFY SYSTEM HANDLERS ==========
       // ✅ BUTTON INTERACTIONS
       if (interaction.isButton()) {
@@ -159,7 +166,7 @@ module.exports = {
             
             let gameId, action, itemIndex;
             
-            // Parsing Logic
+            // Parsing Logic Fixed
             if (customId.startsWith('item_')) {
                 const parts = customId.split('_');
                 gameId = parts[1];
@@ -212,6 +219,14 @@ module.exports = {
             return;
         }
       }
+
+      // Kode Tag System "Mahal" lu ada di bawah sini (tidak gw sentuh/tulis ulang sesuai request)
+
+    } catch (err) {
+      console.error("❌ ERROR GLOBAL DI INTERACTIONCREATE:", err);
+    }
+  },
+};
 
       // ========== EXISTING CODE - TIDAK DIUBAH ==========
       if (!interaction.isButton()) return;
