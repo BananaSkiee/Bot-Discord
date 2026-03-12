@@ -1,278 +1,242 @@
-// modules/shotgunDuels.js
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 class ShotgunDuels {
     constructor() {
         this.games = new Map();
-        this.ROUND_START_ITEMS = [2, 3, 4];
         this.ITEMS = {
-            '🚬': { name: 'Rokok', effect: 'Heal +1 HP (max 5)' },
-            '🍺': { name: 'Minum', effect: 'Buang peluru terdepan' },
-            '🔪': { name: 'Kater', effect: 'Next hit damage 2x' },
-            '🔎': { name: 'Lup', effect: 'Lihat chamber berikutnya' },
-            '🔗': { name: 'Borgol', effect: 'Lawan skip 1 turn' }
+            '🚬': { name: 'Rokok', effect: 'Heal 1 HP' },
+            '🍺': { name: 'Minum', effect: 'Buang 1 peluru' },
+            '🔪': { name: 'Kater', effect: 'Damage x2 (1x per turn)' },
+            '🔎': { name: 'Lup', effect: 'Lihat peluru' },
+            '🔗': { name: 'Borgol', effect: 'Skip turn (1x per turn)' }
         };
     }
 
-    getGame(gameId) {
-        return this.games.get(gameId);
-    }
-
-    isPlayerInGame(playerId) {
-        for (const game of this.games.values()) {
-            if (game.players.some(p => p.id === playerId)) return true;
-        }
-        return false;
-    }
+    getGame(gameId) { return this.games.get(gameId); }
+    isPlayerInGame(id) { return [...this.games.values()].some(g => g.players.some(p => p.id === id)); }
 
     generateChambers() {
-        // Logika Buckshot: Minimal 2 peluru, maksimal 8 total.
+        const loaded = Math.floor(Math.random() * 3) + 2; // 2-4 Tajam
         const total = 8;
-        const loaded = Math.floor(Math.random() * 3) + 2; // 2-4 peluru tajam
-        const empty = total - loaded;
-        
-        return [
-            ...Array(loaded).fill('💥'),
-            ...Array(empty).fill('⚪')
-        ].sort(() => Math.random() - 0.5);
+        return [...Array(loaded).fill('💥'), ...Array(total - loaded).fill('⚪')].sort(() => Math.random() - 0.5);
     }
 
-    generateItems() {
-        const itemCount = this.ROUND_START_ITEMS[Math.floor(Math.random() * this.ROUND_START_ITEMS.length)];
-        const availableItems = Object.keys(this.ITEMS);
-        return Array.from({ length: itemCount }, () => availableItems[Math.floor(Math.random() * availableItems.length)]);
-    }
-
-    async startGame(player1, player2, channel, interaction) {
-        try {
-            const gameId = `${player1.id}-${player2.id}-${Date.now()}`;
-            const randomStarter = Math.random() < 0.5 ? 0 : 1;
-            const players = randomStarter === 0 ? [player1, player2] : [player2, player1];
-
-            const game = {
-                id: gameId,
-                players: players,
-                currentPlayer: 0,
-                chambers: [],
-                currentChamber: 0,
-                items: { [players[0].id]: [], [players[1].id]: [] },
-                health: { [players[0].id]: 5, [players[1].id]: 5 },
-                effects: { 
-                    [players[0].id]: { doubleDamage: false, skipTurn: false },
-                    [players[1].id]: { doubleDamage: false, skipTurn: false }
-                },
-                channel: channel,
-                gameMessage: null,
-                isProcessing: false // Lock biar gak spam klik
-            };
-
-            this.games.set(gameId, game);
-            await this.startNewRound(game);
-            return gameId;
-        } catch (error) {
-            console.error('❌ Error in startGame:', error);
-            return null;
-        }
-    }
-
-    async startNewRound(game) {
-        // Kasih item baru setiap round peluru diisi
-        game.items[game.players[0].id] = [...game.items[game.players[0].id], ...this.generateItems()].slice(0, 8);
-        game.items[game.players[1].id] = [...game.items[game.players[1].id], ...this.generateItems()].slice(0, 8);
-        
-        game.chambers = this.generateChambers();
-        game.currentChamber = 0;
-
-        const loaded = game.chambers.filter(c => c === '💥').length;
-        const empty = game.chambers.filter(c => c === '⚪').length;
-
-        const chamberEmbed = new EmbedBuilder()
-            .setTitle('🔫 CHAMBER RELOADED')
-            .setColor(0xFF6B6B)
-            .setDescription(`Shotgun telah diisi ulang!\n\n**💥 ${loaded} Peluru Tajam**\n**⚪ ${empty} Peluru Kosong**\n\nMenyiapkan arena...`);
-
-        const msg = await game.channel.send({ embeds: [chamberEmbed] });
-        
-        setTimeout(async () => {
-            await msg.delete().catch(() => null);
-            await this.sendGameState(game);
-        }, 4000);
-    }
-
-    async sendGameState(game) {
-        // Jika peluru habis, reload
-        if (game.currentChamber >= game.chambers.length) {
-            return await this.startNewRound(game);
-        }
-
-        const player = game.players[game.currentPlayer];
-        const opponent = game.players[1 - game.currentPlayer];
-
-        const embed = new EmbedBuilder()
-            .setTitle('🎯 SHOTGUN DUELS - BATTLE PHASE')
-            .setColor(0x2F3136)
-            .setThumbnail('https://cdn.discordapp.com/emojis/1093993933549457448.webp')
-            .setDescription(`Giliran: **${player.username}**`)
-            .addFields(
-                {
-                    name: `❤️ HP ${player.username}`,
-                    value: `${'❤️'.repeat(game.health[player.id])} (${game.health[player.id]})`,
-                    inline: true
-                },
-                {
-                    name: `❤️ HP ${opponent.username}`,
-                    value: `${'❤️'.repeat(game.health[opponent.id])} (${game.health[opponent.id]})`,
-                    inline: true
-                },
-                {
-                    name: '🔫 STATS CHAMBER',
-                    value: `Sisa Peluru: **${game.chambers.length - game.currentChamber}**\nNext DMG: **${game.effects[player.id].doubleDamage ? '2x 🔪' : '1x'}**`,
-                    inline: false
-                },
-                {
-                    name: '🎒 INVENTORY KAMU',
-                    value: game.items[player.id].map((item, i) => `\`${i + 1}\` ${item} ${this.ITEMS[item].name}`).join('\n') || '*Kosong*',
-                    inline: false
+    giveItems(game) {
+        const available = Object.keys(this.ITEMS);
+        game.players.forEach(p => {
+            const toGive = Math.floor(Math.random() * 4) + 1; // 1-4 item baru sesuai request
+            for(let i=0; i < toGive; i++) {
+                if (game.items[p.id].length < 4) { // Max 4 items
+                    game.items[p.id].push(available[Math.floor(Math.random() * available.length)]);
                 }
-            )
-            .setFooter({ text: `Gunakan tombol di bawah untuk bertindak!` });
-
-        // Tombol Items (Max 5 per row)
-        const itemRows = [];
-        if (game.items[player.id].length > 0) {
-            const itemButtons = game.items[player.id].slice(0, 5).map((item, index) => 
-                new ButtonBuilder()
-                    .setCustomId(`item_${game.id}_${index}`)
-                    .setEmoji(item)
-                    .setStyle(ButtonStyle.Primary)
-            );
-            itemRows.push(new ActionRowBuilder().addComponents(itemButtons));
-        }
-
-        // Tombol Action
-        const actionRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`shoot_self_${game.id}`).setLabel('Tembak Diri').setEmoji('🎯').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`shoot_opponent_${game.id}`).setLabel('Tembak Lawan').setEmoji('🔫').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`surrender_${game.id}`).setLabel('🏳️').setStyle(ButtonStyle.Secondary)
-        );
-
-        const components = [...itemRows, actionRow];
-
-        // LOGIC ANTI-SPAM: Gunakan edit pesan jika pesan sudah ada
-        if (game.gameMessage) {
-            await game.gameMessage.edit({ content: `${player}`, embeds: [embed], components }).catch(async () => {
-                game.gameMessage = await game.channel.send({ content: `${player}`, embeds: [embed], components });
-            });
-        } else {
-            game.gameMessage = await game.channel.send({ content: `${player}`, embeds: [embed], components });
-        }
-        game.isProcessing = false;
+            }
+        });
     }
 
-    async shoot(gameId, playerId, target, interaction) {
+    async startGame(p1, p2, channel) {
+        const gameId = `shotgun-${Date.now()}`;
+        // RANDOM STARTER: Acak siapa yang masuk index 0
+        const randomizedPlayers = [p1, p2].sort(() => Math.random() - 0.5);
+        
+        const game = {
+            id: gameId,
+            players: randomizedPlayers,
+            ready: { [p1.id]: false, [p2.id]: false },
+            health: { [p1.id]: 5, [p2.id]: 5 },
+            items: { [p1.id]: [], [p2.id]: [] },
+            effects: { 
+                [p1.id]: { dbl: false, skip: false, usedLockItem: false }, 
+                [p2.id]: { dbl: false, skip: false, usedLockItem: false } 
+            },
+            chambers: [],
+            currentIdx: 0,
+            currentPlayer: 0,
+            logs: ['➤ Menunggu kedua pemain menekan tombol SIAP...'],
+            message: null,
+            phase: 'WAITING',
+            channel: channel
+        };
+        this.games.set(gameId, game);
+        await this.render(gameId);
+        return gameId;
+    }
+
+    addLog(game, text) {
+        game.logs.unshift(`➤ ${text}`);
+        if (game.logs.length > 5) game.logs.pop(); // Maksimal 5 baris log
+    }
+
+    async render(gameId) {
         const game = this.games.get(gameId);
-        if (!game || game.isProcessing) return;
-        game.isProcessing = true;
+        if (!game) return;
 
-        const isLive = game.chambers[game.currentChamber] === '💥';
-        const shooter = game.players[game.currentPlayer];
-        const opponent = game.players[1 - game.currentPlayer];
-        const dmg = game.effects[shooter.id].doubleDamage ? 2 : 1;
+        const p1 = game.players[0];
+        const p2 = game.players[1];
+        const turnPlayer = game.players[game.currentPlayer];
 
-        let resultMsg = "";
-        if (isLive) {
-            const targetId = target === 'self' ? shooter.id : opponent.id;
-            game.health[targetId] = Math.max(0, game.health[targetId] - dmg);
-            resultMsg = `💥 **DOOR!** ${target === 'self' ? shooter : opponent} kena peluru tajam! **-${dmg} HP**`;
-            game.effects[shooter.id].doubleDamage = false;
-        } else {
-            resultMsg = `⚪ **KLIK...** Peluru kosong.`;
+        let mainContent = `## 🔫 SHOTGUN DUELS\n`;
+        
+        if (game.phase === 'WAITING') {
+            mainContent += `> **${p1.username}** vs **${p2.username}**\n\n**STATUS:**\n${game.ready[p1.id] ? '✅' : '❌'} ${p1.username}\n${game.ready[p2.id] ? '✅' : '❌'} ${p2.username}\n\n*Duel akan dimulai setelah kedua pemain siap.*`;
+        } else if (game.phase === 'REVEAL') {
+            mainContent += `### 🔍 REVEAL CHAMBER\nIngat urutan peluru ini dalam **5 detik**:\n# ${game.chambers.join(' ')}\n\n*Jangan sampai lupa!*`;
+        } else if (game.phase === 'BATTLE') {
+            mainContent += `### 🩸 ARENA\n**${p1.username}:** ${'❤️'.repeat(game.health[p1.id])}\n**${p2.username}:** ${'❤️'.repeat(game.health[p2.id])}\n\n`;
+            mainContent += `**GILIRAN:** ${turnPlayer}\n**CHAMBER:** Peluru ke-${game.currentIdx + 1}/8\n\n**📝 LOG:**\n\`\`\`md\n${game.logs.join('\n')}\n\`\`\``;
+        } else if (game.phase === 'OVER') {
+            mainContent += `### 🏆 GAME OVER\n${game.logs[0]}`;
         }
 
-        game.currentChamber++;
-        await game.channel.send(resultMsg);
+        const components = [];
+        if (game.phase === 'WAITING') {
+            components.push(new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`ready_${gameId}`).setLabel('SIAP').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`surrender_${gameId}`).setLabel('SUREND').setStyle(ButtonStyle.Danger)
+            ));
+        } else if (game.phase === 'BATTLE') {
+            const itemRow = new ActionRowBuilder();
+            game.items[turnPlayer.id].forEach((emoji, i) => {
+                itemRow.addComponents(new ButtonBuilder().setCustomId(`item_${gameId}_${i}`).setEmoji(emoji).setStyle(ButtonStyle.Primary));
+            });
 
-        // Cek Mati
-        if (game.health[shooter.id] <= 0 || game.health[opponent.id] <= 0) {
-            const winner = game.health[shooter.id] > 0 ? shooter : opponent;
-            const winEmbed = new EmbedBuilder()
-                .setTitle('🏆 DUEL BERAKHIR')
-                .setColor(0xF1C40F)
-                .setDescription(`Selamat kepada **${winner.username}** yang berhasil bertahan hidup!`);
-            
-            await game.channel.send({ embeds: [winEmbed] });
-            if (game.gameMessage) await game.gameMessage.delete().catch(() => null);
-            return this.games.delete(gameId);
+            const actionRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`shoot_opp_${gameId}`).setLabel('TEMBAK LAWAN').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId(`shoot_self_${gameId}`).setLabel('TEMBAK DIRI').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId(`surrender_${gameId}`).setLabel('🏳️').setStyle(ButtonStyle.Secondary)
+            );
+
+            if (itemRow.components.length > 0) components.push(itemRow);
+            components.push(actionRow);
         }
 
-        // Penentuan Giliran
-        let extraTurn = false;
-        if (target === 'self' && !isLive) {
-            extraTurn = true;
-            await game.channel.send(`✨ **${shooter.username}** beruntung! Karena nembak diri pakai peluru kosong, dapat giliran lagi.`);
+        const payload = {
+            content: "",
+            components: [{
+                type: 17,
+                components: [
+                    {
+                        type: 12, // Media Section
+                        items: [{ media: { url: "https://r2.erweima.ai/i/6f90d1920807.png" } }]
+                    },
+                    { type: 10, content: mainContent }, // Text Section
+                    ...components
+                ]
+            }]
+        };
+
+        if (!game.message) {
+            game.message = await game.channel.send(payload);
         } else {
-            if (game.effects[opponent.id].skipTurn) {
-                game.effects[opponent.id].skipTurn = false;
-                await game.channel.send(`🔗 **${opponent.username}** masih diborgol! Giliran **${shooter.username}** lagi.`);
-                extraTurn = true;
+            await game.message.edit(payload).catch(() => null);
+        }
+    }
+
+    async handleAction(customId, gameId, userId, interaction) {
+        const game = this.games.get(gameId);
+        if (!game) return;
+
+        const [action, , extra] = customId.split('_');
+
+        if (action === 'ready') {
+            game.ready[userId] = true;
+            if (game.ready[game.players[0].id] && game.ready[game.players[1].id]) {
+                await this.triggerReload(game);
             } else {
-                game.currentPlayer = 1 - game.currentPlayer;
+                await this.render(gameId);
             }
         }
 
-        // Reset damage effect if it was used or if turn changes
-        game.effects[shooter.id].doubleDamage = false;
+        if (action === 'shoot') {
+            const target = extra; // 'opp' atau 'self'
+            const shooter = game.players[game.currentPlayer];
+            const opponent = game.players[1 - game.currentPlayer];
+            const isLive = game.chambers[game.currentIdx] === '💥';
+            const dmg = game.effects[shooter.id].dbl ? 2 : 1;
 
-        setTimeout(() => this.sendGameState(game), 2000);
-    }
+            if (isLive) {
+                const victimId = target === 'opp' ? opponent.id : shooter.id;
+                game.health[victimId] = Math.max(0, game.health[victimId] - dmg);
+                this.addLog(game, `${shooter.username} menembak ${target === 'opp' ? opponent.username : 'diri'}... 💥 KENA! (-${dmg} HP)`);
+            } else {
+                this.addLog(game, `${shooter.username} menembak ${target === 'opp' ? opponent.username : 'diri'}... ⚪ MISS!`);
+            }
 
-    async useItem(gameId, playerId, itemIndex, interaction) {
-        const game = this.games.get(gameId);
-        if (!game || game.isProcessing) return;
-        
-        const item = game.items[playerId][itemIndex];
-        const shooter = game.players[game.currentPlayer];
-        const opponent = game.players[1 - game.currentPlayer];
+            game.currentIdx++;
+            game.effects[shooter.id].dbl = false;
+            game.effects[shooter.id].usedLockItem = false;
 
-        game.items[playerId].splice(itemIndex, 1);
-        game.isProcessing = true;
+            if (game.health[p1.id] <= 0 || game.health[p2.id] <= 0) { // Cek HP
+                const winner = game.health[shooter.id] > 0 ? shooter : opponent;
+                this.addLog(game, `🏆 ${winner.username} menang duel!`);
+                game.phase = 'OVER';
+                await this.render(gameId);
+                return this.games.delete(gameId);
+            }
 
-        let effectMsg = "";
-        switch (item) {
-            case '🚬':
-                game.health[playerId] = Math.min(game.health[playerId] + 1, 5);
-                effectMsg = `🚬 **${shooter.username}** ngerokok. HP nambah jadi ${game.health[playerId]}!`;
-                break;
-            case '🍺':
-                const ejected = game.chambers[game.currentChamber];
-                game.currentChamber++;
-                effectMsg = `🍺 **${shooter.username}** minum bir. Peluru **${ejected}** dibuang keluar!`;
-                break;
-            case '🔎':
-                const next = game.chambers[game.currentChamber];
-                game.isProcessing = false;
-                return await interaction.followUp({ content: `🔎 Kamu ngintip... peluru berikutnya adalah: **${next}**`, ephemeral: true });
-            case '🔪':
-                game.effects[playerId].doubleDamage = true;
-                effectMsg = `🔪 **${shooter.username}** motong laras shotgun! Damage berikutnya **2x lipat**!`;
-                break;
-            case '🔗':
-                game.effects[opponent.id].skipTurn = true;
-                effectMsg = `🔗 **${shooter.username}** masang borgol ke **${opponent.username}**!`;
-                break;
+            if (target === 'self' && !isLive) {
+                this.addLog(game, `✨ Bonus turn untuk ${shooter.username}!`);
+            } else {
+                if (game.effects[opponent.id].skip) {
+                    game.effects[opponent.id].skip = false;
+                    this.addLog(game, `🔗 ${opponent.username} terlewat!`);
+                } else {
+                    game.currentPlayer = 1 - game.currentPlayer;
+                }
+            }
+
+            if (game.currentIdx >= 8) await this.triggerReload(game);
+            else await this.render(gameId);
         }
 
-        await game.channel.send(effectMsg);
-        setTimeout(() => this.sendGameState(game), 1500);
+        if (action === 'item') {
+            const idx = parseInt(extra);
+            const item = game.items[userId][idx];
+            const shooter = game.players[game.currentPlayer];
+
+            // Item Lock (Borgol/Pisau 1x per turn)
+            if ((item === '🔗' || item === '🔪') && game.effects[userId].usedLockItem) {
+                return await interaction.followUp({ content: "❌ Kamu sudah menggunakan item jenis ini di turn sekarang!", ephemeral: true });
+            }
+
+            game.items[userId].splice(idx, 1);
+            if (item === '🔗' || item === '🔪') game.effects[userId].usedLockItem = true;
+
+            if (item === '🚬') { game.health[userId] = Math.min(game.health[userId] + 1, 5); this.addLog(game, `${shooter.username} pakai Rokok 🚬 (+1 HP)`); }
+            if (item === '🍺') { this.addLog(game, `${shooter.username} pakai Bir 🍺: Peluru ${game.chambers[game.currentIdx]} dibuang.`); game.currentIdx++; }
+            if (item === '🔪') { game.effects[userId].dbl = true; this.addLog(game, `${shooter.username} pakai Pisau 🔪 (DMG x2!)`); }
+            if (item === '🔗') { game.effects[game.players[1 - game.currentPlayer].id].skip = true; this.addLog(game, `${shooter.username} pakai Borgol 🔗`); }
+            if (item === '🔎') { 
+                await interaction.followUp({ content: `🔎 Peluru saat ini: **${game.chambers[game.currentIdx]}**`, ephemeral: true });
+            }
+
+            if (game.currentIdx >= 8) await this.triggerReload(game);
+            else await this.render(gameId);
+        }
+
+        if (action === 'surrender') {
+            const loser = game.players.find(p => p.id === userId);
+            const winner = game.players.find(p => p.id !== userId);
+            this.addLog(game, `🏳️ ${loser.username} menyerah! ${winner.username} menang!`);
+            game.phase = 'OVER';
+            await this.render(gameId);
+            this.games.delete(gameId);
+        }
     }
 
-    async surrender(gameId, playerId) {
-        const game = this.games.get(gameId);
-        if (!game) return;
-        const winner = game.players.find(p => p.id !== playerId);
-        await game.channel.send(`🏳️ Duel dibubarkan karena salah satu pemain menyerah. **${winner.username}** menang lewat WO!`);
-        if (game.gameMessage) await game.gameMessage.delete().catch(() => null);
-        this.games.delete(gameId);
+    async triggerReload(game) {
+        game.phase = 'REVEAL';
+        game.chambers = this.generateChambers();
+        game.currentIdx = 0;
+        this.giveItems(game);
+        this.addLog(game, "Chamber Reloaded & Item dibagikan.");
+        await this.render(game.id);
+
+        setTimeout(async () => {
+            if (this.games.has(game.id)) {
+                game.phase = 'BATTLE';
+                await this.render(game.id);
+            }
+        }, 5000);
     }
 }
 
