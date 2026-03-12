@@ -1,77 +1,41 @@
 // commands/shotgunCommand.js
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const ShotgunDuels = require('../modules/shotgunDuels');
 
 const gameManager = new ShotgunDuels();
-const pendingDuels = new Map();
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('shotgun')
-        .setDescription('Main game Shotgun Duels dengan pemain lain!')
-        .addUserOption(option =>
-            option.setName('lawan')
-                .setDescription('Pilih lawan untuk duel')
-                .setRequired(true)),
-    
+        .setDescription('Duel shotgun maut dengan Component v2!')
+        .addUserOption(opt => opt.setName('lawan').setDescription('Pilih lawanmu').setRequired(true)),
+
     async execute(interaction) {
-        try {
-            await interaction.deferReply();
-            
-            const opponent = interaction.options.getUser('lawan');
-            
-            if (opponent.bot) return await interaction.editReply('❌ Tidak bisa main dengan bot!');
-            if (opponent.id === interaction.user.id) return await interaction.editReply('❌ Tidak bisa main dengan diri sendiri!');
-            if (gameManager.isPlayerInGame(interaction.user.id) || gameManager.isPlayerInGame(opponent.id)) {
-                return await interaction.editReply('❌ Salah satu pemain sedang dalam game!');
-            }
-
-            const duelId = `${interaction.user.id}-${opponent.id}`;
-            pendingDuels.set(duelId, { challenger: interaction.user, opponent: opponent });
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`accept_duel_${duelId}`).setLabel('Terima').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`reject_duel_${duelId}`).setLabel('Tolak').setStyle(ButtonStyle.Danger)
-            );
-
-            const embed = new EmbedBuilder()
-                .setTitle('⚔️ TANTANGAN DUEL')
-                .setColor(0x5865F2)
-                .setDescription(`**${interaction.user.username}** menantang **${opponent.username}** untuk duel shotgun!`);
-
-            await interaction.editReply({ content: `${opponent}`, embeds: [embed], components: [row] });
-
-            // Auto expire 1 menit
-            setTimeout(() => {
-                if (pendingDuels.has(duelId)) {
-                    pendingDuels.delete(duelId);
-                    interaction.editReply({ content: '⏰ Tantangan expired.', embeds: [], components: [] }).catch(() => {});
-                }
-            }, 60000);
-
-        } catch (error) {
-            console.error(error);
+        const opponent = interaction.options.getUser('lawan');
+        
+        if (opponent.bot) return interaction.reply({ content: "❌ Tidak bisa melawan bot!", ephemeral: true });
+        if (opponent.id === interaction.user.id) return interaction.reply({ content: "❌ Jangan bunuh diri dulu, mending cari lawan!", ephemeral: true });
+        
+        if (gameManager.isPlayerInGame(interaction.user.id) || gameManager.isPlayerInGame(opponent.id)) {
+            return interaction.reply({ content: "❌ Salah satu pemain masih dalam game!", ephemeral: true });
         }
+
+        await interaction.reply({ content: "🔫 Menyiapkan arena duel...", ephemeral: true });
+        await gameManager.startGame(interaction.user, opponent, interaction.channel);
     },
 
-    async acceptDuel(duelId, interaction) {
-        const duel = pendingDuels.get(duelId);
-        if (!duel) return interaction.reply({ content: '❌ Tantangan sudah tidak ada.', ephemeral: true });
-        if (interaction.user.id !== duel.opponent.id) return interaction.reply({ content: '❌ Bukan kamu yang ditantang!', ephemeral: true });
+    // Panggil fungsi ini dari event interactionCreate
+    async handleInteraction(interaction) {
+        if (!interaction.isButton()) return;
+        const [action, gameId] = interaction.customId.split('_');
+        const game = gameManager.getGame(gameId);
 
-        pendingDuels.delete(duelId);
-        await interaction.update({ content: '🎮 Duel Dimulai!', embeds: [], components: [] });
-        await gameManager.startGame(duel.challenger, duel.opponent, interaction.channel, interaction);
-    },
+        if (!game) return;
+        if (!game.players.some(p => p.id === interaction.user.id)) {
+            return interaction.reply({ content: "❌ Kamu bukan pemain di duel ini!", ephemeral: true });
+        }
 
-    async rejectDuel(duelId, interaction) {
-        const duel = pendingDuels.get(duelId);
-        if (!duel) return interaction.reply({ content: '❌ Tantangan sudah tidak ada.', ephemeral: true });
-        if (interaction.user.id !== duel.opponent.id) return interaction.reply({ content: '❌ Bukan kamu yang ditantang!', ephemeral: true });
-
-        pendingDuels.delete(duelId);
-        await interaction.update({ content: '❌ Duel ditolak.', embeds: [], components: [] });
-    },
-    
-    gameManager: gameManager
+        await interaction.deferUpdate();
+        await gameManager.handleAction(interaction.customId, gameId, interaction.user.id, interaction);
+    }
 };
