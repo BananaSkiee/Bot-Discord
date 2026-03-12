@@ -1,4 +1,3 @@
-// events/interactionCreate.js
 const fs = require("fs");
 const path = require("path");
 const { ROLES, guildId } = require("../config");
@@ -10,6 +9,9 @@ const filePath = path.join(__dirname, "../data/taggedUsers.json");
 const VerifySystem = require('../modules/verify');
 const verifySystem = new VerifySystem();
 
+// Import Shotgun system - ✅ WAJIB ADA
+const { gameManager } = require('../commands/shotgunCommand');
+
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
@@ -20,114 +22,109 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-// ========== VERIFY SYSTEM HANDLERS ==========
-// ✅ BUTTON INTERACTIONS
-if (interaction.isButton()) {
-  const { customId } = interaction;
-  console.log(`🔘 Button clicked: ${customId}`);
+      // ========== VERIFY SYSTEM HANDLERS ==========
+      // ✅ BUTTON INTERACTIONS
+      if (interaction.isButton()) {
+        const { customId } = interaction;
+        console.log(`🔘 Button clicked: ${customId}`);
 
-  // Verify Account Button
-  if (customId === 'verify_account') {
-    return await verifySystem.handleVerify(interaction);
-  }
-  
-  // Skip Verify Button
-  if (customId === 'skip_verify') {
-    return await verifySystem.handleSkipVerify(interaction);
-  }
-  
-  // Continue Verify Button
-  if (customId === 'continue_verify') {
-    return await verifySystem.handleContinueVerify(interaction);
-  }
-  
-  // Next Verify Button
-  if (customId === 'next_verify') {
-    return await verifySystem.handleNextVerify(interaction);
-  }
-  
-  // See Mission Button - ✅ INI YANG DITAMBAH
-  if (customId === 'see_mission') {
-    return await verifySystem.handleSeeMission(interaction);
-  }
-  
-  // Auto Welcome Button
-  if (customId === 'auto_welcome') {
-    // Fungsi ini tidak ada di verify.js yang terakhir, perlu diimplementasikan
-    // return await verifySystem.handleAutoWelcome(interaction);
-    console.log("⚠️ handleAutoWelcome tidak diimplementasikan.");
-    return interaction.reply({ content: "⚠️ Fitur Auto Welcome belum aktif.", ephemeral: true });
-  }
+        // Verify Account Button
+        if (customId === 'verify_account') {
+          return await verifySystem.handleVerify(interaction);
+        }
+        
+        // Skip Verify Button
+        if (customId === 'skip_verify') {
+          return await verifySystem.handleSkipVerify(interaction);
+        }
+        
+        // Continue Verify Button
+        if (customId === 'continue_verify') {
+          return await verifySystem.handleContinueVerify(interaction);
+        }
+        
+        // Next Verify Button
+        if (customId === 'next_verify') {
+          return await verifySystem.handleNextVerify(interaction);
+        }
+        
+        // See Mission Button
+        if (customId === 'see_mission') {
+          return await verifySystem.handleSeeMission(interaction);
+        }
+        
+        // Auto Welcome Button
+        if (customId === 'auto_welcome') {
+          console.log("⚠️ handleAutoWelcome tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Auto Welcome belum aktif.", ephemeral: true });
+        }
 
-  // Welcome Selection Buttons
-  if (customId.startsWith('welcome_')) {
-    // return await verifySystem.handleWelcomeSelection(interaction);
-    console.log("⚠️ handleWelcomeSelection tidak diimplementasikan.");
-    return interaction.reply({ content: "⚠️ Fitur Welcome Selection belum aktif.", ephemeral: true });
-  }
-  
-  // Custom Message Button
-  if (customId === 'custom_message') {
-    // return await verifySystem.handleCustomMessage(interaction);
-    console.log("⚠️ handleCustomMessage tidak diimplementasikan.");
-    return interaction.reply({ content: "⚠️ Fitur Custom Message belum aktif.", ephemeral: true });
-  }
-  
-  // Input Rating Button
-  if (customId === 'input_rating') {
-    return await verifySystem.handleInputRating(interaction);
-  }
-  
-  // Give Feedback Button
-  if (customId === 'give_feedback') {
-    return await verifySystem.handleGiveFeedback(interaction);
-  }
-  
-  // Next Final Button
-  if (customId === 'next_final') {
-    return await verifySystem.handleNextFinal(interaction);
-  }
-  
-  // Rate Server Button
-  if (customId === 'rate_server') {
-    return await verifySystem.handleInputRating(interaction);
-  }
-  
-  // FAQ Buttons
-  if (customId === 'faqs_skip' || customId === 'faqs_rating') {
-    return await verifySystem.handleFaqs(interaction);
-  }
-  
-  // Give Role Buttons
-  if (customId === 'give_role_skip' || customId === 'give_role_final') {
-    return await verifySystem.handleGiveRole(interaction);
-  }
-  
-  // Back to Verify Button
-  if (customId === 'back_to_verify') {
-    return await verifySystem.handleBackToVerify(interaction);
-  }
-}
+        // Welcome Selection Buttons
+        if (customId.startsWith('welcome_')) {
+          console.log("⚠️ handleWelcomeSelection tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Welcome Selection belum aktif.", ephemeral: true });
+        }
+        
+        // Custom Message Button
+        if (customId === 'custom_message') {
+          console.log("⚠️ handleCustomMessage tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Custom Message belum aktif.", ephemeral: true });
+        }
+        
+        // Input Rating Button
+        if (customId === 'input_rating') {
+          return await verifySystem.handleInputRating(interaction);
+        }
+        
+        // Give Feedback Button
+        if (customId === 'give_feedback') {
+          return await verifySystem.handleGiveFeedback(interaction);
+        }
+        
+        // Next Final Button
+        if (customId === 'next_final') {
+          return await verifySystem.handleNextFinal(interaction);
+        }
+        
+        // Rate Server Button
+        if (customId === 'rate_server') {
+          return await verifySystem.handleInputRating(interaction);
+        }
+        
+        // FAQ Buttons
+        if (customId === 'faqs_skip' || customId === 'faqs_rating') {
+          return await verifySystem.handleFaqs(interaction);
+        }
+        
+        // Give Role Buttons
+        if (customId === 'give_role_skip' || customId === 'give_role_final') {
+          return await verifySystem.handleGiveRole(interaction);
+        }
+        
+        // Back to Verify Button
+        if (customId === 'back_to_verify') {
+          return await verifySystem.handleBackToVerify(interaction);
+        }
+      }
 
-    // ✅ MODAL SUBMIT INTERACTIONS - PASTIKAN INI ADA
-if (interaction.isModalSubmit()) {
-    const { customId } = interaction;
-    console.log(`📝 Modal submitted: ${customId}`);
+      // ✅ MODAL SUBMIT INTERACTIONS
+      if (interaction.isModalSubmit()) {
+        const { customId } = interaction;
+        console.log(`📝 Modal submitted: ${customId}`);
 
-    if (customId === 'input_rating_modal') {
-        return await verifySystem.handleRatingSubmit(interaction);
-    }
-    
-    if (customId === 'give_feedback_modal') {
-        return await verifySystem.handleFeedbackSubmit(interaction);
-    }
-    
-    if (customId === 'custom_message_modal') {
-        // return await verifySystem.handleCustomMessageSubmit(interaction);
-        console.log("⚠️ handleCustomMessageSubmit tidak diimplementasikan.");
-        return interaction.reply({ content: "⚠️ Fitur Custom Message Submit belum aktif.", ephemeral: true });
-    }
-}  
+        if (customId === 'input_rating_modal') {
+          return await verifySystem.handleRatingSubmit(interaction);
+        }
+        
+        if (customId === 'give_feedback_modal') {
+          return await verifySystem.handleFeedbackSubmit(interaction);
+        }
+        
+        if (customId === 'custom_message_modal') {
+          console.log("⚠️ handleCustomMessageSubmit tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Custom Message Submit belum aktif.", ephemeral: true });
+        }
+      }  
       
       // ========== DUEL ACCEPT/REJECT HANDLER ==========
       if (interaction.isButton() && interaction.customId && (
@@ -143,15 +140,13 @@ if (interaction.isModalSubmit()) {
           const shotgunCommand = require('../commands/shotgunCommand');
           
           if (action === 'accept') {
-              await shotgunCommand.acceptDuel(duelId, interaction);
+              return await shotgunCommand.acceptDuel(duelId, interaction);
           } else if (action === 'reject') {
-              await shotgunCommand.rejectDuel(duelId, interaction);
+              return await shotgunCommand.rejectDuel(duelId, interaction);
           }
-          
-          return;
       }
 
-      // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED ==========
+      // ========== SHOTGUN DUELS BUTTON HANDLER - FIXED & CLEANED ==========
       if (interaction.isButton() && interaction.customId) {
         const customId = interaction.customId;
         
@@ -164,7 +159,7 @@ if (interaction.isModalSubmit()) {
             
             let gameId, action, itemIndex;
             
-            // FIX: Parsing yang benar untuk customId
+            // Parsing Logic
             if (customId.startsWith('item_')) {
                 const parts = customId.split('_');
                 gameId = parts[1];
@@ -179,75 +174,40 @@ if (interaction.isModalSubmit()) {
             } else if (customId.startsWith('surrender_')) {
                 gameId = customId.replace('surrender_', '');
                 action = 'surrender';
-            } else {
-                await interaction.reply({ 
-                    content: '❌ Invalid button!', 
-                    ephemeral: true 
-                });
-                return;
             }
-            
-            const { gameManager } = require('../commands/shotgunCommand');
+
             const game = gameManager.getGame(gameId);
             
             if (!game) {
-                await interaction.reply({ 
+                return await interaction.reply({ 
                     content: '❌ Game tidak ditemukan atau sudah selesai!', 
                     ephemeral: true 
                 });
-                return;
             }
 
-            // Check if it's user's turn
-            const currentPlayer = game.players[game.currentPlayer];
-            if (!currentPlayer || currentPlayer.id !== interaction.user.id) {
-                await interaction.reply({ 
+            // Validasi Giliran Pemain
+            if (game.players[game.currentPlayer].id !== interaction.user.id) {
+                return await interaction.reply({ 
                     content: '❌ Bukan giliran kamu!', 
                     ephemeral: true 
                 });
-                return;
             }
 
-            // Defer update untuk button interactions
+            // Defer update agar tombol tidak loading terus
             await interaction.deferUpdate();
 
             try {
-                switch (action) {
-                    case 'use_item':
-                        if (isNaN(itemIndex)) {
-                            await interaction.followUp({ 
-                                content: '❌ Item tidak valid!', 
-                                ephemeral: true 
-                            });
-                            return;
-                        }
-                        await gameManager.useItem(gameId, interaction.user.id, itemIndex, interaction);
-                        break;
-                        
-                    case 'shoot_self':
-                        await gameManager.shoot(gameId, interaction.user.id, 'self', interaction);
-                        break;
-                        
-                    case 'shoot_opponent':
-                        await gameManager.shoot(gameId, interaction.user.id, 'opponent', interaction);
-                        break;
-                        
-                    case 'surrender':
-                        await gameManager.surrender(gameId, interaction.user.id, interaction);
-                        break;
-                        
-                    default:
-                        await interaction.followUp({ 
-                            content: '❌ Aksi tidak dikenali!', 
-                            ephemeral: true 
-                        });
+                if (action === 'use_item') {
+                    await gameManager.useItem(gameId, interaction.user.id, itemIndex, interaction);
+                } else if (action === 'shoot_self') {
+                    await gameManager.shoot(gameId, interaction.user.id, 'self', interaction);
+                } else if (action === 'shoot_opponent') {
+                    await gameManager.shoot(gameId, interaction.user.id, 'opponent', interaction);
+                } else if (action === 'surrender') {
+                    await gameManager.surrender(gameId, interaction.user.id);
                 }
             } catch (error) {
-                console.error('❌ Error handling shotgun interaction:', error);
-                await interaction.followUp({ 
-                    content: '❌ Terjadi error saat memproses aksi!', 
-                    ephemeral: true 
-                });
+                console.error('❌ Shotgun Interaction Error:', error);
             }
             return;
         }
