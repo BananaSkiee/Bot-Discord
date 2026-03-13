@@ -208,19 +208,19 @@ client.on("webhookUpdate", async (channel) => {
 });
 
 // 🔐 Login bot
-client.login(config.token);
+ client.login(config.token);
 // --- HANDLER UNTUK INTERACTION (INTRO & WEBHOOK) ---
-client.on('interactionCreate', async (interaction) => {
+/* client.on('interactionCreate', async (interaction) => {
     try {
         // 1. Handle Intro Card (Lama)
-        await handleIntroInteractions(interaction);
+        await handleIntroInteractions(interaction); 
         
     } catch (err) {
         // Biar nggak error "Already Replied" di log
         if (interaction.replied || interaction.deferred) return;
         console.error("❌ Interaction Error:", err);
     }
-});
+}); */
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
