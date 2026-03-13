@@ -9,7 +9,7 @@ const filePath = path.join(__dirname, "../data/taggedUsers.json");
 const VerifySystem = require('../modules/verify');
 const verifySystem = new VerifySystem();
 
-// Import Shotgun system - ✅ Pakai Destructuring yang bener sesuai log lu
+// Import Shotgun system - ✅ WAJIB ADA
 const { gameManager } = require('../commands/shotgunCommand');
 
 function saveTaggedUsers(data) {
@@ -20,10 +20,7 @@ module.exports = {
   name: "interactionCreate",
   async execute(interaction) {
     try {
-      // Log interaction biar gampang debug di console
-      if (interaction.isButton() || interaction.isModalSubmit()) {
-          console.log(`👉 Interaction [${interaction.type}]: ${interaction.customId}`);
-      }
+      console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
       // ========== SLASH COMMANDS HANDLER ==========
       if (interaction.isChatInputCommand()) {
@@ -32,69 +29,32 @@ module.exports = {
         return await command.execute(interaction);
       }
 
-      // ========== SHOTGUN DUELS HANDLER (V2) - PRIORITAS UTAMA ==========
-      if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
-          const parts = interaction.customId.split('_');
-          const action = parts[1]; // accept, reject, ready, shoot, item, surrender
-          const gameId = parts[2];
-
-          // 1. Handle Accept/Reject (Gak perlu cek turn)
-          if (action === 'accept') return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
-          if (action === 'reject') return await gameManager.rejectDuel(gameId, interaction);
-
-          // 2. Load Game Data
-          const game = gameManager.getGame(gameId);
-          if (!game) {
-              return await interaction.reply({ content: '❌ Sesi game hilang atau bot baru saja restart!', ephemeral: true });
-          }
-
-          // 3. Handle Ready
-          if (action === 'ready') {
-              await interaction.deferUpdate().catch(() => {});
-              return await gameManager.handleAction('ready', gameId, interaction.user.id, interaction);
-          }
-
-          // 4. Check Turn
-          const turnPlayer = game.players[game.currentPlayer];
-          if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
-              return await interaction.reply({ content: '❌ Sabar, ini bukan giliranmu!', ephemeral: true });
-          }
-
-          // 5. Execute Action
-          // Gunakan try-catch lokal supaya kalau gameManager error, bot gak crash total
-          try {
-              if (action === 'shoot') {
-                  await interaction.deferUpdate().catch(() => {});
-                  const target = parts[2]; // self / opp (dari customId sg_shoot_self_gameId)
-                  const realId = parts[3]; 
-                  return await gameManager.handleAction(`shoot_${target}`, realId, interaction.user.id, interaction);
-              }
-              
-              if (action === 'item') {
-                  await interaction.deferUpdate().catch(() => {});
-                  return await gameManager.handleAction('use_item', gameId, interaction.user.id, interaction, parts[3]);
-              }
-              
-              if (action === 'surrender') {
-                  await interaction.deferUpdate().catch(() => {});
-                  return await gameManager.handleAction('surrender', gameId, interaction.user.id, interaction);
-              }
-          } catch (gameErr) {
-              console.error("❌ Shotgun Logic Error:", gameErr);
-              if (!interaction.replied) await interaction.followUp({ content: "❌ Terjadi kesalahan saat memproses aksi game.", ephemeral: true });
-          }
-          return;
-      }
-
       // ========== VERIFY SYSTEM HANDLERS ==========
       if (interaction.isButton()) {
         const { customId } = interaction;
+        console.log(`🔘 Button clicked: ${customId}`);
 
         if (customId === 'verify_account') return await verifySystem.handleVerify(interaction);
         if (customId === 'skip_verify') return await verifySystem.handleSkipVerify(interaction);
         if (customId === 'continue_verify') return await verifySystem.handleContinueVerify(interaction);
         if (customId === 'next_verify') return await verifySystem.handleNextVerify(interaction);
         if (customId === 'see_mission') return await verifySystem.handleSeeMission(interaction);
+        
+        if (customId === 'auto_welcome') {
+          console.log("⚠️ handleAutoWelcome tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Auto Welcome belum aktif.", ephemeral: true });
+        }
+
+        if (customId.startsWith('welcome_')) {
+          console.log("⚠️ handleWelcomeSelection tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Welcome Selection belum aktif.", ephemeral: true });
+        }
+        
+        if (customId === 'custom_message') {
+          console.log("⚠️ handleCustomMessage tidak diimplementasikan.");
+          return interaction.reply({ content: "⚠️ Fitur Custom Message belum aktif.", ephemeral: true });
+        }
+        
         if (customId === 'input_rating') return await verifySystem.handleInputRating(interaction);
         if (customId === 'give_feedback') return await verifySystem.handleGiveFeedback(interaction);
         if (customId === 'next_final') return await verifySystem.handleNextFinal(interaction);
@@ -109,9 +69,50 @@ module.exports = {
         const { customId } = interaction;
         if (customId === 'input_rating_modal') return await verifySystem.handleRatingSubmit(interaction);
         if (customId === 'give_feedback_modal') return await verifySystem.handleFeedbackSubmit(interaction);
+        if (customId === 'custom_message_modal') {
+          return interaction.reply({ content: "⚠️ Fitur Custom Message Submit belum aktif.", ephemeral: true });
+        }
       }  
             
-      // ========== TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
+      // ========== SHOTGUN DUELS HANDLER (V2) - FULLY SYNCED ==========
+      if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
+          const parts = interaction.customId.split('_');
+          const action = parts[1]; // accept, reject, ready, shoot, item, surrender
+          const gameId = parts[2];
+
+          // 1. Handle Accept/Reject (Bebas Turn)
+          if (action === 'accept') return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
+          if (action === 'reject') return await gameManager.rejectDuel(gameId, interaction);
+
+          // 2. Load Game Data
+          const game = gameManager.getGame(gameId);
+          if (!game) return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
+
+          // 3. Handle Ready (Sebelum game mulai)
+          if (action === 'ready') return await gameManager.handleReady(gameId, interaction);
+
+          // 4. Check Turn (Hanya pemain giliran, kecuali surrender)
+          const turnPlayer = game.players[game.currentPlayer];
+          if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
+              return await interaction.reply({ content: '❌ Bukan giliranmu!', ephemeral: true });
+          }
+
+          // 5. Execute Action (Synced to modules/shotgunDuels.js)
+          if (action === 'shoot') {
+              const target = parts[3]; // target: self / opp
+              return await gameManager.handleShoot(gameId, target, interaction);
+          }
+          if (action === 'item') {
+              const itemIndex = parseInt(parts[3]);
+              return await gameManager.handleItem(gameId, itemIndex, interaction);
+          }
+          if (action === 'surrender') {
+              return await gameManager.handleSurrender(gameId, interaction);
+          }
+          return;
+      }
+      
+      // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
       if (!interaction.isButton()) return;
       
       const username = interaction.user.globalName ?? interaction.user.username;
@@ -119,7 +120,9 @@ module.exports = {
       if (!guild) return;
 
       const member = await guild.members.fetch(interaction.user.id).catch(() => null);
-      if (!member) return;
+      if (!member) {
+        return interaction.reply({ content: "❌ Gagal ambil datamu dari server.", ephemeral: true });
+      }
 
       const customId = interaction.customId;
       const taggedUsers = fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : {};
@@ -140,8 +143,7 @@ module.exports = {
         return interaction.reply({ content: "✅ Tag dihapus.", ephemeral: true });
       }
 
-      // Handler Nickname Testing
-      if (customId.startsWith("test_use_tag_") || customId.startsWith("test_remove_tag_")) {
+      if (customId && (customId.startsWith("test_use_tag_") || customId.startsWith("test_remove_tag_"))) {
         const parts = customId.split("_");
         const action = parts[1];
         const roleId = parts[3];
@@ -164,21 +166,17 @@ module.exports = {
         }
       }
 
-      // Handler Unknown Button (Filter biar gak spam)
-      const skipPrefixes = ['verify_', 'sg_', 'skip_', 'continue_', 'next_', 'welcome_', 'rate_', 'faqs_', 'give_', 'back_', 'auto_', 'custom_'];
-      if (!skipPrefixes.some(p => interaction.customId.startsWith(p)) && 
-          !['use_tag', 'remove_tag'].includes(interaction.customId)) {
+      // Handler Unknown Button
+      const verifyPrefixes = ['verify_', 'skip_', 'continue_', 'next_', 'welcome_', 'rate_', 'faqs_', 'give_', 'back_', 'auto_', 'custom_'];
+      if (!verifyPrefixes.some(p => interaction.customId.startsWith(p))) {
         await interaction.reply({ content: "⚠️ Tombol tidak dikenali.", ephemeral: true });
       }
 
     } catch (err) {
-      console.error("❌ ERROR GLOBAL INTERACTION:", err);
-      // Cegah crash "Unknown Interaction" saat bot mencoba reply interaction yang sudah hang
-      try {
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: "❌ Terjadi error internal pada bot.", ephemeral: true });
-          }
-      } catch (e) {}
+      console.error("❌ ERROR GLOBAL:", err);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: "❌ Terjadi error internal.", ephemeral: true });
+      }
     }
   },
 };
