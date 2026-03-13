@@ -74,43 +74,69 @@ module.exports = {
         }
       }  
             
-      // ========== SHOTGUN DUELS HANDLER (V2) - FULLY SYNCED ==========
-      if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
-          const parts = interaction.customId.split('_');
-          const action = parts[1]; // accept, reject, ready, shoot, item, surrender
-          const gameId = parts[2];
+      // ========== SHOTGUN DUELS HANDLER (V2) - FIXED ==========
+if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
+    const parts = interaction.customId.split('_');
+    const action = parts[1]; // accept, reject, ready, shoot, item, surrender, dec, done
+    const gameId = parts[2];
 
-          // 1. Handle Accept/Reject (Bebas Turn)
-          if (action === 'accept') return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
-          if (action === 'reject') return await gameManager.rejectDuel(gameId, interaction);
+    console.log(`🔫 Shotgun action: ${action} for game ${gameId}`);
 
-          // 2. Load Game Data
-          const game = gameManager.getGame(gameId);
-          if (!game) return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
+    // 1. Handle Accept/Reject (Bebas Turn)
+    if (action === 'accept') {
+        return await this.gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
+    }
+    
+    if (action === 'reject') {
+        return await this.gameManager.rejectDuel(gameId, interaction);
+    }
 
-          // 3. Handle Ready (Sebelum game mulai)
-          if (action === 'ready') return await gameManager.handleReady(gameId, interaction);
+    // 2. Load Game Data
+    const game = this.gameManager.getGame(gameId);
+    if (!game) {
+        return await interaction.reply({ 
+            content: '❌ Sesi game hilang atau bot baru restart!', 
+            ephemeral: true 
+        });
+    }
 
-          // 4. Check Turn (Hanya pemain giliran, kecuali surrender)
-          const turnPlayer = game.players[game.currentPlayer];
-          if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
-              return await interaction.reply({ content: '❌ Bukan giliranmu!', ephemeral: true });
+    // 3. Handle Ready (Sebelum game mulai)
+    if (action === 'ready') {
+        return await this.gameManager.handleReady(gameId, interaction);
+    }
+
+    // 4. Handle decorative buttons (ignore)
+    if (action === 'dec' || action === 'done') {
+        return await interaction.deferUpdate();
+    }
+
+    // 5. Check Turn (Hanya pemain giliran, kecuali surrender)
+    const turnPlayer = game.players[game.currentPlayer];
+    if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
+        return await interaction.reply({ 
+            content: '❌ Bukan giliranmu!', 
+            ephemeral: true 
+        });
+    }
+
+    // 6. Execute Action
+    if (action === 'shoot') {
+        const target = parts[3]; // target: self / opp
+        return await this.gameManager.handleShoot(gameId, target, interaction);
+    }
+    
+    if (action === 'item') {
+        const itemIndex = parseInt(parts[3]);
+        if (isNaN(itemIndex)) return;
+        return await this.gameManager.handleItem(gameId, itemIndex, interaction);
+    }
+    
+    if (action === 'surrender') {
+        return await this.gameManager.handleSurrender(gameId, interaction);
+    }
+    
+    return;
           }
-
-          // 5. Execute Action (Synced to modules/shotgunDuels.js)
-          if (action === 'shoot') {
-              const target = parts[3]; // target: self / opp
-              return await gameManager.handleShoot(gameId, target, interaction);
-          }
-          if (action === 'item') {
-              const itemIndex = parseInt(parts[3]);
-              return await gameManager.handleItem(gameId, itemIndex, interaction);
-          }
-          if (action === 'surrender') {
-              return await gameManager.handleSurrender(gameId, interaction);
-          }
-          return;
-      }
       
       // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
       if (!interaction.isButton()) return;
