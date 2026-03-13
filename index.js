@@ -15,7 +15,7 @@ const invitesTracker = require("./modules/invitesTracker");
 // const srvName = require("./modules/srvName.js"); 
 // const { startAutoAnimation } = require("./modules/iconAnim");
 // const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
-// const { handleIntroInteractions } = require('./modules/introCard');
+const { handleIntroInteractions } = require('./modules/introCard');
 const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
 
 const client = new Client({
@@ -209,8 +209,9 @@ client.on("webhookUpdate", async (channel) => {
 
 // 🔐 Login bot
  client.login(config.token);
+
 // --- HANDLER UNTUK INTERACTION (INTRO & WEBHOOK) ---
-/* client.on('interactionCreate', async (interaction) => {
+ client.on('interactionCreate', async (interaction) => {
     try {
         // 1. Handle Intro Card (Lama)
         await handleIntroInteractions(interaction); 
@@ -220,7 +221,7 @@ client.on("webhookUpdate", async (channel) => {
         if (interaction.replied || interaction.deferred) return;
         console.error("❌ Interaction Error:", err);
     }
-}); */
+});
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
