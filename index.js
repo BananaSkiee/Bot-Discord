@@ -15,7 +15,7 @@ const invitesTracker = require("./modules/invitesTracker");
 // const srvName = require("./modules/srvName.js"); 
 // const { startAutoAnimation } = require("./modules/iconAnim");
 // const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
-const { handleIntroInteractions } = require('./modules/introCard');
+// const { handleIntroInteractions } = require('./modules/introCard');
 const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
 
 const client = new Client({
