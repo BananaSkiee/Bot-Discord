@@ -4,39 +4,45 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 class ShotgunLogic {
     constructor() {
         this.games = new Map();
-        // Helper Animasi Font
-        this.fonts = {
+    }
+
+    getGame(id) { 
+        return this.games.get(id); 
+    }
+
+    // --- Helper Animasi Font ---
+    get fonts() {
+        return {
             loading: ["『 ▒▒▒▒▒▒▒▒▒▒ 』", "『 ██▒▒▒▒▒▒▒▒ 』", "『 ████▒▒▒▒▒▒ 』", "『 ██████▒▒▒▒ 』", "『 ████████▒▒ 』", "『 ██████████ 』"],
             reload: "ＲＥＬＯＡＤＩＮＧ  ＣＨＡＭＢＥＲ",
             gacha: "ＧＡＣＨＡＩＮＧ  ＩＴＥＭＳ"
         };
     }
 
-    getGame(id) { return this.games.get(id); }
-
     async acceptDuel(gameId, interaction, challengerId, opponentId) {
         if (interaction.user.id !== opponentId) {
-            return interaction.reply({ content: "❌ Bukan lu yang ditantang!", ephemeral: true });
+            return interaction.reply({ 
+                content: "❌ Bukan lu yang ditantang!", 
+                ephemeral: true 
+            });
         }
         
         const challengerUser = await interaction.client.users.fetch(challengerId);
         const opponentUser = await interaction.client.users.fetch(opponentId);
-        
+
         const game = {
             id: gameId,
             players: [
                 { 
                     id: challengerId, 
-                    username: challengerUser.username,
-                    tag: `<@${challengerId}>`,
+                    username: challengerUser.username, 
                     hp: 5, 
                     items: [], 
                     ready: false 
                 },
                 { 
                     id: opponentId, 
-                    username: opponentUser.username,
-                    tag: `<@${opponentId}>`,
+                    username: opponentUser.username, 
                     hp: 5, 
                     items: [], 
                     ready: false 
@@ -47,102 +53,130 @@ class ShotgunLogic {
             logs: ["│ INFO │ Game dimulai!", "│ INFO │ Menunggu pemain ready...", "│ INFO │", "│ INFO │", "│ INFO │"],
             nextDmg: 1,
             handcuffed: false,
-            handcuffedPlayer: null,
             usedItemThisTurn: { handcuff: false, knife: false },
             reloadCount: 0,
-            afkTimer: null,
-            message: null
+            afkTimer: null
         };
 
         this.games.set(gameId, game);
         this.resetAFK(gameId, interaction);
 
-        const statusStr = `${game.players[0].tag} Wait vs ${game.players[1].tag} Wait`;
-
-        const payload = {
+        await interaction.update({
+            flags: 32768,
             components: [{
                 type: 17,
                 components: [
                     { type: 10, content: "# Game Shotgun Duels" },
                     { type: 14 },
-                    { type: 10, content: `**${opponentUser.username} menerima tantangan**\n## Informasi\n> AFK 5 menit = Kalah\n> Main dengan Cerdik\n## Jenis Item\n> - 🍺 Minum: Buang peluru\n> - 🔪 Pisau: Double Damage\n> - 🔗 Borgol: Jalan 2x\n> - 🔎 Lup: Lihat isi peluru\n> - 🚬 Rokok: Heal 1 HP\n\n${statusStr}` },
+                    { 
+                        type: 10, 
+                        content: `**<@${opponentId}> menerima tantangan\nKamu, <@${challengerId}>**\n## Informasi\n> AFK 5 menit = Kalah\n> Main dengan Cerdik\n## Jenis Item\n> - Minum ( 🍺 ) Buang peluru\n> - Pisau ( 🔪 ) Double Damage\n> - Borgol ( 🔗 ) Jalan 2x\n> - Lup ( 🔎 ) Lihat isi peluru\n> - Rokok ( 🚬 ) Heal 1 HP\n\n**${game.players[0].username} Wait vs ${game.players[1].username} Wait**` 
+                    },
                     { type: 14 },
                     {
                         type: 1,
                         components: [
-                            { style: 4, type: 2, label: "Tunggu", custom_id: `sg_ready_${gameId}` },
-                            { style: 2, type: 2, label: "◼️", custom_id: `sg_dec_${gameId}`, disabled: true },
-                            { style: 3, type: 2, label: "Selesai", custom_id: `sg_done_${gameId}`, disabled: true }
+                            { 
+                                style: 4, 
+                                type: 2, 
+                                label: "Tunggu", 
+                                custom_id: `sg_ready_${gameId}` 
+                            },
+                            { 
+                                style: 2, 
+                                type: 2, 
+                                label: "◼️", 
+                                custom_id: `sg_dec`, 
+                                disabled: true 
+                            },
+                            { 
+                                style: 3, 
+                                type: 2, 
+                                label: "Selesai", 
+                                custom_id: `sg_done`, 
+                                disabled: true 
+                            }
                         ]
                     },
                     { type: 14 },
                     { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
                 ]
             }]
-        };
-
-        await interaction.update(payload);
+        });
     }
 
     async rejectDuel(gameId, interaction) {
-        const rejectNotes = [
-            "Mentalnya ciut!",
-            "Kabur sebelum perang!",
-            "Takut mati rupanya!",
-            "Mending main yang lain aja!",
-            "Keberaniannya hilang!"
-        ];
-        const randomNote = rejectNotes[Math.floor(Math.random() * rejectNotes.length)];
-
         await interaction.update({
+            flags: 32768,
             components: [{
                 type: 17,
                 components: [
                     { type: 10, content: "# Game Shotgun Duels" },
                     { type: 14 },
-                    { type: 10, content: `**${interaction.user.username} Menolak Tantangan**\n\n>>> Note: ${randomNote}` },
+                    { 
+                        type: 10, 
+                        content: `**${interaction.user.username} Menolak Tantangan**\n\n>>> Note: Lawan mentalnya ciut! Jangan takut untuk mencoba, keberanian adalah kunci kemenangan.` 
+                    },
                     { type: 14 },
                     { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
                 ]
             }]
         });
-        
-        // Hapus game dari memory
-        setTimeout(() => this.games.delete(gameId), 5000);
     }
 
     async handleReady(gameId, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
-        
+        if (!game) {
+            return interaction.reply({ 
+                content: "❌ Game tidak ditemukan!", 
+                ephemeral: true 
+            });
+        }
+
         const player = game.players.find(p => p.id === interaction.user.id);
-        if (!player || player.ready) return;
+        if (!player) {
+            return interaction.reply({ 
+                content: "❌ Kamu bukan pemain di game ini!", 
+                ephemeral: true 
+            });
+        }
+
+        if (player.ready) {
+            return interaction.reply({ 
+                content: "❌ Kamu sudah ready!", 
+                ephemeral: true 
+            });
+        }
 
         player.ready = true;
-        this.resetAFK(gameId, interaction);
-
         const allReady = game.players.every(p => p.ready);
 
         if (allReady) {
-            await this.startNewRound(gameId, interaction, true);
+            await this.startNewRound(gameId, interaction);
         } else {
-            const statusStr = game.players.map(p => `${p.tag} ${p.ready ? 'Ready' : 'Wait'}`).join(' vs ');
+            const statusStr = game.players.map(p => 
+                `${p.username} ${p.ready ? 'Ready' : 'Wait'}`
+            ).join(' vs ');
             
             await interaction.update({
+                flags: 32768,
                 components: [{
                     type: 17,
                     components: [
                         { type: 10, content: "# Game Shotgun Duels" },
                         { type: 14 },
                         { type: 10, content: `## Persiapan\n${statusStr}` },
-                        { type: 14 },
-                        {
-                            type: 1,
+                        { 
+                            type: 1, 
                             components: [
-                                { style: 4, type: 2, label: "Tunggu", custom_id: `sg_ready_${gameId}`, disabled: true },
-                                { style: 2, type: 2, label: "◼️", custom_id: `sg_dec_${gameId}`, disabled: true },
-                                { style: 3, type: 2, label: "Selesai", custom_id: `sg_done_${gameId}`, disabled: true }
-                            ]
+                                { 
+                                    style: 3, 
+                                    type: 2, 
+                                    label: "Selesai", 
+                                    custom_id: "sg_rd", 
+                                    disabled: true 
+                                }
+                            ] 
                         },
                         { type: 14 },
                         { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
@@ -152,30 +186,12 @@ class ShotgunLogic {
         }
     }
 
-    async startNewRound(gameId, interaction, isFirstRound = false) {
+    async startNewRound(gameId, interaction) {
         const game = this.games.get(gameId);
         if (!game) return;
-        
+
         game.reloadCount++;
         
-        // Animasi Loading
-        for (let i = 0; i < this.fonts.loading.length; i++) {
-            const frame = this.fonts.loading[i];
-            const animText = i < 3 ? this.fonts.gacha : this.fonts.reload;
-            
-            await interaction.editReply({
-                components: [{
-                    type: 17,
-                    components: [
-                        { type: 10, content: `# ${animText}` },
-                        { type: 14 },
-                        { type: 10, content: `\`\`\`${frame}\`\`\`\n-# Mempersiapkan chamber...` }
-                    ]
-                }]
-            });
-            await new Promise(r => setTimeout(r, 600));
-        }
-
         // Aturan Peluru: Total 8, Min 2 Kosong & 2 Isi
         const total = 8;
         const realCount = Math.floor(Math.random() * 5) + 2; // 2 sampai 6 isi
@@ -184,26 +200,66 @@ class ShotgunLogic {
         game.chamber = Array(realCount).fill('🔴').concat(Array(emptyCount).fill('⚪'));
         this.shuffle(game.chamber);
 
-        // Gacha Item (1-4 random, minimal 1)
+        // Gacha Item (1-4 random)
         game.players.forEach(p => {
-            p.items = []; // Reset items
-            const itemCount = Math.floor(Math.random() * 4) + 1; // 1-4 item
+            const itemCount = Math.floor(Math.random() * 4) + 1;
             const pool = ['🍺', '🔪', '🔗', '🔎', '🚬'];
+            p.items = []; // Reset items dulu
             for(let i = 0; i < itemCount; i++) {
-                p.items.push(pool[Math.floor(Math.random() * pool.length)]);
+                if(p.items.length < 4) {
+                    p.items.push(pool[Math.floor(Math.random() * pool.length)]);
+                }
             }
         });
+
+        // Reset status per turn
+        game.usedItemThisTurn = { handcuff: false, knife: false };
+        game.nextDmg = 1;
+        game.handcuffed = false;
+
+        // Animasi Loading
+        const loadingFrames = this.fonts.loading;
+        for (let i = 0; i < loadingFrames.length; i++) {
+            await interaction.editReply({
+                flags: 32768,
+                components: [
+                    {
+                        type: 17,
+                        components: [
+                            { type: 10, content: `# ${this.fonts.gacha}` },
+                            { type: 14 },
+                            { type: 10, content: `${loadingFrames[i]}` }
+                        ]
+                    }
+                ]
+            });
+            await new Promise(r => setTimeout(r, 400));
+        }
+
+        // Animasi Reload
+        for (let i = 0; i < loadingFrames.length; i++) {
+            await interaction.editReply({
+                flags: 32768,
+                components: [
+                    {
+                        type: 17,
+                        components: [
+                            { type: 10, content: `# ${this.fonts.reload}` },
+                            { type: 14 },
+                            { type: 10, content: `${loadingFrames[i]}` }
+                        ]
+                    }
+                ]
+            });
+            await new Promise(r => setTimeout(r, 400));
+        }
 
         // Tampilkan Chamber & Items (5 detik)
         await interaction.editReply(this.renderChamberView(game));
         await new Promise(r => setTimeout(r, 5000));
         
-        // Reset status untuk round baru
-        game.nextDmg = 1;
-        game.handcuffed = false;
-        game.handcuffedPlayer = null;
-        game.usedItemThisTurn = { handcuff: false, knife: false };
-        game.logs = ["│ INFO │ Round baru dimulai!", "│ INFO │ Chamber telah diisi ulang", "│ INFO │", "│ INFO │", "│ INFO │"];
+        // Reset logs untuk round baru
+        game.logs = ["│ INFO │ Round baru dimulai!", "│ INFO │", "│ INFO │", "│ INFO │", "│ INFO │"];
         
         await this.renderMain(gameId, interaction);
     }
@@ -212,112 +268,103 @@ class ShotgunLogic {
         const real = game.chamber.filter(c => c === '🔴').length;
         const empty = game.chamber.filter(c => c === '⚪').length;
         
-        const p1Items = game.players[0].items.map(i => `> - **${this.getItemName(i)}** (${i})`).join('\n') || '> - Tidak ada item';
-        const p2Items = game.players[1].items.map(i => `> - **${this.getItemName(i)}** (${i})`).join('\n') || '> - Tidak ada item';
-        
-        return {
-            components: [
-                {
-                    type: 17,
-                    components: [
-                        { type: 10, content: "# 🔄 RELOAD CHAMBER" },
-                        { type: 14 },
-                        { type: 10, content: `**Isi Chamber:**\n> **Kosong: ${empty} ⚪**\n> **Peluru: ${real} 🔴**\n\n**Item ${game.players[0].tag}:**\n${p1Items}\n\n**Item ${game.players[1].tag}:**\n${p2Items}` },
-                        { type: 14 },
-                        { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${game.id}` }
-                    ]
-                }
-            ]
+        const itemEmojis = {
+            '🍺': 'Minum ( 🍺 )',
+            '🔪': 'Pisau ( 🔪 )',
+            '🔗': 'Borgol ( 🔗 )',
+            '🔎': 'Lup ( 🔎 )',
+            '🚬': 'Rokok ( 🚬 )'
         };
-    }
 
-    getItemName(emoji) {
-        const names = {
-            '🍺': 'Minum',
-            '🔪': 'Pisau',
-            '🔗': 'Borgol',
-            '🔎': 'Lup',
-            '🚬': 'Rokok'
+        return {
+            flags: 32768,
+            components: [{
+                type: 17,
+                components: [
+                    { type: 10, content: "# Reload Chamber" },
+                    { type: 14 },
+                    { 
+                        type: 10, 
+                        content: `**Isi Chamber:**\n> **Kosong: ${empty} ⚪**\n> **Peluru: ${real} 🔴**\n\n**Item ${game.players[0].username}:**\n${game.players[0].items.map(i => `> - **${itemEmojis[i]}**`).join('\n')}\n\n**Item ${game.players[1].username}:**\n${game.players[1].items.map(i => `> - **${itemEmojis[i]}**`).join('\n')}` 
+                    },
+                    { type: 14 },
+                    { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${game.id}` }
+                ]
+            }]
         };
-        return names[emoji] || 'Item';
     }
 
     async renderMain(gameId, interaction) {
         const game = this.games.get(gameId);
         if (!game) return;
-        
+
         const p1 = game.players[0];
         const p2 = game.players[1];
         const current = game.players[game.currentPlayer];
-        const opponent = game.players[1 - game.currentPlayer];
 
-        const hpBar = (hp) => "♥️".repeat(hp) + "🤍".repeat(5-hp);
+        const hpBar = (hp) => "♥️".repeat(hp) + "🤍".repeat(5 - hp);
 
-        // Status section
-        let statusText = "";
-        if (game.nextDmg > 1 || game.handcuffed) {
-            statusText = "\n### Status:\n";
-            if (game.nextDmg > 1) statusText += `> **Next DMG: 2x**\n`;
-            if (game.handcuffed && game.handcuffedPlayer) {
-                statusText += `> **${game.handcuffedPlayer.tag} Terborgol**\n`;
-            }
-        }
-
-        // Items section
-        const currentItems = current.items.map(item => `${this.getItemName(item)} (${item})`).join('\n> - ') || 'Tidak ada item';
-        
-        const mainContent = `### ${p1.tag} vs ${p2.tag}
-> **${p1.tag}:** ${hpBar(p1.hp)} (${p1.hp})
-> **${p2.tag}:** ${hpBar(p2.hp)} (${p2.hp})
-
-> **Giliran: ${current.tag}**
-> **Sisa peluru: ${game.chamber.length}/8**
-> **Reload Chamber: ${game.reloadCount}x**${statusText}
-
-### Item ${current.username} :
-> - ${currentItems}`;
-
-        // Item buttons
-        const itemButtons = [];
-        if (current.items.length > 0) {
-            const row = { type: 1, components: [] };
-            current.items.forEach((item, idx) => {
-                if (idx < 5) { // Max 5 buttons per row
-                    row.components.push({
-                        type: 2,
-                        style: 2,
-                        label: item,
-                        custom_id: `sg_item_${gameId}_${idx}`
-                    });
-                }
-            });
-            itemButtons.push(row);
-        }
-
-        // Action buttons row
-        const actionRow = {
-            type: 1,
-            components: [
-                { type: 2, style: 2, label: "Shoot Yourself", custom_id: `sg_shoot_self_${gameId}` },
-                { type: 2, style: 2, label: "Shoot Enemy", custom_id: `sg_shoot_opp_${gameId}` },
-                { type: 2, style: 2, label: "🏳️", custom_id: `sg_surrender_${gameId}` }
-            ]
+        const itemEmojis = {
+            '🍺': '🍺',
+            '🔪': '🔪',
+            '🔗': '🔗',
+            '🔎': '🔎',
+            '🚬': '🚬'
         };
 
-        // Logs
-        const logText = game.logs.join('\n');
+        // Build status section
+        let statusContent = "";
+        if (game.nextDmg > 1 || game.handcuffed) {
+            statusContent = "### Status:\n";
+            if (game.nextDmg > 1) statusContent += `> **Next DMG: 2x**\n`;
+            if (game.handcuffed) statusContent += `> **${game.players[1 - game.currentPlayer].username} Terborgol**\n`;
+        }
+
+        // Build item buttons
+        const itemButtons = current.items.map((item, idx) => ({
+            type: 2,
+            style: 2,
+            label: itemEmojis[item],
+            custom_id: `sg_item_${gameId}_${idx}`
+        }));
+
+        // Fill empty slots if less than 4 items
+        while (itemButtons.length < 4) {
+            itemButtons.push({
+                type: 2,
+                style: 2,
+                label: "◼️",
+                custom_id: `sg_empty_${gameId}_${itemButtons.length}`,
+                disabled: true
+            });
+        }
 
         const payload = {
+            flags: 32768,
             components: [
                 {
                     type: 17,
                     components: [
                         { type: 12, items: [] },
-                        { type: 10, content: mainContent },
+                        { type: 10, content: "# Game Shotgun Duels" },
                         { type: 14 },
-                        ...itemButtons,
-                        actionRow,
-                        { type: 14 }
+                        { 
+                            type: 10, 
+                            content: `### ${p1.username} vs ${p2.username}\n> **${p1.username}:** ${hpBar(p1.hp)} **(${p1.hp})**\n> **${p2.username}:** ${hpBar(p2.hp)} **(${p2.hp})**\n\n> **Giliran: <@${current.id}>**\n> **Sisa peluru: ${game.chamber.length}/8**\n> **Reload Chamber: ${game.reloadCount}x**\n${statusContent}\n### Item ${current.username}:\n${current.items.map(i => `> - ${itemEmojis[i]}`).join('\n')}` 
+                        },
+                        { type: 14 },
+                        {
+                            type: 1,
+                            components: itemButtons
+                        },
+                        {
+                            type: 1,
+                            components: [
+                                { type: 2, style: 2, label: "Shoot Yourself", custom_id: `sg_shoot_self_${gameId}` },
+                                { type: 2, style: 2, label: "Shoot Enemy", custom_id: `sg_shoot_opp_${gameId}` },
+                                { type: 2, style: 2, label: "🏳️", custom_id: `sg_surrender_${gameId}` }
+                            ]
+                        }
                     ]
                 },
                 {
@@ -326,7 +373,7 @@ class ShotgunLogic {
                         { type: 14 },
                         { type: 10, content: "## Log Shotgun Duels:" },
                         { type: 14 },
-                        { type: 10, content: logText },
+                        { type: 10, content: game.logs.join('\n') },
                         { type: 14 },
                         { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
                     ]
@@ -343,67 +390,100 @@ class ShotgunLogic {
 
     async handleShoot(gameId, target, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
-        
+        if (!game) {
+            return interaction.reply({ 
+                content: "❌ Game tidak ditemukan!", 
+                ephemeral: true 
+            });
+        }
+
         const bullet = game.chamber.shift();
         const shooter = game.players[game.currentPlayer];
         const victim = target === 'self' ? shooter : game.players[1 - game.currentPlayer];
 
         let logMsg = "";
-        let damage = game.nextDmg;
-        
+        let gameEnded = false;
+
         if (bullet === '🔴') {
-            victim.hp -= damage;
+            victim.hp -= game.nextDmg;
+            logMsg = `│ INFO │ 💥 DOR! ${victim.username} kena ${game.nextDmg} DMG!`;
             
-            if (target === 'self') {
-                logMsg = `│ INFO │ 💥 ${shooter.username} menembak diri sendiri! -${damage} HP`;
-            } else {
-                logMsg = `│ INFO │ 💥 ${shooter.username} menembak ${victim.username}! -${damage} HP`;
-            }
-            
-            // Reset status setelah tembakan
+            // Reset status
             game.nextDmg = 1;
             game.usedItemThisTurn = { handcuff: false, knife: false };
             
-            // Cek handcuff
-            if (game.handcuffed && game.handcuffedPlayer && game.handcuffedPlayer.id === victim.id) {
-                game.handcuffed = false;
-                game.handcuffedPlayer = null;
-                // Korban tetap tidak bisa jalan di turn ini
-            } else if (!game.handcuffed) {
+            // Switch turn unless handcuffed
+            if (!game.handcuffed) {
                 game.currentPlayer = 1 - game.currentPlayer;
             } else {
                 game.handcuffed = false;
-                game.handcuffedPlayer = null;
             }
         } else {
-            logMsg = `│ INFO │ 💨 ${shooter.username} menembak tapi kosong!`;
+            logMsg = `│ INFO │ 💨 KLIK! Peluru kosong.`;
+            game.nextDmg = 1;
+            game.usedItemThisTurn = { handcuff: false, knife: false };
             
             if (target !== 'self') {
                 if (!game.handcuffed) {
                     game.currentPlayer = 1 - game.currentPlayer;
                 } else {
                     game.handcuffed = false;
-                    game.handcuffedPlayer = null;
                 }
             }
-            
-            game.nextDmg = 1;
-            game.usedItemThisTurn = { handcuff: false, knife: false };
         }
 
         this.addLog(game, logMsg);
         this.resetAFK(gameId, interaction);
 
-        // Cek game over
-        const p1 = game.players[0];
-        const p2 = game.players[1];
-        
-        if (p1.hp <= 0 || p2.hp <= 0) {
-            return this.endGame(gameId, interaction, p1.hp <= 0 ? p2 : p1);
+        // Check win condition
+        if (game.players[0].hp <= 0 || game.players[1].hp <= 0) {
+            const winner = game.players.find(p => p.hp > 0);
+            const loser = game.players.find(p => p.hp <= 0);
+            return this.endGame(gameId, interaction, winner, loser, 'kill');
         }
-        
+
+        // Check if chamber empty
         if (game.chamber.length === 0) {
+            // Show reload animation in log area briefly
+            await interaction.update({
+                flags: 32768,
+                components: [
+                    {
+                        type: 17,
+                        components: [
+                            { type: 12, items: [] },
+                            { type: 10, content: "# Game Shotgun Duels" },
+                            { type: 14 },
+                            { 
+                                type: 10, 
+                                content: `### ${game.players[0].username} vs ${game.players[1].username}\n> **${game.players[0].username}:** ${"♥️".repeat(game.players[0].hp) + "🤍".repeat(5 - game.players[0].hp)} **(${game.players[0].hp})**\n> **${game.players[1].username}:** ${"♥️".repeat(game.players[1].hp) + "🤍".repeat(5 - game.players[1].hp)} **(${game.players[1].hp})**\n\n> **Giliran: <@${game.players[game.currentPlayer].id}>**\n> **Sisa peluru: 0/8**\n> **Reload Chamber: ${game.reloadCount}x**` 
+                            },
+                            { type: 14 },
+                            {
+                                type: 1,
+                                components: [
+                                    { type: 2, style: 2, label: "◼️", custom_id: `sg_wait`, disabled: true },
+                                    { type: 2, style: 2, label: "◼️", custom_id: `sg_wait2`, disabled: true },
+                                    { type: 2, style: 2, label: "◼️", custom_id: `sg_wait3`, disabled: true }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        type: 17,
+                        components: [
+                            { type: 14 },
+                            { type: 10, content: "# Reload Chamber" },
+                            { type: 14 },
+                            { type: 10, content: "Mempersiapkan peluru baru..." },
+                            { type: 14 },
+                            { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
+                        ]
+                    }
+                ]
+            });
+            
+            await new Promise(r => setTimeout(r, 2000));
             return this.startNewRound(gameId, interaction);
         }
         
@@ -412,140 +492,98 @@ class ShotgunLogic {
 
     async handleItem(gameId, idx, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
-        
-        const player = game.players[game.currentPlayer];
-        const opponent = game.players[1 - game.currentPlayer];
-        const item = player.items[idx];
-
-        if (!item) return;
-
-        let logMsg = `│ INFO │ ${player.username} menggunakan ${this.getItemName(item)} ${item}`;
-        let needRender = true;
-
-        // Handle item effects
-        if (item === '🔗') { // Borgol
-            if (game.usedItemThisTurn.handcuff) {
-                return interaction.reply({ content: "❌ Borgol cuma bisa 1x per turn!", ephemeral: true });
-            }
-            game.handcuffed = true;
-            game.handcuffedPlayer = opponent;
-            game.usedItemThisTurn.handcuff = true;
-            
-        } else if (item === '🔪') { // Pisau
-            if (game.usedItemThisTurn.knife) {
-                return interaction.reply({ content: "❌ Pisau cuma bisa 1x per turn!", ephemeral: true });
-            }
-            game.nextDmg = 2;
-            game.usedItemThisTurn.knife = true;
-            
-        } else if (item === '🚬') { // Rokok
-            if (player.hp < 5) {
-                player.hp++;
-                logMsg = `│ INFO │ ${player.username} merokok, HP +1!`;
-            } else {
-                return interaction.reply({ content: "❌ HP sudah penuh!", ephemeral: true });
-            }
-            
-        } else if (item === '🍺') { // Minum
-            if (game.chamber.length > 0) {
-                const removed = game.chamber.shift();
-                logMsg = `│ INFO │ ${player.username} minum, membuang 1 peluru (${removed})!`;
-            } else {
-                return interaction.reply({ content: "❌ Tidak ada peluru untuk dibuang!", ephemeral: true });
-            }
-            
-        } else if (item === '🔎') { // Lup
-            needRender = false;
-            const nextBullet = game.chamber[0] || 'Kosong';
-            const bulletText = nextBullet === '🔴' ? '🔴 Berisi' : '⚪ Kosong';
-            await interaction.reply({ 
-                content: `🔍 **${player.username}** melihat peluru selanjutnya: **${bulletText}**`,
+        if (!game) {
+            return interaction.reply({ 
+                content: "❌ Game tidak ditemukan!", 
                 ephemeral: true 
             });
         }
 
-        // Hapus item yang digunakan
-        player.items.splice(idx, 1);
+        const player = game.players[game.currentPlayer];
         
-        if (needRender) {
-            this.addLog(game, logMsg);
-            this.resetAFK(gameId, interaction);
-            
-            // Cek jika chamber habis setelah minum
-            if (item === '🍺' && game.chamber.length === 0) {
-                return this.startNewRound(gameId, interaction);
-            }
-            
-            await this.renderMain(gameId, interaction);
+        if (idx >= player.items.length) {
+            return interaction.reply({ 
+                content: "❌ Item tidak valid!", 
+                ephemeral: true 
+            });
         }
+
+        const item = player.items[idx];
+
+        if (item === '🔗') {
+            if (game.usedItemThisTurn.handcuff) {
+                return interaction.reply({ 
+                    content: "❌ Borgol cuma bisa 1x per turn!", 
+                    ephemeral: true 
+                });
+            }
+            game.handcuffed = true;
+            game.usedItemThisTurn.handcuff = true;
+        } else if (item === '🔪') {
+            if (game.usedItemThisTurn.knife) {
+                return interaction.reply({ 
+                    content: "❌ Pisau cuma bisa 1x per turn!", 
+                    ephemeral: true 
+                });
+            }
+            game.nextDmg = 2;
+            game.usedItemThisTurn.knife = true;
+        } else if (item === '🚬') {
+            if (player.hp < 5) player.hp++;
+        } else if (item === '🍺') {
+            if (game.chamber.length > 0) {
+                game.chamber.shift();
+            }
+        } else if (item === '🔎') {
+            const nextBullet = game.chamber[0] || '⚪';
+            const bulletType = nextBullet === '🔴' ? 'Peluru Aktif 🔴' : 'Peluru Kosong ⚪';
+            return interaction.reply({ 
+                content: `🔍 Peluru selanjutnya adalah: **${bulletType}**`, 
+                ephemeral: true 
+            });
+        }
+
+        player.items.splice(idx, 1);
+        this.addLog(game, `│ INFO │ ${player.username} menggunakan ${item}`);
+        await this.renderMain(gameId, interaction);
     }
 
     async handleSurrender(gameId, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
-        
-        const surrenderer = game.players.find(p => p.id === interaction.user.id);
+        if (!game) {
+            return interaction.reply({ 
+                content: "❌ Game tidak ditemukan!", 
+                ephemeral: true 
+            });
+        }
+
+        const surrenderPlayer = game.players.find(p => p.id === interaction.user.id);
+        if (!surrenderPlayer) {
+            return interaction.reply({ 
+                content: "❌ Kamu bukan pemain di game ini!", 
+                ephemeral: true 
+            });
+        }
+
         const winner = game.players.find(p => p.id !== interaction.user.id);
         
-        if (!surrenderer || !winner) return;
-        
-        const surrenderNotes = [
-            "Menyerah sebelum bertarung!",
-            "Keberaniannya luntur!",
-            "Kabur dari kenyataan!",
-            "Mentalnya lemah!",
-            "Tidak siap bertarung!"
-        ];
-        const randomNote = surrenderNotes[Math.floor(Math.random() * surrenderNotes.length)];
-
         await interaction.update({
+            flags: 32768,
             components: [{
                 type: 17,
                 components: [
                     { type: 10, content: "# Game Shotgun Duels" },
                     { type: 14 },
-                    { type: 10, content: `**Selamat ${winner.tag} menang!**\n**${surrenderer.username} Menyerah**\n\n>>> Note: ${randomNote}` },
+                    { 
+                        type: 10, 
+                        content: `**Selamat kamu menang <@${winner.id}>**\n**Karena <@${surrenderPlayer.id}> menyerah!**\n\n> Note: Menyerah bukanlah akhir dari segalanya. Yang penting adalah keberanian untuk mencoba lagi di lain waktu. Mental juara tidak pernah menyerah, tapi tahu kapan harus beristirahat.` 
+                    },
                     { type: 14 },
                     { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
                 ]
             }]
         });
-        
-        // Hapus game
-        if (game.afkTimer) clearTimeout(game.afkTimer);
-        this.games.delete(gameId);
-    }
 
-    async endGame(gameId, interaction, winner) {
-        const game = this.games.get(gameId);
-        if (!game) return;
-        
-        const loser = game.players.find(p => p.id !== winner.id);
-        
-        const winNotes = [
-            "Kemenangan yang gemilang!",
-            "Pantang menyerah sampai akhir!",
-            "Strategi yang brilian!",
-            "Luar biasa pertarungannya!",
-            "Berhasil mengalahkan lawan!"
-        ];
-        const randomNote = winNotes[Math.floor(Math.random() * winNotes.length)];
-
-        await interaction.editReply({
-            components: [{
-                type: 17,
-                components: [
-                    { type: 10, content: "# Game Shotgun Duels" },
-                    { type: 14 },
-                    { type: 10, content: `**Selamat ${winner.tag} menang!**\n**${loser.username} Kalah**\n\n>>> Note: ${randomNote}` },
-                    { type: 14 },
-                    { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
-                ]
-            }]
-        });
-        
-        // Hapus game
         if (game.afkTimer) clearTimeout(game.afkTimer);
         this.games.delete(gameId);
     }
@@ -560,41 +598,64 @@ class ShotgunLogic {
         if (!game) return;
         
         if (game.afkTimer) clearTimeout(game.afkTimer);
-        
-        game.afkTimer = setTimeout(async () => {
-            await this.afkWin(gameId, interaction);
-        }, 300000); // 5 menit
+        game.afkTimer = setTimeout(() => this.afkWin(gameId, interaction), 300000);
     }
 
     async afkWin(gameId, interaction) {
         const game = this.games.get(gameId);
         if (!game) return;
         
-        const afkPlayer = game.players[game.currentPlayer];
         const winner = game.players[1 - game.currentPlayer];
+        const afkPlayer = game.players[game.currentPlayer];
         
-        const afkNotes = [
-            "Terlalu lama mikir, mentalnya kabur!",
-            "AFK terlalu lama, konsentrasi hilang!",
-            "Mungkin lagi sibuk, lain kali main lagi!",
-            "Jangan kelamaan mikir, nanti kena AFK!",
-            "Kehabisan waktu, lain kali lebih cepat!"
-        ];
-        const randomNote = afkNotes[Math.floor(Math.random() * afkNotes.length)];
+        try {
+            await interaction.editReply({
+                flags: 32768,
+                components: [{
+                    type: 17,
+                    components: [
+                        { type: 10, content: "# Game Shotgun Duels" },
+                        { type: 14, divider: true },
+                        { 
+                            type: 10, 
+                            content: `**<@${afkPlayer.id}> AFK Selama 5 menit, Selamat\nKamu menang <@${winner.id}>!**\n\n> Note: Waktu adalah emas! Jangan kelamaan mikir, mentalnya kabur ya? Strategi cepat dan tepat adalah kunci kemenangan sejati.` 
+                        },
+                        { type: 14 },
+                        { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
+                    ]
+                }]
+            });
+        } catch (err) {
+            console.error("Error saat mengedit reply AFK:", err);
+        }
+        
+        this.games.delete(gameId);
+    }
 
-        await interaction.editReply({
+    async endGame(gameId, interaction, winner, loser, type) {
+        const game = this.games.get(gameId);
+        if (!game) return;
+
+        let content = "";
+        if (type === 'kill') {
+            content = `**Selamat kamu menang <@${winner.id}>!**\n\n> Note: Kemenangan yang gemilang! Strategi dan keberanianmu telah membuahkan hasil. Terus asah instingmu untuk pertempuran berikutnya.`;
+        }
+
+        await interaction.update({
+            flags: 32768,
             components: [{
                 type: 17,
                 components: [
                     { type: 10, content: "# Game Shotgun Duels" },
                     { type: 14 },
-                    { type: 10, content: `**${afkPlayer.username} AFK Selama 5 menit!**\n**Selamat ${winner.tag} menang!**\n\n>>> Note: ${randomNote}` },
+                    { type: 10, content: content },
                     { type: 14 },
                     { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
                 ]
             }]
         });
-        
+
+        if (game.afkTimer) clearTimeout(game.afkTimer);
         this.games.delete(gameId);
     }
 
