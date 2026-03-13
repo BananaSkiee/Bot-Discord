@@ -73,7 +73,7 @@ module.exports = {
           return interaction.reply({ content: "⚠️ Fitur Custom Message Submit belum aktif.", ephemeral: true });
         }
       }  
-            
+
       // ========== SHOTGUN DUELS HANDLER (V2) - FIXED ==========
 if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
     const parts = interaction.customId.split('_');
@@ -84,15 +84,15 @@ if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
 
     // 1. Handle Accept/Reject (Bebas Turn)
     if (action === 'accept') {
-        return await this.gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
+        return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]); // <-- ganti this.gameManager jadi gameManager
     }
     
     if (action === 'reject') {
-        return await this.gameManager.rejectDuel(gameId, interaction);
+        return await gameManager.rejectDuel(gameId, interaction); // <-- ganti this.gameManager jadi gameManager
     }
 
     // 2. Load Game Data
-    const game = this.gameManager.getGame(gameId);
+    const game = gameManager.getGame(gameId); // <-- ganti this.gameManager jadi gameManager
     if (!game) {
         return await interaction.reply({ 
             content: '❌ Sesi game hilang atau bot baru restart!', 
@@ -102,7 +102,7 @@ if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
 
     // 3. Handle Ready (Sebelum game mulai)
     if (action === 'ready') {
-        return await this.gameManager.handleReady(gameId, interaction);
+        return await gameManager.handleReady(gameId, interaction); // <-- ganti this.gameManager jadi gameManager
     }
 
     // 4. Handle decorative buttons (ignore)
@@ -122,21 +122,21 @@ if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
     // 6. Execute Action
     if (action === 'shoot') {
         const target = parts[3]; // target: self / opp
-        return await this.gameManager.handleShoot(gameId, target, interaction);
+        return await gameManager.handleShoot(gameId, target, interaction); // <-- ganti this.gameManager jadi gameManager
     }
     
     if (action === 'item') {
         const itemIndex = parseInt(parts[3]);
         if (isNaN(itemIndex)) return;
-        return await this.gameManager.handleItem(gameId, itemIndex, interaction);
+        return await gameManager.handleItem(gameId, itemIndex, interaction); // <-- ganti this.gameManager jadi gameManager
     }
     
     if (action === 'surrender') {
-        return await this.gameManager.handleSurrender(gameId, interaction);
+        return await gameManager.handleSurrender(gameId, interaction); // <-- ganti this.gameManager jadi gameManager
     }
     
     return;
-          }
+}
       
       // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
       if (!interaction.isButton()) return;
