@@ -61,8 +61,32 @@ class ShotgunLogic {
         this.games.set(gameId, game);
         this.resetAFK(gameId, interaction);
 
-        // HAPUS type: 12 (Media Gallery) karena tidak ada gambar
-        await interaction.update({
+        // Render initial state - semua pemain Wait
+        await this.renderReadyScreen(gameId, interaction);
+    }
+
+    // Fungsi baru untuk render screen ready
+    async renderReadyScreen(gameId, interaction) {
+        const game = this.games.get(gameId);
+        if (!game) return;
+
+        const [p1, p2] = game.players;
+        
+        // Build status line
+        const statusLine = `**${p1.username} ${p1.ready ? 'Ready' : 'Wait'} vs ${p2.username} ${p2.ready ? 'Ready' : 'Wait'}**`;
+        
+        // Build buttons - dynamic based on player readiness
+        // Tombol untuk P1 (challenger) - di posisi kiri
+        const p1Button = p1.ready 
+            ? { style: 4, type: 2, label: "Waiting", custom_id: `sg_wait_p1_${gameId}`, disabled: true }
+            : { style: 3, type: 2, label: "Confirm", custom_id: `sg_ready_${gameId}_${p1.id}`, disabled: false };
+            
+        // Tombol untuk P2 (opponent) - di posisi kanan
+        const p2Button = p2.ready
+            ? { style: 4, type: 2, label: "Waiting", custom_id: `sg_wait_p2_${gameId}`, disabled: true }
+            : { style: 3, type: 2, label: "Confirm", custom_id: `sg_ready_${gameId}_${p2.id}`, disabled: false };
+
+        const payload = {
             flags: 32768,
             components: [{
                 type: 17,
@@ -71,58 +95,24 @@ class ShotgunLogic {
                     { type: 14 },
                     { 
                         type: 10, 
-                        content: `**<@${opponentId}> menerima tantangan\nKamu, <@${challengerId}>**\n## Informasi\n> AFK 5 menit = Kalah\n> Main dengan Cerdik\n## Jenis Item\n> - Minum ( 🍺 ) Buang peluru\n> - Pisau ( 🔪 ) Double Damage\n> - Borgol ( 🔗 ) Jalan 2x\n> - Lup ( 🔎 ) Lihat isi peluru\n> - Rokok ( 🚬 ) Heal 1 HP\n\n**${game.players[0].username} Wait vs ${game.players[1].username} Wait**` 
+                        content: `**<@${p2.id}> menerima tantangan\nKamu, <@${p1.id}>**\n## Informasi\n> AFK 5 menit = Kalah\n> Main dengan Cerdik\n## Jenis Item\n> - Minum ( 🍺 ) Buang peluru\n> - Pisau ( 🔪 ) Double Damage\n> - Borgol ( 🔗 ) Jalan 2x\n> - Lup ( 🔎 ) Lihat isi peluru\n> - Rokok ( 🚬 ) Heal 1 HP\n\n${statusLine}` 
                     },
                     { type: 14 },
                     {
                         type: 1,
                         components: [
-                            { 
-                                style: 4, 
-                                type: 2, 
-                                label: "Tunggu", 
-                                custom_id: `sg_ready_${gameId}` 
-                            },
-                            { 
-                                style: 2, 
-                                type: 2, 
-                                label: "◼️", 
-                                custom_id: `sg_dec`, 
-                                disabled: true 
-                            },
-                            { 
-                                style: 3, 
-                                type: 2, 
-                                label: "Selesai", 
-                                custom_id: `sg_done`, 
-                                disabled: true 
-                            }
+                            p1Button,
+                            { style: 2, type: 2, label: "◼️", custom_id: `sg_dec_${gameId}`, disabled: true },
+                            p2Button
                         ]
                     },
                     { type: 14 },
                     { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
                 ]
             }]
-        });
-    }
+        };
 
-    async rejectDuel(gameId, interaction) {
-        await interaction.update({
-            flags: 32768,
-            components: [{
-                type: 17,
-                components: [
-                    { type: 10, content: "# Game Shotgun Duels" },
-                    { type: 14 },
-                    { 
-                        type: 10, 
-                        content: `**${interaction.user.username} Menolak Tantangan**\n\n>>> Note: Lawan mentalnya ciut! Jangan takut untuk mencoba, keberanian adalah kunci kemenangan.` 
-                    },
-                    { type: 14 },
-                    { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
-                ]
-            }]
-        });
+        await interaction.update(payload);
     }
 
     async handleReady(gameId, interaction) {
@@ -153,37 +143,11 @@ class ShotgunLogic {
         const allReady = game.players.every(p => p.ready);
 
         if (allReady) {
+            // Langsung gacha jika semua ready
             await this.startNewRound(gameId, interaction);
         } else {
-            const statusStr = game.players.map(p => 
-                `${p.username} ${p.ready ? 'Ready' : 'Wait'}`
-            ).join(' vs ');
-            
-            await interaction.update({
-                flags: 32768,
-                components: [{
-                    type: 17,
-                    components: [
-                        { type: 10, content: "# Game Shotgun Duels" },
-                        { type: 14 },
-                        { type: 10, content: `## Persiapan\n${statusStr}` },
-                        { 
-                            type: 1, 
-                            components: [
-                                { 
-                                    style: 3, 
-                                    type: 2, 
-                                    label: "Selesai", 
-                                    custom_id: "sg_rd", 
-                                    disabled: true 
-                                }
-                            ] 
-                        },
-                        { type: 14 },
-                        { type: 10, content: `-# © BananaSkiee - Shotgun Duels - ID: ${gameId}` }
-                    ]
-                }]
-            });
+            // Update tampilan - tombol yang sudah ready jadi merah "Waiting"
+            await this.renderReadyScreen(gameId, interaction);
         }
     }
 
@@ -346,7 +310,6 @@ class ShotgunLogic {
                 {
                     type: 17,
                     components: [
-                        // HAPUS type: 12 (Media Gallery) yang menyebabkan error
                         { type: 10, content: "# Game Shotgun Duels" },
                         { type: 14 },
                         { 
@@ -403,7 +366,6 @@ class ShotgunLogic {
         const victim = target === 'self' ? shooter : game.players[1 - game.currentPlayer];
 
         let logMsg = "";
-        let gameEnded = false;
 
         if (bullet === '🔴') {
             victim.hp -= game.nextDmg;
