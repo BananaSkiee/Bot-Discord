@@ -32,13 +32,12 @@ module.exports = {
         // Buat ID game unik
         const gameId = `sg-${Date.now()}`;
         
-        // Template Awal (Menantang)
+        // Template Awal (Menantang) - HAPUS type: 12 (Media Gallery)
         const payload = {
             flags: 32768,
             components: [{
                 type: 17,
                 components: [
-                    { type: 12, items: [] },
                     { type: 10, content: "# Game Shotgun Duels" },
                     { type: 14, divider: true, spacing: 1 },
                     { 
