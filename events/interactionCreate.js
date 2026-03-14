@@ -74,16 +74,64 @@ module.exports = {
         }
       }  
 
-      // ========== SHOTGUN DUELS HANDLER (V2) - FULLY SYNCED ==========
+      // ========== SHOTGUN DUELS HANDLER (V2) - FIXED PARSING ==========
       if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
           const parts = interaction.customId.split('_');
           const action = parts[1];
-          const gameId = parts[2];
           
-          console.log(`🎮 Shotgun: action=${action}, gameId=${gameId}, customId=${interaction.customId}`);
+          console.log(`🎮 Shotgun: action=${action}, full customId=${interaction.customId}`);
+          console.log(`🎮 Parts: ${parts.join(' | ')}`);
 
-          if (action === 'accept') return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
-          if (action === 'reject') return await gameManager.rejectDuel(gameId, interaction);
+          // Handle Accept/Reject (format: sg_accept_gameId_challengerId_opponentId)
+          if (action === 'accept') {
+              const gameId = parts[2];
+              return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
+          }
+          if (action === 'reject') {
+              const gameId = parts[2];
+              return await gameManager.rejectDuel(gameId, interaction);
+          }
+
+          // Handle Ready (format: sg_ready_gameId_playerId)
+          if (action === 'ready') {
+              const gameId = parts[2];
+              const playerId = parts[3];
+              console.log(`🎮 Ready: gameId=${gameId}, playerId=${playerId}`);
+              
+              const game = gameManager.getGame(gameId);
+              if (!game) return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
+              
+              if (playerId && interaction.user.id !== playerId) {
+                  return await interaction.reply({ content: '❌ Bukan tombolmu!', ephemeral: true });
+              }
+              return await gameManager.handleReady(gameId, interaction);
+          }
+
+          // Handle Shoot (format: sg_shoot_target_gameId)
+          // Handle Item (format: sg_item_gameId_index)
+          // Handle Surrender (format: sg_surrender_gameId)
+          
+          let gameId;
+          let extraParam;
+          
+          if (action === 'shoot') {
+              // sg_shoot_opp_gameId → parts[3] = gameId
+              // sg_shoot_self_gameId → parts[3] = gameId
+              extraParam = parts[2]; // target: opp/self
+              gameId = parts[3];
+              console.log(`🎮 Shoot: target=${extraParam}, gameId=${gameId}`);
+          } else if (action === 'item') {
+              // sg_item_gameId_index
+              gameId = parts[2];
+              extraParam = parseInt(parts[3]); // item index
+              console.log(`🎮 Item: gameId=${gameId}, index=${extraParam}`);
+          } else if (action === 'surrender') {
+              // sg_surrender_gameId
+              gameId = parts[2];
+              console.log(`🎮 Surrender: gameId=${gameId}`);
+          } else {
+              return await interaction.reply({ content: '❌ Aksi tidak dikenal!', ephemeral: true });
+          }
 
           const game = gameManager.getGame(gameId);
           console.log(`🎮 Game lookup: ${gameId} => ${game ? 'FOUND' : 'NOT FOUND'}`);
@@ -93,31 +141,21 @@ module.exports = {
               return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
           }
 
-          if (action === 'ready') {
-              const playerId = parts[3];
-              if (playerId && interaction.user.id !== playerId) {
-                  return await interaction.reply({ content: '❌ Bukan tombolmu!', ephemeral: true });
-              }
-              return await gameManager.handleReady(gameId, interaction);
-          }
-
+          // Check turn untuk shoot dan item (tidak untuk surrender)
           const turnPlayer = game.players[game.currentPlayer];
           if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
               return await interaction.reply({ content: '❌ Bukan giliranmu!', ephemeral: true });
           }
 
           if (action === 'shoot') {
-              const target = parts[3];
-              return await gameManager.handleShoot(gameId, target, interaction);
+              return await gameManager.handleShoot(gameId, extraParam, interaction);
           }
           if (action === 'item') {
-              const itemIndex = parseInt(parts[3]);
-              return await gameManager.handleItem(gameId, itemIndex, interaction);
+              return await gameManager.handleItem(gameId, extraParam, interaction);
           }
           if (action === 'surrender') {
               return await gameManager.handleSurrender(gameId, interaction);
           }
-          return;
       }
 
       // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
