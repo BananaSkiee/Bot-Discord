@@ -89,7 +89,14 @@ module.exports = {
           if (!game) return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
 
           // 3. Handle Ready (Sebelum game mulai)
-          if (action === 'ready') return await gameManager.handleReady(gameId, interaction);
+          if (action === 'ready') {
+              // Cek apakah ada playerId di parts[3]
+              const playerId = parts[3];
+              if (playerId && interaction.user.id !== playerId) {
+                  return await interaction.reply({ content: '❌ Bukan tombolmu!', ephemeral: true });
+              }
+              return await gameManager.handleReady(gameId, interaction);
+          }
 
           // 4. Check Turn (Hanya pemain giliran, kecuali surrender)
           const turnPlayer = game.players[game.currentPlayer];
