@@ -74,87 +74,130 @@ module.exports = {
         }
       }  
 
-      // ========== SHOTGUN DUELS HANDLER (V2) - FIXED PARSING ==========
+      // ========== SHOTGUN DUELS HANDLER - VERSI DEWA BERKELAS DUNIA ==========
       if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
-          const parts = interaction.customId.split('_');
-          const action = parts[1];
-          
-          console.log(`🎮 Shotgun: action=${action}, full customId=${interaction.customId}`);
-          console.log(`🎮 Parts: ${parts.join(' | ')}`);
-
-          // Handle Accept/Reject (format: sg_accept_gameId_challengerId_opponentId)
-          if (action === 'accept') {
-              const gameId = parts[2];
-              return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
-          }
-          if (action === 'reject') {
-              const gameId = parts[2];
-              return await gameManager.rejectDuel(gameId, interaction);
-          }
-
-          // Handle Ready (format: sg_ready_gameId_playerId)
-          if (action === 'ready') {
-              const gameId = parts[2];
-              const playerId = parts[3];
-              console.log(`🎮 Ready: gameId=${gameId}, playerId=${playerId}`);
+          try {
+              const parts = interaction.customId.split('_');
+              const prefix = parts[0]; // sg
+              const action = parts[1]; // accept, reject, ready, shoot, item, surrender
               
-              const game = gameManager.getGame(gameId);
-              if (!game) return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
-              
-              if (playerId && interaction.user.id !== playerId) {
-                  return await interaction.reply({ content: '❌ Bukan tombolmu!', ephemeral: true });
+              console.log(`🎮 [SHOTGUN] Action: ${action} | CustomID: ${interaction.customId}`);
+              console.log(`🎮 [SHOTGUN] Parts: [${parts.join('][')}]`);
+
+              // ===== FORMAT PARSING =====
+              // accept:  sg_accept_{gameId}_{challengerId}_{opponentId}
+              // reject:  sg_reject_{gameId}_{challengerId}
+              // ready:   sg_ready_{gameId}_{playerId}
+              // shoot:   sg_shoot_{target}_{gameId}  ← PERHATIKAN: target dulu, gameId belakang
+              // item:    sg_item_{gameId}_{index}
+              // surrender: sg_surrender_{gameId}
+
+              let gameId, param1, param2;
+
+              // Parse berdasarkan action
+              switch(action) {
+                  case 'accept':
+                      gameId = parts[2];
+                      param1 = parts[3]; // challengerId
+                      param2 = parts[4]; // opponentId
+                      break;
+                  case 'reject':
+                      gameId = parts[2];
+                      break;
+                  case 'ready':
+                      gameId = parts[2];
+                      param1 = parts[3]; // playerId
+                      break;
+                  case 'shoot':
+                      // FORMAT KHUSUS: sg_shoot_opp_gameId atau sg_shoot_self_gameId
+                      param1 = parts[2]; // target (opp/self)
+                      gameId = parts[3]; // gameId
+                      break;
+                  case 'item':
+                      gameId = parts[2];
+                      param1 = parseInt(parts[3]); // item index
+                      break;
+                  case 'surrender':
+                      gameId = parts[2];
+                      break;
+                  default:
+                      return await interaction.reply({ 
+                          content: '❌ Aksi tidak dikenal!', 
+                          ephemeral: true 
+                      });
               }
-              return await gameManager.handleReady(gameId, interaction);
-          }
 
-          // Handle Shoot (format: sg_shoot_target_gameId)
-          // Handle Item (format: sg_item_gameId_index)
-          // Handle Surrender (format: sg_surrender_gameId)
-          
-          let gameId;
-          let extraParam;
-          
-          if (action === 'shoot') {
-              // sg_shoot_opp_gameId → parts[3] = gameId
-              // sg_shoot_self_gameId → parts[3] = gameId
-              extraParam = parts[2]; // target: opp/self
-              gameId = parts[3];
-              console.log(`🎮 Shoot: target=${extraParam}, gameId=${gameId}`);
-          } else if (action === 'item') {
-              // sg_item_gameId_index
-              gameId = parts[2];
-              extraParam = parseInt(parts[3]); // item index
-              console.log(`🎮 Item: gameId=${gameId}, index=${extraParam}`);
-          } else if (action === 'surrender') {
-              // sg_surrender_gameId
-              gameId = parts[2];
-              console.log(`🎮 Surrender: gameId=${gameId}`);
-          } else {
-              return await interaction.reply({ content: '❌ Aksi tidak dikenal!', ephemeral: true });
-          }
+              console.log(`🎮 [SHOTGUN] Parsed: gameId=${gameId}, param1=${param1}, param2=${param2}`);
 
-          const game = gameManager.getGame(gameId);
-          console.log(`🎮 Game lookup: ${gameId} => ${game ? 'FOUND' : 'NOT FOUND'}`);
-          
-          if (!game) {
-              console.log(`🎮 Available games: ${gameManager.games?.size || 0} games`);
-              return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
-          }
+              // ===== HANDLE ACCEPT/REJECT (tidak perlu cek game) =====
+              if (action === 'accept') {
+                  return await gameManager.acceptDuel(gameId, interaction, param1, param2);
+              }
+              if (action === 'reject') {
+                  return await gameManager.rejectDuel(gameId, interaction);
+              }
 
-          // Check turn untuk shoot dan item (tidak untuk surrender)
-          const turnPlayer = game.players[game.currentPlayer];
-          if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
-              return await interaction.reply({ content: '❌ Bukan giliranmu!', ephemeral: true });
-          }
+              // ===== CEK GAME EXISTENCE =====
+              const game = gameManager.getGame(gameId);
+              if (!game) {
+                  console.error(`🎮 [SHOTGUN] ERROR: Game ${gameId} not found!`);
+                  console.error(`🎮 [SHOTGUN] Available: ${gameManager.gamesList?.join(', ') || 'none'}`);
+                  
+                  // Coba cari game yang mirip (tanpa timestamp)
+                  const baseId = gameId?.split('-')[0];
+                  const similarGame = Array.from(gameManager.games?.keys() || []).find(k => k.includes(baseId));
+                  if (similarGame) {
+                      console.log(`🎮 [SHOTGUN] Found similar game: ${similarGame}`);
+                  }
+                  
+                  return await interaction.reply({ 
+                      content: '❌ Sesi game hilang atau sudah berakhir!', 
+                      ephemeral: true 
+                  });
+              }
 
-          if (action === 'shoot') {
-              return await gameManager.handleShoot(gameId, extraParam, interaction);
-          }
-          if (action === 'item') {
-              return await gameManager.handleItem(gameId, extraParam, interaction);
-          }
-          if (action === 'surrender') {
-              return await gameManager.handleSurrender(gameId, interaction);
+              // ===== HANDLE READY =====
+              if (action === 'ready') {
+                  // Cek apakah tombol ini untuk pemain yang benar
+                  if (param1 && interaction.user.id !== param1) {
+                      return await interaction.reply({ 
+                          content: '❌ Bukan tombolmu!', 
+                          ephemeral: true 
+                      });
+                  }
+                  return await gameManager.handleReady(gameId, interaction);
+              }
+
+              // ===== CEK TURN (kecuali surrender) =====
+              const currentPlayer = game.players[game.currentPlayer];
+              if (action !== 'surrender' && interaction.user.id !== currentPlayer.id) {
+                  return await interaction.reply({ 
+                      content: `❌ Bukan giliranmu! Sekarang giliran ${currentPlayer.username}`, 
+                      ephemeral: true 
+                  });
+              }
+
+              // ===== HANDLE ACTIONS =====
+              switch(action) {
+                  case 'shoot':
+                      console.log(`🎮 [SHOTGUN] Shoot: ${param1} (target) | Game: ${gameId}`);
+                      return await gameManager.handleShoot(gameId, param1, interaction);
+                  case 'item':
+                      console.log(`🎮 [SHOTGUN] Item: index ${param1} | Game: ${gameId}`);
+                      return await gameManager.handleItem(gameId, param1, interaction);
+                  case 'surrender':
+                      console.log(`🎮 [SHOTGUN] Surrender by ${interaction.user.tag} | Game: ${gameId}`);
+                      return await gameManager.handleSurrender(gameId, interaction);
+              }
+
+          } catch (err) {
+              console.error('🎮 [SHOTGUN] CRITICAL ERROR:', err);
+              if (!interaction.replied && !interaction.deferred) {
+                  return await interaction.reply({ 
+                      content: '❌ Terjadi error internal!', 
+                      ephemeral: true 
+                  });
+              }
           }
       }
 
