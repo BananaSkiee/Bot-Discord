@@ -143,6 +143,8 @@ class ShotgunLogic {
         const allReady = game.players.every(p => p.ready);
 
         if (allReady) {
+            // Defer dulu supaya interaction tidak expired
+            await interaction.deferUpdate();
             // Langsung gacha jika semua ready
             await this.startNewRound(gameId, interaction);
         } else {
@@ -182,7 +184,7 @@ class ShotgunLogic {
         game.nextDmg = 1;
         game.handcuffed = false;
 
-        // Animasi Loading
+        // Animasi Loading - pakai editReply karena sudah defer
         const loadingFrames = this.fonts.loading;
         for (let i = 0; i < loadingFrames.length; i++) {
             await interaction.editReply({
@@ -345,11 +347,8 @@ class ShotgunLogic {
             ]
         };
 
-        if (interaction.replied || interaction.deferred) {
-            await interaction.editReply(payload);
-        } else {
-            await interaction.update(payload);
-        }
+        // Selalu pakai editReply karena interaction sudah deferred
+        await interaction.editReply(payload);
     }
 
     async handleShoot(gameId, target, interaction) {
