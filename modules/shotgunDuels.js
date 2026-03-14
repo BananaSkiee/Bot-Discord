@@ -61,6 +61,7 @@ class ShotgunLogic {
         this.games.set(gameId, game);
         this.resetAFK(gameId, interaction);
 
+        // HAPUS type: 12 (Media Gallery) karena tidak ada gambar
         await interaction.update({
             flags: 32768,
             components: [{
@@ -345,7 +346,7 @@ class ShotgunLogic {
                 {
                     type: 17,
                     components: [
-                        { type: 12, items: [] },
+                        // HAPUS type: 12 (Media Gallery) yang menyebabkan error
                         { type: 10, content: "# Game Shotgun Duels" },
                         { type: 14 },
                         { 
@@ -445,18 +446,21 @@ class ShotgunLogic {
         // Check if chamber empty
         if (game.chamber.length === 0) {
             // Show reload animation in log area briefly
+            const p1 = game.players[0];
+            const p2 = game.players[1];
+            const hpBar = (hp) => "♥️".repeat(hp) + "🤍".repeat(5 - hp);
+            
             await interaction.update({
                 flags: 32768,
                 components: [
                     {
                         type: 17,
                         components: [
-                            { type: 12, items: [] },
                             { type: 10, content: "# Game Shotgun Duels" },
                             { type: 14 },
                             { 
                                 type: 10, 
-                                content: `### ${game.players[0].username} vs ${game.players[1].username}\n> **${game.players[0].username}:** ${"♥️".repeat(game.players[0].hp) + "🤍".repeat(5 - game.players[0].hp)} **(${game.players[0].hp})**\n> **${game.players[1].username}:** ${"♥️".repeat(game.players[1].hp) + "🤍".repeat(5 - game.players[1].hp)} **(${game.players[1].hp})**\n\n> **Giliran: <@${game.players[game.currentPlayer].id}>**\n> **Sisa peluru: 0/8**\n> **Reload Chamber: ${game.reloadCount}x**` 
+                                content: `### ${p1.username} vs ${p2.username}\n> **${p1.username}:** ${hpBar(p1.hp)} **(${p1.hp})**\n> **${p2.username}:** ${hpBar(p2.hp)} **(${p2.hp})**\n\n> **Giliran: <@${game.players[game.currentPlayer].id}>**\n> **Sisa peluru: 0/8**\n> **Reload Chamber: ${game.reloadCount}x**` 
                             },
                             { type: 14 },
                             {
