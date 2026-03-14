@@ -74,23 +74,26 @@ module.exports = {
         }
       }  
 
-            // ========== SHOTGUN DUELS HANDLER (V2) - FULLY SYNCED ==========
+      // ========== SHOTGUN DUELS HANDLER (V2) - FULLY SYNCED ==========
       if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
           const parts = interaction.customId.split('_');
-          const action = parts[1]; // accept, reject, ready, shoot, item, surrender
+          const action = parts[1];
           const gameId = parts[2];
+          
+          console.log(`🎮 Shotgun: action=${action}, gameId=${gameId}, customId=${interaction.customId}`);
 
-          // 1. Handle Accept/Reject (Bebas Turn)
           if (action === 'accept') return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
           if (action === 'reject') return await gameManager.rejectDuel(gameId, interaction);
 
-          // 2. Load Game Data
           const game = gameManager.getGame(gameId);
-          if (!game) return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
+          console.log(`🎮 Game lookup: ${gameId} => ${game ? 'FOUND' : 'NOT FOUND'}`);
+          
+          if (!game) {
+              console.log(`🎮 Available games: ${gameManager.games?.size || 0} games`);
+              return await interaction.reply({ content: '❌ Sesi game hilang/bot restart!', ephemeral: true });
+          }
 
-          // 3. Handle Ready (Sebelum game mulai)
           if (action === 'ready') {
-              // Cek apakah ada playerId di parts[3]
               const playerId = parts[3];
               if (playerId && interaction.user.id !== playerId) {
                   return await interaction.reply({ content: '❌ Bukan tombolmu!', ephemeral: true });
@@ -98,15 +101,13 @@ module.exports = {
               return await gameManager.handleReady(gameId, interaction);
           }
 
-          // 4. Check Turn (Hanya pemain giliran, kecuali surrender)
           const turnPlayer = game.players[game.currentPlayer];
           if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
               return await interaction.reply({ content: '❌ Bukan giliranmu!', ephemeral: true });
           }
 
-          // 5. Execute Action (Synced to modules/shotgunDuels.js)
           if (action === 'shoot') {
-              const target = parts[3]; // target: self / opp
+              const target = parts[3];
               return await gameManager.handleShoot(gameId, target, interaction);
           }
           if (action === 'item') {
