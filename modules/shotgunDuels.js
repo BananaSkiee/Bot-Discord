@@ -10,7 +10,6 @@ class ShotgunLogic {
         return this.games.get(id); 
     }
 
-    // --- Helper Animasi Font ---
     get fonts() {
         return {
             loading: ["『 ▒▒▒▒▒▒▒▒▒▒ 』", "『 ██▒▒▒▒▒▒▒▒ 』", "『 ████▒▒▒▒▒▒ 』", "『 ██████▒▒▒▒ 』", "『 ████████▒▒ 』", "『 ██████████ 』"],
@@ -60,28 +59,23 @@ class ShotgunLogic {
 
         this.games.set(gameId, game);
         this.resetAFK(gameId, interaction);
-
-        // Render initial state - semua pemain Wait
         await this.renderReadyScreen(gameId, interaction);
     }
 
-    // Fungsi baru untuk render screen ready
     async renderReadyScreen(gameId, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
+        if (!game) {
+            console.error(`❌ renderReadyScreen: Game ${gameId} not found`);
+            return;
+        }
 
         const [p1, p2] = game.players;
-        
-        // Build status line
         const statusLine = `**${p1.username} ${p1.ready ? 'Ready' : 'Wait'} vs ${p2.username} ${p2.ready ? 'Ready' : 'Wait'}**`;
         
-        // Build buttons - dynamic based on player readiness
-        // Tombol untuk P1 (challenger) - di posisi kiri
         const p1Button = p1.ready 
             ? { style: 4, type: 2, label: "Waiting", custom_id: `sg_wait_p1_${gameId}`, disabled: true }
             : { style: 3, type: 2, label: "Confirm", custom_id: `sg_ready_${gameId}_${p1.id}`, disabled: false };
             
-        // Tombol untuk P2 (opponent) - di posisi kanan
         const p2Button = p2.ready
             ? { style: 4, type: 2, label: "Waiting", custom_id: `sg_wait_p2_${gameId}`, disabled: true }
             : { style: 3, type: 2, label: "Confirm", custom_id: `sg_ready_${gameId}_${p2.id}`, disabled: false };
@@ -143,35 +137,33 @@ class ShotgunLogic {
         const allReady = game.players.every(p => p.ready);
 
         if (allReady) {
-            // Defer dulu supaya interaction tidak expired
             await interaction.deferUpdate();
-            // Langsung gacha jika semua ready
             await this.startNewRound(gameId, interaction);
         } else {
-            // Update tampilan - tombol yang sudah ready jadi merah "Waiting"
             await this.renderReadyScreen(gameId, interaction);
         }
     }
 
     async startNewRound(gameId, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
+        if (!game) {
+            console.error(`❌ startNewRound: Game ${gameId} not found`);
+            return;
+        }
 
         game.reloadCount++;
         
-        // Aturan Peluru: Total 8, Min 2 Kosong & 2 Isi
         const total = 8;
-        const realCount = Math.floor(Math.random() * 5) + 2; // 2 sampai 6 isi
+        const realCount = Math.floor(Math.random() * 5) + 2;
         const emptyCount = total - realCount;
         
         game.chamber = Array(realCount).fill('🔴').concat(Array(emptyCount).fill('⚪'));
         this.shuffle(game.chamber);
 
-        // Gacha Item (1-4 random)
         game.players.forEach(p => {
             const itemCount = Math.floor(Math.random() * 4) + 1;
             const pool = ['🍺', '🔪', '🔗', '🔎', '🚬'];
-            p.items = []; // Reset items dulu
+            p.items = [];
             for(let i = 0; i < itemCount; i++) {
                 if(p.items.length < 4) {
                     p.items.push(pool[Math.floor(Math.random() * pool.length)]);
@@ -179,12 +171,10 @@ class ShotgunLogic {
             }
         });
 
-        // Reset status per turn
         game.usedItemThisTurn = { handcuff: false, knife: false };
         game.nextDmg = 1;
         game.handcuffed = false;
 
-        // Animasi Loading - pakai editReply karena sudah defer
         const loadingFrames = this.fonts.loading;
         for (let i = 0; i < loadingFrames.length; i++) {
             await interaction.editReply({
@@ -203,7 +193,6 @@ class ShotgunLogic {
             await new Promise(r => setTimeout(r, 400));
         }
 
-        // Animasi Reload
         for (let i = 0; i < loadingFrames.length; i++) {
             await interaction.editReply({
                 flags: 32768,
@@ -221,11 +210,9 @@ class ShotgunLogic {
             await new Promise(r => setTimeout(r, 400));
         }
 
-        // Tampilkan Chamber & Items (5 detik)
         await interaction.editReply(this.renderChamberView(game));
         await new Promise(r => setTimeout(r, 5000));
         
-        // Reset logs untuk round baru
         game.logs = ["│ INFO │ Round baru dimulai!", "│ INFO │", "│ INFO │", "│ INFO │", "│ INFO │"];
         
         await this.renderMain(gameId, interaction);
@@ -263,7 +250,10 @@ class ShotgunLogic {
 
     async renderMain(gameId, interaction) {
         const game = this.games.get(gameId);
-        if (!game) return;
+        if (!game) {
+            console.error(`❌ renderMain: Game ${gameId} not found`);
+            return;
+        }
 
         const p1 = game.players[0];
         const p2 = game.players[1];
@@ -279,7 +269,6 @@ class ShotgunLogic {
             '🚬': '🚬'
         };
 
-        // Build status section
         let statusContent = "";
         if (game.nextDmg > 1 || game.handcuffed) {
             statusContent = "### Status:\n";
@@ -287,7 +276,6 @@ class ShotgunLogic {
             if (game.handcuffed) statusContent += `> **${game.players[1 - game.currentPlayer].username} Terborgol**\n`;
         }
 
-        // Build item buttons
         const itemButtons = current.items.map((item, idx) => ({
             type: 2,
             style: 2,
@@ -295,7 +283,6 @@ class ShotgunLogic {
             custom_id: `sg_item_${gameId}_${idx}`
         }));
 
-        // Fill empty slots if less than 4 items
         while (itemButtons.length < 4) {
             itemButtons.push({
                 type: 2,
@@ -347,13 +334,13 @@ class ShotgunLogic {
             ]
         };
 
-        // Selalu pakai editReply karena interaction sudah deferred
         await interaction.editReply(payload);
     }
 
     async handleShoot(gameId, target, interaction) {
         const game = this.games.get(gameId);
         if (!game) {
+            console.error(`❌ handleShoot: Game ${gameId} not found`);
             return interaction.reply({ 
                 content: "❌ Game tidak ditemukan!", 
                 ephemeral: true 
@@ -370,11 +357,9 @@ class ShotgunLogic {
             victim.hp -= game.nextDmg;
             logMsg = `│ INFO │ 💥 DOR! ${victim.username} kena ${game.nextDmg} DMG!`;
             
-            // Reset status
             game.nextDmg = 1;
             game.usedItemThisTurn = { handcuff: false, knife: false };
             
-            // Switch turn unless handcuffed
             if (!game.handcuffed) {
                 game.currentPlayer = 1 - game.currentPlayer;
             } else {
@@ -397,16 +382,13 @@ class ShotgunLogic {
         this.addLog(game, logMsg);
         this.resetAFK(gameId, interaction);
 
-        // Check win condition
         if (game.players[0].hp <= 0 || game.players[1].hp <= 0) {
             const winner = game.players.find(p => p.hp > 0);
             const loser = game.players.find(p => p.hp <= 0);
             return this.endGame(gameId, interaction, winner, loser, 'kill');
         }
 
-        // Check if chamber empty
         if (game.chamber.length === 0) {
-            // Show reload animation in log area briefly
             const p1 = game.players[0];
             const p2 = game.players[1];
             const hpBar = (hp) => "♥️".repeat(hp) + "🤍".repeat(5 - hp);
