@@ -1,4 +1,4 @@
-//index.js.
+// index.js
 require("dotenv").config();
 require("./modules/globalLogger"); 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
@@ -208,20 +208,11 @@ client.on("webhookUpdate", async (channel) => {
 });
 
 // 🔐 Login bot
- client.login(config.token);
+client.login(config.token);
 
-// --- HANDLER UNTUK INTERACTION (INTRO & WEBHOOK) ---
- client.on('interactionCreate', async (interaction) => {
-    try {
-        // 1. Handle Intro Card (Lama)
-        await handleIntroInteractions(interaction); 
-        
-    } catch (err) {
-        // Biar nggak error "Already Replied" di log
-        if (interaction.replied || interaction.deferred) return;
-        console.error("❌ Interaction Error:", err);
-    }
-});
+// ❌❌❌ DIHAPUS: Handler interactionCreate inline yang duplikat
+// Handler introCard sekarang hanya di events/interactionCreate.js
+// Jangan tambahkan client.on('interactionCreate') lagi di sini!
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
