@@ -1,23 +1,18 @@
 // modules/feedbackSystem.js
 const { 
     ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    MessageFlags,
     ModalBuilder,
-    TextInputBuilder,
-    TextInputStyle
+    TextInputBuilder, 
+    TextInputStyle,
+    MessageFlags 
 } = require('discord.js');
 
 const FEEDBACK_CHANNEL_ID = '1352326384940220488';
-
-// Store pending feedbacks
-const pendingFeedbacks = new Map();
+const FEEDBACK_PROMPT_MESSAGE_ID = 'feedback_prompt_msg'; // Key untuk tracking
 
 module.exports = {
     name: 'feedbackSystem',
     
-    // Kirim pesan awal feedback di channel
     async sendFeedbackPrompt(client) {
         try {
             const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID);
@@ -26,45 +21,62 @@ module.exports = {
                 return;
             }
 
+            // ✅ CEK: Ambil 10 pesan terakhir, cari yang sudah ada
+            const messages = await channel.messages.fetch({ limit: 10 });
+            const existingPrompt = messages.find(m => 
+                m.author.id === client.user.id && 
+                m.content === '' && // Components V2 tidak ada content
+                m.components?.length > 0 &&
+                m.components[0]?.components?.some(c => 
+                    c.components?.some(btn => btn.custom_id === 'feedback_open_modal')
+                )
+            );
+
+            // Jika sudah ada, jangan kirim lagi
+            if (existingPrompt) {
+                console.log('✅ Feedback prompt already exists, skipping...');
+                return;
+            }
+
             const timestamp = Math.floor(Date.now() / 1000);
             
             const feedbackPromptPayload = {
                 components: [{
-                    type: 17, // Container
+                    type: 17,
                     components: [
                         {
-                            type: 9, // Section
+                            type: 9,
                             components: [{
-                                type: 10, // Text Display
+                                type: 10,
                                 content: `# 📢 Server Feedback\n\nWe value your opinion! Share your experience with our server.\n\n**How it works:**\n> 1. Click **"Send Review"** below\n> 2. Rate us 1-5 stars\n> 3. Write your feedback\n> 4. Submit!\n\n**__Benefits__**\n> • Help us improve\n> • Get recognized for great ideas\n> • Shape the future of our community`
                             }],
                             accessory: {
-                                type: 11, // Thumbnail
+                                type: 11,
                                 media: { url: client.user.displayAvatarURL({ dynamic: true, size: 128 }) }
                             }
                         },
-                        { type: 14 }, // Separator
+                        { type: 14 },
                         {
-                            type: 1, // Action Row
+                            type: 1,
                             components: [
                                 {
-                                    type: 2, // Button
-                                    style: 1, // Primary (Blurple)
+                                    type: 2,
+                                    style: 1,
                                     label: "Send Review",
                                     custom_id: "feedback_open_modal",
                                     emoji: { name: "📝" }
                                 },
                                 {
                                     type: 2,
-                                    style: 2, // Secondary
+                                    style: 2,
                                     label: "Info Description",
                                     custom_id: "feedback_info"
                                 },
                                 {
                                     type: 2,
-                                    style: 5, // Link
+                                    style: 5,
                                     label: "Server Rules",
-                                    url: "https://discord.com/channels/1347233781391560837/1347233781391560840" // Ganti dengan channel rules
+                                    url: "https://discord.com/channels/1347233781391560837/1347233781391560840"
                                 }
                             ]
                         }
@@ -72,53 +84,31 @@ module.exports = {
                 }]
             };
 
-            // Cek apakah sudah ada pesan feedback di channel
-            const messages = await channel.messages.fetch({ limit: 10 });
-            const existingPrompt = messages.find(m => 
-                m.author.id === client.user.id && 
-                m.components?.length > 0
-            );
-
-            if (existingPrompt) {
-                // Update pesan yang ada
-                await existingPrompt.edit({
-                    ...feedbackPromptPayload,
-                    flags: MessageFlags.IsComponentsV2
-                });
-                console.log('✅ Updated existing feedback prompt');
-            } else {
-                // Kirim pesan baru
-                await channel.send({
-                    ...feedbackPromptPayload,
-                    flags: MessageFlags.IsComponentsV2
-                });
-                console.log('✅ Sent new feedback prompt');
-            }
+            await channel.send({
+                ...feedbackPromptPayload,
+                flags: MessageFlags.IsComponentsV2
+            });
+            console.log('✅ Sent new feedback prompt');
 
         } catch (error) {
             console.error('❌ Error sending feedback prompt:', error);
         }
     },
-
-    // Handler untuk button interactions
+    
     async handleFeedbackButtons(interaction) {
         if (!interaction.isButton()) return false;
         
         const { customId } = interaction;
-        
-        // Cek apakah ini feedback button
         if (!customId.startsWith('feedback_')) return false;
         
         try {
             const action = customId.replace('feedback_', '');
             
             if (action === 'open_modal') {
-                // Buat modal untuk input feedback
                 const modal = new ModalBuilder()
                     .setCustomId('feedback_modal_submit')
                     .setTitle('📝 Server Feedback');
 
-                // Input Rating (1-5)
                 const ratingInput = new TextInputBuilder()
                     .setCustomId('feedback_rating')
                     .setLabel('Rating (1-5 stars)')
@@ -128,7 +118,6 @@ module.exports = {
                     .setMaxLength(1)
                     .setRequired(true);
 
-                // Input Feedback Text
                 const feedbackInput = new TextInputBuilder()
                     .setCustomId('feedback_text')
                     .setLabel('Your Feedback')
@@ -166,20 +155,16 @@ module.exports = {
         return true;
     },
 
-    // Handler untuk modal submit
     async handleFeedbackModal(interaction) {
         if (!interaction.isModalSubmit()) return false;
         if (interaction.customId !== 'feedback_modal_submit') return false;
         
         try {
-            // Defer reply untuk proses
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             
-            // Ambil data dari modal
             const rating = interaction.fields.getTextInputValue('feedback_rating').trim();
             const feedbackText = interaction.fields.getTextInputValue('feedback_text').trim();
             
-            // Validasi rating
             const ratingNum = parseInt(rating);
             if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
                 return await interaction.editReply({
@@ -187,12 +172,10 @@ module.exports = {
                 });
             }
             
-            // Buat star display
             const stars = '⭐'.repeat(ratingNum);
             const emptyStars = '☆'.repeat(5 - ratingNum);
             const starDisplay = stars + emptyStars;
             
-            // Get channel
             const channel = await interaction.client.channels.fetch(FEEDBACK_CHANNEL_ID);
             if (!channel) {
                 return await interaction.editReply({
@@ -203,40 +186,39 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const username = interaction.user.globalName || interaction.user.username;
             
-            // Buat payload Components V2
             const feedbackPayload = {
                 components: [{
-                    type: 17, // Container
+                    type: 17,
                     components: [
                         {
-                            type: 9, // Section
+                            type: 9,
                             components: [{
-                                type: 10, // Text Display
+                                type: 10,
                                 content: `# New Feedback\n> **"${feedbackText}"**\n\n**__Information__**\n> **Rating:** ${starDisplay} (${ratingNum}/5)\n> **Reviewer:** ${username}\n> **User ID:** ${interaction.user.id}\n> **Date:** <t:${timestamp}:F>`
                             }],
                             accessory: {
-                                type: 11, // Thumbnail
+                                type: 11,
                                 media: { url: interaction.user.displayAvatarURL({ dynamic: true, size: 128 }) }
                             }
                         },
-                        { type: 14 }, // Separator
+                        { type: 14 },
                         {
-                            type: 10, // Text Display
+                            type: 10,
                             content: 'Thank you for your feedback! Your review helps us improve the quality of our server.'
                         },
-                        { type: 14 }, // Separator
+                        { type: 14 },
                         {
-                            type: 1, // Action Row
+                            type: 1,
                             components: [
                                 {
                                     type: 2,
-                                    style: 2, // Secondary
+                                    style: 2,
                                     label: "Info Description",
                                     custom_id: `feedback_view_${interaction.user.id}_${timestamp}`
                                 },
                                 {
                                     type: 2,
-                                    style: 5, // Link
+                                    style: 5,
                                     label: "Profile",
                                     url: `https://discord.com/users/${interaction.user.id}`
                                 }
@@ -246,17 +228,15 @@ module.exports = {
                 }]
             };
 
-            // Kirim feedback ke channel
             const sentFeedback = await channel.send({
                 ...feedbackPayload,
                 flags: MessageFlags.IsComponentsV2
             });
 
-            // Buat thread untuk diskusi (opsional)
             try {
                 const thread = await sentFeedback.startThread({
                     name: `💬 Feedback from ${username}`,
-                    autoArchiveDuration: 10080, // 7 hari
+                    autoArchiveDuration: 10080,
                     reason: 'Feedback discussion'
                 });
                 
@@ -267,7 +247,6 @@ module.exports = {
                 console.log('Could not create thread for feedback:', threadError.message);
             }
 
-            // Reply ke user
             return await interaction.editReply({
                 content: `✅ **Thank you for your feedback!**\n\nYour ${ratingNum}-star review has been posted in <#${FEEDBACK_CHANNEL_ID}>.\n\n${starDisplay}\n\n> "${feedbackText}"`
             });
@@ -278,25 +257,19 @@ module.exports = {
                 await interaction.editReply({
                     content: '❌ An error occurred while submitting your feedback. Please try again.'
                 }).catch(() => {});
-            } else if (!interaction.replied) {
-                await interaction.reply({
-                    content: '❌ An error occurred!',
-                    flags: MessageFlags.Ephemeral
-                }).catch(() => {});
             }
         }
         
         return true;
     },
 
-    // Handler untuk info button di feedback yang sudah terkirim
     async handleFeedbackView(interaction) {
         if (!interaction.isButton()) return false;
         if (!interaction.customId.startsWith('feedback_view_')) return false;
         
         try {
             return await interaction.reply({
-                content: '**📋 Feedback Info**\n\nThis feedback has been submitted by a server member.\n\n• Ratings are verified\n• Feedback is monitored by staff\n• Constructive criticism is welcome!\n• Abuse will result in punishment',
+                content: '**📋 Feedback Info**\n\nThis feedback has been submitted by a server member.\n\n• Ratings are verified\n• Feedback is monitored by staff\n• Constructive criticism is welcome!',
                 flags: MessageFlags.Ephemeral
             });
         } catch (error) {
