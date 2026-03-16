@@ -12,6 +12,9 @@ const verifySystem = new VerifySystem();
 // Import Shotgun system - ✅ WAJIB ADA
 const { gameManager } = require('../commands/shotgunCommand');
 
+// ✅ TAMBAHAN: Import introCard handler
+const { handleIntroInteractions } = require('../modules/introCard');
+
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
@@ -27,6 +30,20 @@ module.exports = {
         const command = interaction.client.commands.get(interaction.commandName);
         if (!command) return;
         return await command.execute(interaction);
+      }
+
+      // ========== INTRO CARD HANDLER (TAMBAHAN) ==========
+      // ✅ Panggil introCard handler di sini, sebelum handler lain
+      if (interaction.isButton() || interaction.isModalSubmit()) {
+        const introIds = ['open_intro_modal', 'intro_modal_form', 'info_user_'];
+        const isIntroInteraction = introIds.some(id => 
+          interaction.customId === id || interaction.customId.startsWith(id)
+        );
+        
+        if (isIntroInteraction) {
+          console.log(`🎴 Intro Card interaction: ${interaction.customId}`);
+          return await handleIntroInteractions(interaction);
+        }
       }
 
       // ========== VERIFY SYSTEM HANDLERS ==========
@@ -255,16 +272,30 @@ module.exports = {
         }
       }
 
-      // Handler Unknown Button
+      // ✅ PERBAIKAN: Handler Unknown Button - tambahkan pengecekan introCard
       const verifyPrefixes = ['verify_', 'skip_', 'continue_', 'next_', 'welcome_', 'rate_', 'faqs_', 'give_', 'back_', 'auto_', 'custom_'];
-      if (!verifyPrefixes.some(p => interaction.customId.startsWith(p))) {
-        await interaction.reply({ content: "⚠️ Tombol tidak dikenali.", ephemeral: true });
+      const introPrefixes = ['open_intro_modal', 'intro_modal_form', 'info_user_'];
+      
+      // Cek apakah button sudah dihandle oleh introCard atau sistem lain
+      const isHandled = introPrefixes.some(p => customId === p || customId.startsWith(p)) ||
+                       verifyPrefixes.some(p => customId.startsWith(p));
+      
+      if (!isHandled) {
+        // ✅ PERBAIKAN: Cek dulu apakah sudah direspon
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "⚠️ Tombol tidak dikenali.", ephemeral: true });
+        }
       }
 
     } catch (err) {
       console.error("❌ ERROR GLOBAL:", err);
+      // ✅ PERBAIKAN: Cek dengan benar sebelum reply error
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: "❌ Terjadi error internal.", ephemeral: true });
+        try {
+          await interaction.reply({ content: "❌ Terjadi error internal.", ephemeral: true });
+        } catch (replyErr) {
+          console.error("Gagal kirim error reply:", replyErr.message);
+        }
       }
     }
   },
