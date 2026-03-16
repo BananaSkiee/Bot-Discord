@@ -69,7 +69,14 @@ module.exports = {
             }
 
             if (interaction.isModalSubmit() && customId === 'intro_modal_form') {
-                await interaction.deferReply();
+                // PERBAIKAN: Gunakan deferReply dengan catch untuk menghindari race condition
+                try {
+                    await interaction.deferReply();
+                } catch (deferError) {
+                    console.log("Modal defer failed (mungkin sudah direspon):", deferError.message);
+                    return;
+                }
+                
                 const [n, a, g, r, h] = ['f1','f2','f3','f4','f5'].map(id => interaction.fields.getTextInputValue(id));
                 const now = new Date();
                 const dateStr = `${now.toLocaleString('en-US', { month: 'long' }).toUpperCase()} - ${String(now.getDate()).padStart(2, '0')} - ${now.getFullYear()}`;
@@ -102,20 +109,65 @@ module.exports = {
                         ]
                     }]
                 };
-                return await interaction.editReply({ ...resultPayload, flags: MessageFlags.IsComponentsV2 });
+                
+                // PERBAIKAN: Gunakan safe editReply dengan pengecekan
+                try {
+                    return await interaction.editReply({ ...resultPayload, flags: MessageFlags.IsComponentsV2 });
+                } catch (editError) {
+                    console.error("Modal editReply failed:", editError.message);
+                    return;
+                }
             }
 
             if (customId.startsWith('info_user_')) {
-                await interaction.deferReply({ ephemeral: true });
+                // PERBAIKAN #1: Gunakan flags MessageFlags.Ephemeral, bukan ephemeral: true
+                // PERBAIKAN #2: Bungkus deferReply dalam try-catch untuk menghindari "Unknown interaction"
+                try {
+                    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+                } catch (deferError) {
+                    console.log("Info user defer failed (mungkin sudah direspon atau timeout):", deferError.message);
+                    return;
+                }
+                
                 const targetId = customId.split('_')[2];
-                const targetUser = await client.users.fetch(targetId, { force: true });
-                const targetMember = await guild.members.fetch({ user: targetId, withPresences: true }).catch(() => null);
+                
+                // PERBAIKAN #3: Parallel fetching dengan Promise.all untuk kecepatan
+                // PERBAIKAN #4: Hapus parameter withPresences yang tidak valid
+                let targetUser;
+                let targetMember;
+                
+                try {
+                    [targetUser, targetMember] = await Promise.all([
+                        client.users.fetch(targetId, { force: true }),
+                        guild.members.fetch(targetId).catch(() => null)
+                    ]);
+                } catch (fetchError) {
+                    console.error("Error fetching user/member:", fetchError);
+                    try {
+                        return await interaction.editReply({ 
+                            content: "❌ Gagal mengambil data user.",
+                            flags: MessageFlags.Ephemeral 
+                        });
+                    } catch (e) { return; }
+                }
 
-                if (!targetMember) return await interaction.editReply("Member tidak ditemukan.");
+                if (!targetMember) {
+                    try {
+                        return await interaction.editReply({ 
+                            content: "Member tidak ditemukan.",
+                            flags: MessageFlags.Ephemeral 
+                        });
+                    } catch (e) { return; }
+                }
 
                 // Kalkulasi Join Position
-                const members = await guild.members.fetch();
-                const joinPos = [...members.values()].sort((a,b) => a.joinedTimestamp - b.joinedTimestamp).findIndex(m => m.id === targetId) + 1;
+                let joinPos = 1;
+                try {
+                    const members = await guild.members.fetch();
+                    joinPos = [...members.values()].sort((a,b) => a.joinedTimestamp - b.joinedTimestamp).findIndex(m => m.id === targetId) + 1;
+                } catch (e) {
+                    console.error("Error calculating join position:", e);
+                }
 
                 // Status Platform
                 const devices = targetMember.presence?.clientStatus || {};
@@ -173,8 +225,51 @@ module.exports = {
                     }]
                 };
 
-                return await interaction.editReply({ ...infoPayload, flags: MessageFlags.IsComponentsV2 });
+                // PERBAIKAN #5: Gunakan safe editReply dengan pengecekan dan flags yang benar
+                try {
+                    return await interaction.editReply({ 
+                        ...infoPayload, 
+                        flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral 
+                    });
+                } catch (editError) {
+                    console.error("Info user editReply failed:", editError.message);
+                    // PERBAIKAN #6: Jika editReply gagal, coba followUp sebagai fallback
+                    try {
+                        if (interaction.replied || interaction.deferred) {
+                            return await interaction.followUp({ 
+                                content: "❌ Gagal menampilkan data (format error).",
+                                flags: MessageFlags.Ephemeral 
+                            });
+                        }
+                    } catch (followUpError) {
+                        console.error("FollowUp juga failed:", followUpError.message);
+                    }
+                    return;
+                }
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            // PERBAIKAN #7: Error handling global yang lebih aman
+            console.error("Global error in handleIntroInteractions:", e);
+            
+            // Coba kirim error message jika belum direspon
+            if (!interaction.replied && !interaction.deferred) {
+                try {
+                    await interaction.reply({ 
+                        content: '❌ Terjadi error internal.',
+                        flags: MessageFlags.Ephemeral 
+                    });
+                } catch (replyError) {
+                    console.error("Failed to send error reply:", replyError.message);
+                }
+            } else if (interaction.deferred && !interaction.replied) {
+                try {
+                    await interaction.editReply({ 
+                        content: '❌ Terjadi error internal saat memproses.'
+                    });
+                } catch (editError) {
+                    console.error("Failed to send error editReply:", editError.message);
+                }
+            }
+        }
     }
 };
