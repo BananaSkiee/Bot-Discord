@@ -12,7 +12,6 @@ const FEEDBACK_CHANNEL_ID = '1352326384940220488';
 module.exports = {
     name: 'feedbackSystem',
     
-    // Kirim template feedback prompt (hanya sekali saat ready)
     async sendFeedbackPrompt(client) {
         try {
             const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID);
@@ -21,7 +20,6 @@ module.exports = {
                 return;
             }
 
-            // Cek apakah sudah ada pesan feedback prompt
             const messages = await channel.messages.fetch({ limit: 10 });
             const existingPrompt = messages.find(m => 
                 m.author.id === client.user.id && 
@@ -39,7 +37,6 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const botName = client.user.globalName || client.user.username;
             
-            // Template AWAL dengan data BOT
             const feedbackPromptPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -70,7 +67,7 @@ module.exports = {
                                 label: "Profile"
                             }
                         },
-                        { type: 10, content: "" },
+                        { type: 14 },
                         {
                             type: 1,
                             components: [
@@ -152,14 +149,11 @@ module.exports = {
         if (interaction.customId !== 'feedback_modal_submit') return false;
         
         try {
-            // Ambil data dari modal
             const rating = interaction.fields.getTextInputValue('feedback_rating').trim();
             const feedbackText = interaction.fields.getTextInputValue('feedback_text').trim();
             
-            // Validasi rating
             const ratingNum = parseInt(rating);
             if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-                // Error pakai template Components V2
                 const errorPayload = {
                     flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
                     components: [{
@@ -190,7 +184,6 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const username = interaction.user.globalName || interaction.user.username;
             
-            // Template HASIL SUBMIT sesuai format baru
             const feedbackPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -221,7 +214,7 @@ module.exports = {
                                 label: "Profile"
                             }
                         },
-                        { type: 10, content: "" },
+                        { type: 14 },
                         {
                             type: 1,
                             components: [
@@ -237,10 +230,7 @@ module.exports = {
                 }]
             };
 
-            // Kirim feedback ke channel
             await channel.send(feedbackPayload);
-
-            // HAPUS REPLY MESSAGE - langsung deferUpdate saja
             await interaction.deferUpdate().catch(() => {});
             
         } catch (error) {
