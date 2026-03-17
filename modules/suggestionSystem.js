@@ -12,9 +12,6 @@ module.exports = {
         if (message.channel.id !== SUGGESTION_CHANNEL_ID) return;
         if (message.author.bot) return;
         
-        const hasAttachment = message.attachments.size > 0;
-        const attachmentUrl = hasAttachment ? message.attachments.first().url : null;
-        
         try {
             // Hapus pesan asli user
             await message.delete().catch(() => {});
@@ -22,7 +19,7 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const username = message.author.globalName || message.author.username;
             
-            // Template persis seperti yang diminta - HANYA 2 TOMBOL (Yes/No)
+            // Template suggestion
             const suggestionPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -80,16 +77,28 @@ module.exports = {
             // Kirim suggestion
             const sentMessage = await message.channel.send(suggestionPayload);
 
-            // AUTO BUAT THREAD (untuk suggestion)
+            // AUTO BUAT THREAD - hanya bot yang di-thread
             const thread = await sentMessage.startThread({
-                name: `💡 Suggestion by ${username}`,
-                autoArchiveDuration: 1440,
+                name: `Suggestion Discussion`,
+                autoArchiveDuration: 1440, // 24 jam
                 reason: 'Suggestion discussion thread'
             });
 
-            await thread.send({
-                content: `👋 Hey <@${message.author.id}>! This is the discussion thread for your suggestion.\n\nFeel free to explain more details here!`
-            });
+            // Isi thread pakai Components V2
+            const threadContent = {
+                flags: MessageFlags.IsComponentsV2,
+                components: [{
+                    type: 17,
+                    components: [
+                        {
+                            type: 10,
+                            content: "Anda dapat berdiskusi di sini tentang saran tersebut."
+                        }
+                    ]
+                }]
+            };
+
+            await thread.send(threadContent);
 
             // Inisialisasi vote count
             suggestionVotes.set(sentMessage.id, { yes: 0, no: 0, voters: new Set() });
