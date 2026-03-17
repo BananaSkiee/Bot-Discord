@@ -15,7 +15,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const statusMC = require("../modules/statusMC");
 
 // ✅ TAMBAHAN: Import Feedback System
-const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
+// const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
 
 const verifySystem = new VerifySystem();
 
@@ -163,11 +163,11 @@ if (logChannel) {
     }
 
     // ✅ TAMBAHAN: Kirim Feedback Prompt (hanya sekali saat ready)
-    try {
+   /* try {
       await sendFeedbackPrompt(client);
     } catch (err) {
       console.error("❌ Feedback prompt error:", err);
-    }
+    } */
 
     // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
     try {
