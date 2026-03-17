@@ -32,7 +32,7 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# New Suggestion\n> **"${message.content}"**\n\n**__Informasi__**\n> **Pengusul:** ${username}\n> **Tanggal:** <t:${timestamp}:F>\n> **User ID:** ${message.author.id}`
+                                content: `# New Suggestion\n> **"${message.content}"**\n\n**__Informasi__**\n> **Pengusul:** ${username}\n> **User ID:** ${message.author.id}\n> **Tanggal:** <t:${timestamp}:F>`
                             }],
                             accessory: {
                                 type: 11,
@@ -44,12 +44,9 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!${hasAttachment ? '\n\n📎 **Attachment included**' : ''}`
+                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!`
                             }],
-                            accessory: hasAttachment ? {
-                                type: 11,
-                                media: { url: attachmentUrl }
-                            } : {
+                            accessory: {
                                 type: 2,
                                 style: 5,
                                 label: "Profile",
@@ -61,16 +58,16 @@ module.exports = {
                             type: 1,
                             components: [
                                 {
-                                    style: 3, // Success (Green)
+                                    style: 3,
                                     type: 2,
-                                    label: "👍 (0)",
+                                    label: "Yes (0)",
                                     emoji: { name: "👍" },
                                     custom_id: `suggest_yes_${message.author.id}_${timestamp}`
                                 },
                                 {
-                                    style: 4, // Danger (Red)
+                                    style: 4,
                                     type: 2,
-                                    label: "👎 (0)",
+                                    label: "No (0)",
                                     emoji: { name: "👎" },
                                     custom_id: `suggest_no_${message.author.id}_${timestamp}`
                                 }
@@ -86,7 +83,7 @@ module.exports = {
             // AUTO BUAT THREAD (untuk suggestion)
             const thread = await sentMessage.startThread({
                 name: `💡 Suggestion by ${username}`,
-                autoArchiveDuration: 1440, // 24 jam
+                autoArchiveDuration: 1440,
                 reason: 'Suggestion discussion thread'
             });
 
@@ -101,10 +98,6 @@ module.exports = {
 
         } catch (error) {
             console.error('❌ Error handling suggestion:', error);
-            // Jika gagal, coba kirim pesan error ke user via DM
-            try {
-                await message.author.send('❌ Failed to post your suggestion. Please try again.').catch(() => {});
-            } catch (e) {}
         }
     },
 
@@ -116,7 +109,7 @@ module.exports = {
         
         try {
             const parts = customId.split('_');
-            const action = parts[1]; // yes atau no
+            const action = parts[1];
             const authorId = parts[2];
             const timestamp = parts[3];
             
@@ -130,10 +123,9 @@ module.exports = {
 
                 // Cek apakah user sudah vote
                 if (votes.voters.has(interaction.user.id)) {
-                    return await interaction.reply({ 
-                        content: '❌ You have already voted!', 
-                        flags: MessageFlags.Ephemeral 
-                    });
+                    // Langsung update tanpa reply message
+                    await interaction.deferUpdate().catch(() => {});
+                    return true;
                 }
 
                 // Tambah vote
@@ -141,27 +133,30 @@ module.exports = {
                 if (action === 'yes') votes.yes++;
                 else votes.no++;
 
-                // Update button labels - format: 👍 (1) atau 👎 (1)
+                // Update button labels - format: Yes (1) atau No (1)
                 const updatedContainer = {
                     type: 17,
                     components: message.components[0].components.map(row => {
-                        // Jika ini action row (type 1), update buttons
                         if (row.type === 1) {
                             return {
                                 type: 1,
                                 components: row.components.map(btn => {
                                     if (btn.custom_id === `suggest_yes_${authorId}_${timestamp}`) {
                                         return { 
-                                            ...btn, 
-                                            label: `👍 (${votes.yes})`,
-                                            emoji: { name: "👍" }
+                                            type: 2,
+                                            style: 3,
+                                            label: `Yes (${votes.yes})`,
+                                            emoji: { name: "👍" },
+                                            custom_id: btn.custom_id
                                         };
                                     }
                                     if (btn.custom_id === `suggest_no_${authorId}_${timestamp}`) {
                                         return { 
-                                            ...btn, 
-                                            label: `👎 (${votes.no})`,
-                                            emoji: { name: "👎" }
+                                            type: 2,
+                                            style: 4,
+                                            label: `No (${votes.no})`,
+                                            emoji: { name: "👎" },
+                                            custom_id: btn.custom_id
                                         };
                                     }
                                     return btn;
@@ -172,26 +167,20 @@ module.exports = {
                     })
                 };
 
-                // Update message dengan full payload
+                // Update message langsung tanpa reply
                 await message.edit({ 
                     components: [updatedContainer],
                     flags: MessageFlags.IsComponentsV2
                 });
                 
-                return await interaction.reply({ 
-                    content: `✅ You voted **${action === 'yes' ? '👍 Yes' : '👎 No'}**!`, 
-                    flags: MessageFlags.Ephemeral 
-                });
+                // Defer update (tidak ada reply message)
+                await interaction.deferUpdate().catch(() => {});
+                return true;
             }
 
         } catch (error) {
             console.error('❌ Error handling suggestion button:', error);
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ 
-                    content: '❌ An error occurred!', 
-                    flags: MessageFlags.Ephemeral 
-                }).catch(() => {});
-            }
+            await interaction.deferUpdate().catch(() => {});
         }
         
         return true;
