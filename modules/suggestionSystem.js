@@ -7,19 +7,16 @@ const suggestionVotes = new Map();
 module.exports = {
     name: 'suggestionSystem',
     
-    // Handler untuk message create di channel suggestion (CHAT LANGSUNG)
     async handleSuggestionMessage(message) {
         if (message.channel.id !== SUGGESTION_CHANNEL_ID) return;
         if (message.author.bot) return;
         
         try {
-            // Hapus pesan asli user
             await message.delete().catch(() => {});
             
             const timestamp = Math.floor(Date.now() / 1000);
             const username = message.author.globalName || message.author.username;
             
-            // Template suggestion
             const suggestionPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -74,18 +71,15 @@ module.exports = {
                 }]
             };
 
-            // Kirim suggestion
             const sentMessage = await message.channel.send(suggestionPayload);
 
-            // AUTO BUAT THREAD - hanya bot yang di-thread
             const thread = await sentMessage.startThread({
                 name: `Suggestion Discussion`,
-                autoArchiveDuration: 1440, // 24 jam
+                autoArchiveDuration: 1440,
                 reason: 'Suggestion discussion thread'
             });
 
-            // Isi thread pakai Components V2
-            const threadContent = {
+            const threadPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
                     type: 17,
@@ -98,12 +92,11 @@ module.exports = {
                 }]
             };
 
-            await thread.send(threadContent);
+            await thread.send(threadPayload);
 
-            // Inisialisasi vote count
             suggestionVotes.set(sentMessage.id, { yes: 0, no: 0, voters: new Set() });
 
-            console.log(`✅ Suggestion created by ${username} with thread`);
+            console.log(`✅ Suggestion created with thread "Suggestion Discussion"`);
 
         } catch (error) {
             console.error('❌ Error handling suggestion:', error);
@@ -123,66 +116,61 @@ module.exports = {
             const timestamp = parts[3];
             
             if (action === 'yes' || action === 'no') {
-                // Ambil atau buat vote data
                 let votes = suggestionVotes.get(message.id);
                 if (!votes) {
                     votes = { yes: 0, no: 0, voters: new Set() };
                     suggestionVotes.set(message.id, votes);
                 }
 
-                // Cek apakah user sudah vote
                 if (votes.voters.has(interaction.user.id)) {
-                    // Langsung update tanpa reply message
                     await interaction.deferUpdate().catch(() => {});
                     return true;
                 }
 
-                // Tambah vote
                 votes.voters.add(interaction.user.id);
                 if (action === 'yes') votes.yes++;
                 else votes.no++;
 
-                // Update button labels - format: Yes (1) atau No (1)
-                const updatedContainer = {
+                // Build new components array dari awal
+                const newComponents = [{
                     type: 17,
-                    components: message.components[0].components.map(row => {
-                        if (row.type === 1) {
-                            return {
-                                type: 1,
-                                components: row.components.map(btn => {
-                                    if (btn.custom_id === `suggest_yes_${authorId}_${timestamp}`) {
-                                        return { 
-                                            type: 2,
-                                            style: 3,
-                                            label: `Yes (${votes.yes})`,
-                                            emoji: { name: "👍" },
-                                            custom_id: btn.custom_id
-                                        };
-                                    }
-                                    if (btn.custom_id === `suggest_no_${authorId}_${timestamp}`) {
-                                        return { 
-                                            type: 2,
-                                            style: 4,
-                                            label: `No (${votes.no})`,
-                                            emoji: { name: "👎" },
-                                            custom_id: btn.custom_id
-                                        };
-                                    }
-                                    return btn;
-                                })
-                            };
+                    components: [
+                        // Section 1 - Header (tetap sama)
+                        message.components[0].components[0],
+                        // Separator
+                        message.components[0].components[1],
+                        // Section 2 - Catatan (tetap sama)
+                        message.components[0].components[2],
+                        // Separator
+                        message.components[0].components[3],
+                        // Action Row - Buttons (diupdate)
+                        {
+                            type: 1,
+                            components: [
+                                {
+                                    type: 2,
+                                    style: 3,
+                                    label: `Yes (${votes.yes})`,
+                                    emoji: { name: "👍" },
+                                    custom_id: `suggest_yes_${authorId}_${timestamp}`
+                                },
+                                {
+                                    type: 2,
+                                    style: 4,
+                                    label: `No (${votes.no})`,
+                                    emoji: { name: "👎" },
+                                    custom_id: `suggest_no_${authorId}_${timestamp}`
+                                }
+                            ]
                         }
-                        return row;
-                    })
-                };
+                    ]
+                }];
 
-                // Update message langsung tanpa reply
                 await message.edit({ 
-                    components: [updatedContainer],
+                    components: newComponents,
                     flags: MessageFlags.IsComponentsV2
                 });
                 
-                // Defer update (tidak ada reply message)
                 await interaction.deferUpdate().catch(() => {});
                 return true;
             }
