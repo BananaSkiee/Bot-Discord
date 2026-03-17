@@ -1,43 +1,23 @@
-// modules/feedbackSystem.js
-const { 
-    ActionRowBuilder, 
-    ModalBuilder,
-    TextInputBuilder, 
-    TextInputStyle,
-    MessageFlags 
-} = require('discord.js');
+// modules/suggestionSystem.js
+const { MessageFlags } = require('discord.js');
 
-const FEEDBACK_CHANNEL_ID = '1352326384940220488';
+const SUGGESTION_CHANNEL_ID = '1430584708974252102';
+const suggestionVotes = new Map();
 
 module.exports = {
-    name: 'feedbackSystem',
+    name: 'suggestionSystem',
     
-    async sendFeedbackPrompt(client) {
+    async handleSuggestionMessage(message) {
+        if (message.channel.id !== SUGGESTION_CHANNEL_ID) return;
+        if (message.author.bot) return;
+        
         try {
-            const channel = await client.channels.fetch(FEEDBACK_CHANNEL_ID);
-            if (!channel) {
-                console.error('❌ Feedback channel not found!');
-                return;
-            }
-
-            const messages = await channel.messages.fetch({ limit: 10 });
-            const existingPrompt = messages.find(m => 
-                m.author.id === client.user.id && 
-                m.components?.length > 0 &&
-                m.components[0]?.components?.some(c => 
-                    c.components?.some(btn => btn.custom_id === 'feedback_open_modal')
-                )
-            );
-
-            if (existingPrompt) {
-                console.log('✅ Feedback prompt already exists, skipping...');
-                return;
-            }
-
-            const timestamp = Math.floor(Date.now() / 1000);
-            const botName = client.user.globalName || client.user.username;
+            await message.delete().catch(() => {});
             
-            const feedbackPromptPayload = {
+            const timestamp = Math.floor(Date.now() / 1000);
+            const username = message.author.globalName || message.author.username;
+            
+            const suggestionPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
                     type: 17,
@@ -46,11 +26,11 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# New Feedback\n> **\"None\"**\n\n **__Informasi__**\n> **Rating:** None\n> **Pengusul:** ${botName}\n> **User ID:** ${client.user.id}\n> **Tanggal:** <t:${timestamp}:F>`
+                                content: `# New Suggestion\n> **"${message.content}"**\n\n**__Informasi__**\n> **Pengusul:** ${username}\n> **User ID:** ${message.author.id}\n> **Tanggal:** <t:${timestamp}:F>`
                             }],
                             accessory: {
                                 type: 11,
-                                media: { url: client.user.displayAvatarURL({ dynamic: true, size: 128 }) }
+                                media: { url: message.author.displayAvatarURL({ dynamic: true, size: 128 }) }
                             }
                         },
                         { type: 14 },
@@ -58,13 +38,13 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `**__Terimakasih Banyak__**\n\n> Saran Anda membantu kami meningkatkan kualitas server kami.`
+                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!`
                             }],
                             accessory: {
                                 type: 2,
                                 style: 5,
-                                url: `https://discord.com/users/${client.user.id}`,
-                                label: "Profile"
+                                label: "Profile",
+                                url: `https://discord.com/users/${message.author.id}`
                             }
                         },
                         { type: 14 },
@@ -72,10 +52,18 @@ module.exports = {
                             type: 1,
                             components: [
                                 {
-                                    style: 2,
+                                    style: 3,
                                     type: 2,
-                                    label: "Kirim Saran",
-                                    custom_id: "feedback_open_modal"
+                                    label: "Yes (0)",
+                                    emoji: { name: "👍" },
+                                    custom_id: `suggest_yes_${message.author.id}_${timestamp}`
+                                },
+                                {
+                                    style: 4,
+                                    type: 2,
+                                    label: "No (0)",
+                                    emoji: { name: "👎" },
+                                    custom_id: `suggest_no_${message.author.id}_${timestamp}`
                                 }
                             ]
                         }
@@ -83,158 +71,135 @@ module.exports = {
                 }]
             };
 
-            await channel.send(feedbackPromptPayload);
-            console.log('✅ Sent new feedback prompt');
+            const sentMessage = await message.channel.send(suggestionPayload);
+
+            const thread = await sentMessage.startThread({
+                name: `Suggestion Discussion`,
+                autoArchiveDuration: 1440,
+                reason: 'Suggestion discussion thread'
+            });
+
+            const threadPayload = {
+                flags: MessageFlags.IsComponentsV2,
+                components: [{
+                    type: 17,
+                    components: [
+                        {
+                            type: 10,
+                            content: "Anda dapat berdiskusi di sini tentang saran tersebut."
+                        }
+                    ]
+                }]
+            };
+
+            await thread.send(threadPayload);
+
+            // Simpan data vote: Map<userId, 'yes' | 'no'>
+            suggestionVotes.set(sentMessage.id, new Map());
+
+            console.log(`✅ Suggestion created with thread "Suggestion Discussion"`);
 
         } catch (error) {
-            console.error('❌ Error sending feedback prompt:', error);
+            console.error('❌ Error handling suggestion:', error);
         }
     },
-    
-    async handleFeedbackButtons(interaction) {
+
+    async handleSuggestionButtons(interaction) {
         if (!interaction.isButton()) return false;
         
-        const { customId } = interaction;
-        if (!customId.startsWith('feedback_')) return false;
+        const { customId, message } = interaction;
+        if (!customId.startsWith('suggest_')) return false;
         
         try {
-            const action = customId.replace('feedback_', '');
+            const parts = customId.split('_');
+            const action = parts[1]; // 'yes' atau 'no'
+            const authorId = parts[2];
+            const timestamp = parts[3];
             
-            if (action === 'open_modal') {
-                const modal = new ModalBuilder()
-                    .setCustomId('feedback_modal_submit')
-                    .setTitle('📝 Server Feedback');
+            if (action === 'yes' || action === 'no') {
+                // Ambil atau buat vote data
+                let userVotes = suggestionVotes.get(message.id);
+                if (!userVotes) {
+                    userVotes = new Map();
+                    suggestionVotes.set(message.id, userVotes);
+                }
 
-                const ratingInput = new TextInputBuilder()
-                    .setCustomId('feedback_rating')
-                    .setLabel('Rating (1-5 stars)')
-                    .setPlaceholder('Enter a number from 1 to 5')
-                    .setStyle(TextInputStyle.Short)
-                    .setMinLength(1)
-                    .setMaxLength(1)
-                    .setRequired(true);
+                const userId = interaction.user.id;
+                const currentVote = userVotes.get(userId); // 'yes', 'no', atau undefined
 
-                const feedbackInput = new TextInputBuilder()
-                    .setCustomId('feedback_text')
-                    .setLabel('Your Feedback')
-                    .setPlaceholder('Tell us what you think about the server...')
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setMinLength(10)
-                    .setMaxLength(1000)
-                    .setRequired(true);
+                let yesCount = 0;
+                let noCount = 0;
 
-                modal.addComponents(
-                    new ActionRowBuilder().addComponents(ratingInput),
-                    new ActionRowBuilder().addComponents(feedbackInput)
-                );
+                // Hitung ulang total vote
+                for (const [uid, vote] of userVotes) {
+                    if (vote === 'yes') yesCount++;
+                    else if (vote === 'no') noCount++;
+                }
 
-                return await interaction.showModal(modal);
-            }
+                // Logika toggle vote
+                if (currentVote === action) {
+                    // Double click = hapus vote
+                    userVotes.delete(userId);
+                    if (action === 'yes') yesCount--;
+                    else noCount--;
+                } else if (currentVote === undefined) {
+                    // Belum vote, tambah vote baru
+                    userVotes.set(userId, action);
+                    if (action === 'yes') yesCount++;
+                    else noCount++;
+                } else {
+                    // Ganti vote (yes ↔ no)
+                    userVotes.set(userId, action);
+                    if (action === 'yes') {
+                        yesCount++;
+                        noCount--;
+                    } else {
+                        noCount++;
+                        yesCount--;
+                    }
+                }
 
-        } catch (error) {
-            console.error('❌ Error handling feedback button:', error);
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ 
-                    content: '❌ An error occurred!', 
-                    flags: MessageFlags.Ephemeral 
-                }).catch(() => {});
-            }
-        }
-        
-        return true;
-    },
-
-    async handleFeedbackModal(interaction) {
-        if (!interaction.isModalSubmit()) return false;
-        if (interaction.customId !== 'feedback_modal_submit') return false;
-        
-        try {
-            const rating = interaction.fields.getTextInputValue('feedback_rating').trim();
-            const feedbackText = interaction.fields.getTextInputValue('feedback_text').trim();
-            
-            const ratingNum = parseInt(rating);
-            if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-                const errorPayload = {
-                    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
-                    components: [{
-                        type: 17,
-                        components: [
-                            {
-                                type: 10,
-                                content: "❌ Rating tidak valid! Silakan masukkan angka 1 - 5."
-                            }
-                        ]
-                    }]
-                };
-                return await interaction.reply(errorPayload);
-            }
-            
-            const stars = '⭐'.repeat(ratingNum);
-            const emptyStars = '☆'.repeat(5 - ratingNum);
-            const starDisplay = stars + emptyStars;
-            
-            const channel = await interaction.client.channels.fetch(FEEDBACK_CHANNEL_ID);
-            if (!channel) {
-                return await interaction.reply({
-                    content: '❌ Could not find feedback channel!',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-            
-            const timestamp = Math.floor(Date.now() / 1000);
-            const username = interaction.user.globalName || interaction.user.username;
-            
-            const feedbackPayload = {
-                flags: MessageFlags.IsComponentsV2,
-                components: [{
+                // Build new components array
+                const newComponents = [{
                     type: 17,
                     components: [
-                        {
-                            type: 9,
-                            components: [{
-                                type: 10,
-                                content: `# New Feedback\n> **"${feedbackText}"**\n\n **__Informasi__**\n> **Rating:** ${starDisplay} (${ratingNum}/5)\n> **Pengusul:** ${username}\n> **User ID:** ${interaction.user.id}\n> **Tanggal:** <t:${timestamp}:F>`
-                            }],
-                            accessory: {
-                                type: 11,
-                                media: { url: interaction.user.displayAvatarURL({ dynamic: true, size: 128 }) }
-                            }
-                        },
-                        { type: 14 },
-                        {
-                            type: 9,
-                            components: [{
-                                type: 10,
-                                content: `**__Terimakasih Banyak__**\n\n> Saran Anda membantu kami meningkatkan kualitas server kami.`
-                            }],
-                            accessory: {
-                                type: 2,
-                                style: 5,
-                                url: `https://discord.com/users/${interaction.user.id}`,
-                                label: "Profile"
-                            }
-                        },
-                        { type: 14 },
+                        message.components[0].components[0], // Header
+                        message.components[0].components[1], // Separator
+                        message.components[0].components[2], // Catatan
+                        message.components[0].components[3], // Separator
                         {
                             type: 1,
                             components: [
                                 {
-                                    style: 2,
                                     type: 2,
-                                    label: "Kirim Saran",
-                                    custom_id: "feedback_open_modal"
+                                    style: 3,
+                                    label: `Yes (${yesCount})`,
+                                    emoji: { name: "👍" },
+                                    custom_id: `suggest_yes_${authorId}_${timestamp}`
+                                },
+                                {
+                                    type: 2,
+                                    style: 4,
+                                    label: `No (${noCount})`,
+                                    emoji: { name: "👎" },
+                                    custom_id: `suggest_no_${authorId}_${timestamp}`
                                 }
                             ]
                         }
                     ]
-                }]
-            };
+                }];
 
-            await channel.send(feedbackPayload);
-            await interaction.deferUpdate().catch(() => {});
-            
+                await message.edit({ 
+                    components: newComponents,
+                    flags: MessageFlags.IsComponentsV2
+                });
+                
+                await interaction.deferUpdate().catch(() => {});
+                return true;
+            }
+
         } catch (error) {
-            console.error('❌ Error handling feedback modal:', error);
+            console.error('❌ Error handling suggestion button:', error);
             await interaction.deferUpdate().catch(() => {});
         }
         
