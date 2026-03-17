@@ -22,7 +22,7 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const username = message.author.globalName || message.author.username;
             
-            // Template persis seperti yang diminta
+            // Template persis seperti yang diminta - HANYA 2 TOMBOL (Yes/No)
             const suggestionPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -44,9 +44,12 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!`
+                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!${hasAttachment ? '\n\n📎 **Attachment included**' : ''}`
                             }],
-                            accessory: {
+                            accessory: hasAttachment ? {
+                                type: 11,
+                                media: { url: attachmentUrl }
+                            } : {
                                 type: 2,
                                 style: 5,
                                 label: "Profile",
@@ -58,24 +61,18 @@ module.exports = {
                             type: 1,
                             components: [
                                 {
-                                    style: 3,
+                                    style: 3, // Success (Green)
                                     type: 2,
-                                    label: "Yes (0)",
+                                    label: "👍 (0)",
                                     emoji: { name: "👍" },
                                     custom_id: `suggest_yes_${message.author.id}_${timestamp}`
                                 },
                                 {
-                                    style: 4,
+                                    style: 4, // Danger (Red)
                                     type: 2,
-                                    label: "No (0)",
+                                    label: "👎 (0)",
                                     emoji: { name: "👎" },
                                     custom_id: `suggest_no_${message.author.id}_${timestamp}`
-                                },
-                                {
-                                    style: 2,
-                                    type: 2,
-                                    label: "Info Deskripsi",
-                                    custom_id: `suggest_info_${message.author.id}_${timestamp}`
                                 }
                             ]
                         }
@@ -104,6 +101,10 @@ module.exports = {
 
         } catch (error) {
             console.error('❌ Error handling suggestion:', error);
+            // Jika gagal, coba kirim pesan error ke user via DM
+            try {
+                await message.author.send('❌ Failed to post your suggestion. Please try again.').catch(() => {});
+            } catch (e) {}
         }
     },
 
@@ -114,17 +115,20 @@ module.exports = {
         if (!customId.startsWith('suggest_')) return false;
         
         try {
-            const [prefix, action, authorId, timestamp] = customId.split('_');
+            const parts = customId.split('_');
+            const action = parts[1]; // yes atau no
+            const authorId = parts[2];
+            const timestamp = parts[3];
             
             if (action === 'yes' || action === 'no') {
-                const votes = suggestionVotes.get(message.id);
+                // Ambil atau buat vote data
+                let votes = suggestionVotes.get(message.id);
                 if (!votes) {
-                    return await interaction.reply({ 
-                        content: '❌ Voting data not found!', 
-                        flags: MessageFlags.Ephemeral 
-                    });
+                    votes = { yes: 0, no: 0, voters: new Set() };
+                    suggestionVotes.set(message.id, votes);
                 }
 
+                // Cek apakah user sudah vote
                 if (votes.voters.has(interaction.user.id)) {
                     return await interaction.reply({ 
                         content: '❌ You have already voted!', 
@@ -132,36 +136,51 @@ module.exports = {
                     });
                 }
 
+                // Tambah vote
                 votes.voters.add(interaction.user.id);
                 if (action === 'yes') votes.yes++;
                 else votes.no++;
 
-                // Update button labels
-                const updatedComponents = message.components.map(row => ({
-                    type: 1,
-                    components: row.components.map(btn => {
-                        if (btn.customId === `suggest_yes_${authorId}_${timestamp}`) {
-                            return { ...btn, label: `Yes (${votes.yes})` };
+                // Update button labels - format: 👍 (1) atau 👎 (1)
+                const updatedContainer = {
+                    type: 17,
+                    components: message.components[0].components.map(row => {
+                        // Jika ini action row (type 1), update buttons
+                        if (row.type === 1) {
+                            return {
+                                type: 1,
+                                components: row.components.map(btn => {
+                                    if (btn.custom_id === `suggest_yes_${authorId}_${timestamp}`) {
+                                        return { 
+                                            ...btn, 
+                                            label: `👍 (${votes.yes})`,
+                                            emoji: { name: "👍" }
+                                        };
+                                    }
+                                    if (btn.custom_id === `suggest_no_${authorId}_${timestamp}`) {
+                                        return { 
+                                            ...btn, 
+                                            label: `👎 (${votes.no})`,
+                                            emoji: { name: "👎" }
+                                        };
+                                    }
+                                    return btn;
+                                })
+                            };
                         }
-                        if (btn.customId === `suggest_no_${authorId}_${timestamp}`) {
-                            return { ...btn, label: `No (${votes.no})` };
-                        }
-                        return btn;
+                        return row;
                     })
-                }));
+                };
 
-                await message.edit({ components: updatedComponents });
+                // Update message dengan full payload
+                await message.edit({ 
+                    components: [updatedContainer],
+                    flags: MessageFlags.IsComponentsV2
+                });
                 
                 return await interaction.reply({ 
-                    content: `✅ You voted **${action.toUpperCase()}**!`, 
+                    content: `✅ You voted **${action === 'yes' ? '👍 Yes' : '👎 No'}**!`, 
                     flags: MessageFlags.Ephemeral 
-                });
-            }
-
-            if (action === 'info') {
-                return await interaction.reply({
-                    content: '**📋 Suggestion Info**\n\nClick **Yes** if you agree\nClick **No** if you disagree\n\nVotes are anonymous!',
-                    flags: MessageFlags.Ephemeral
                 });
             }
 
