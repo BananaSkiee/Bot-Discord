@@ -7,6 +7,7 @@ const suggestionVotes = new Map();
 module.exports = {
     name: 'suggestionSystem',
     
+    // Handler untuk message create di channel suggestion (CHAT LANGSUNG)
     async handleSuggestionMessage(message) {
         if (message.channel.id !== SUGGESTION_CHANNEL_ID) return;
         if (message.author.bot) return;
@@ -15,12 +16,15 @@ module.exports = {
         const attachmentUrl = hasAttachment ? message.attachments.first().url : null;
         
         try {
+            // Hapus pesan asli user
             await message.delete().catch(() => {});
             
             const timestamp = Math.floor(Date.now() / 1000);
             const username = message.author.globalName || message.author.username;
             
+            // Template persis seperti yang diminta
             const suggestionPayload = {
+                flags: MessageFlags.IsComponentsV2,
                 components: [{
                     type: 17,
                     components: [
@@ -28,7 +32,7 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# New Suggestion\n> **"${message.content}"**\n\n**__Information__**\n> **Proposer:** ${username}\n> **Date:** <t:${timestamp}:F>\n> **User ID:** ${message.author.id}`
+                                content: `# New Suggestion\n> **"${message.content}"**\n\n**__Informasi__**\n> **Pengusul:** ${username}\n> **Tanggal:** <t:${timestamp}:F>\n> **User ID:** ${message.author.id}`
                             }],
                             accessory: {
                                 type: 11,
@@ -40,42 +44,38 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `**__Note__**\n\n> Please discuss this suggestion in the thread below!${hasAttachment ? '\n\n📎 **Attachment included**' : ''}`
+                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!`
                             }],
-                            accessory: hasAttachment ? {
-                                type: 11,
-                                media: { url: attachmentUrl }
-                            } : undefined
+                            accessory: {
+                                type: 2,
+                                style: 5,
+                                label: "Profile",
+                                url: `https://discord.com/users/${message.author.id}`
+                            }
                         },
                         { type: 14 },
                         {
                             type: 1,
                             components: [
                                 {
-                                    type: 2,
                                     style: 3,
+                                    type: 2,
                                     label: "Yes (0)",
                                     emoji: { name: "👍" },
                                     custom_id: `suggest_yes_${message.author.id}_${timestamp}`
                                 },
                                 {
-                                    type: 2,
                                     style: 4,
+                                    type: 2,
                                     label: "No (0)",
                                     emoji: { name: "👎" },
                                     custom_id: `suggest_no_${message.author.id}_${timestamp}`
                                 },
                                 {
-                                    type: 2,
                                     style: 2,
-                                    label: "Info Description",
-                                    custom_id: `suggest_info_${message.author.id}_${timestamp}`
-                                },
-                                {
                                     type: 2,
-                                    style: 5,
-                                    label: "Profile",
-                                    url: `https://discord.com/users/${message.author.id}`
+                                    label: "Info Deskripsi",
+                                    custom_id: `suggest_info_${message.author.id}_${timestamp}`
                                 }
                             ]
                         }
@@ -83,14 +83,13 @@ module.exports = {
                 }]
             };
 
-            const sentMessage = await message.channel.send({
-                ...suggestionPayload,
-                flags: MessageFlags.IsComponentsV2
-            });
+            // Kirim suggestion
+            const sentMessage = await message.channel.send(suggestionPayload);
 
+            // AUTO BUAT THREAD (untuk suggestion)
             const thread = await sentMessage.startThread({
                 name: `💡 Suggestion by ${username}`,
-                autoArchiveDuration: 1440,
+                autoArchiveDuration: 1440, // 24 jam
                 reason: 'Suggestion discussion thread'
             });
 
@@ -98,13 +97,13 @@ module.exports = {
                 content: `👋 Hey <@${message.author.id}>! This is the discussion thread for your suggestion.\n\nFeel free to explain more details here!`
             });
 
+            // Inisialisasi vote count
             suggestionVotes.set(sentMessage.id, { yes: 0, no: 0, voters: new Set() });
+
+            console.log(`✅ Suggestion created by ${username} with thread`);
 
         } catch (error) {
             console.error('❌ Error handling suggestion:', error);
-            try {
-                await message.author.send('❌ Failed to post your suggestion. Please try again.').catch(() => {});
-            } catch (e) {}
         }
     },
 
@@ -137,6 +136,7 @@ module.exports = {
                 if (action === 'yes') votes.yes++;
                 else votes.no++;
 
+                // Update button labels
                 const updatedComponents = message.components.map(row => ({
                     type: 1,
                     components: row.components.map(btn => {
@@ -160,7 +160,7 @@ module.exports = {
 
             if (action === 'info') {
                 return await interaction.reply({
-                    content: '**📋 Suggestion Info**\n\nClick **Yes** if you agree with this suggestion\nClick **No** if you disagree\n\nVotes are anonymous!',
+                    content: '**📋 Suggestion Info**\n\nClick **Yes** if you agree\nClick **No** if you disagree\n\nVotes are anonymous!',
                     flags: MessageFlags.Ephemeral
                 });
             }
