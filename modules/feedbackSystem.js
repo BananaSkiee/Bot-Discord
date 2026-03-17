@@ -36,7 +36,10 @@ module.exports = {
                 return;
             }
 
-            // Template persis seperti yang diminta (TANPA THREAD)
+            const timestamp = Math.floor(Date.now() / 1000);
+            const botName = client.user.globalName || client.user.username;
+            
+            // Template AWAL dengan data BOT (sesuai permintaan)
             const feedbackPromptPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -46,12 +49,17 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# 📢 Server Feedback\n\nWe value your opinion! Share your experience with our server.\n\n**How it works:**\n> 1. Click **"Kirim Ulasan"** below\n> 2. Rate us 1-5 stars\n> 3. Write your feedback\n> 4. Submit!\n\n**__Benefits__**\n> • Help us improve\n> • Get recognized for great ideas\n> • Shape the future of our community`
+                                content: `# New Feedback\n> **\"None\"**\n\n **__Informasi__**\n> **Rating:** None\n> **Pengusul:** ${botName}\n> **User ID:** ${client.user.id}\n> **Tanggal:** <t:${timestamp}:F>`
                             }],
                             accessory: {
                                 type: 11,
                                 media: { url: client.user.displayAvatarURL({ dynamic: true, size: 128 }) }
                             }
+                        },
+                        { type: 14 },
+                        {
+                            type: 10,
+                            content: 'Terima kasih atas masukan Anda! Ulasan Anda membantu kami meningkatkan kualitas server kami.'
                         },
                         { type: 14 },
                         {
@@ -63,12 +71,6 @@ module.exports = {
                                     label: "Kirim Ulasan",
                                     custom_id: "feedback_open_modal",
                                     emoji: { name: "📝" }
-                                },
-                                {
-                                    style: 2,
-                                    type: 2,
-                                    label: "Info Deskripsi",
-                                    custom_id: "feedback_info"
                                 },
                                 {
                                     type: 2,
@@ -100,6 +102,7 @@ module.exports = {
             const action = customId.replace('feedback_', '');
             
             if (action === 'open_modal') {
+                // Buat modal untuk input feedback
                 const modal = new ModalBuilder()
                     .setCustomId('feedback_modal_submit')
                     .setTitle('📝 Server Feedback');
@@ -130,13 +133,6 @@ module.exports = {
                 return await interaction.showModal(modal);
             }
 
-            if (action === 'info') {
-                return await interaction.reply({
-                    content: '**📋 Feedback Info**\n\nYour feedback helps us improve!\n\n• Be honest and constructive\n• All feedback is anonymous\n• We read every submission',
-                    flags: MessageFlags.Ephemeral
-                });
-            }
-
         } catch (error) {
             console.error('❌ Error handling feedback button:', error);
             if (!interaction.replied && !interaction.deferred) {
@@ -155,11 +151,14 @@ module.exports = {
         if (interaction.customId !== 'feedback_modal_submit') return false;
         
         try {
+            // Defer reply untuk proses
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             
+            // Ambil data dari modal
             const rating = interaction.fields.getTextInputValue('feedback_rating').trim();
             const feedbackText = interaction.fields.getTextInputValue('feedback_text').trim();
             
+            // Validasi rating
             const ratingNum = parseInt(rating);
             if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
                 return await interaction.editReply({
@@ -167,10 +166,12 @@ module.exports = {
                 });
             }
             
+            // Buat star display
             const stars = '⭐'.repeat(ratingNum);
             const emptyStars = '☆'.repeat(5 - ratingNum);
             const starDisplay = stars + emptyStars;
             
+            // Get channel
             const channel = await interaction.client.channels.fetch(FEEDBACK_CHANNEL_ID);
             if (!channel) {
                 return await interaction.editReply({
@@ -181,7 +182,7 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const username = interaction.user.globalName || interaction.user.username;
             
-            // Template persis seperti yang diminta (TANPA THREAD)
+            // Template HASIL SUBMIT dengan data USER
             const feedbackPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -211,13 +212,8 @@ module.exports = {
                                     style: 1,
                                     type: 2,
                                     label: "Kirim Ulasan",
-                                    custom_id: "feedback_open_modal"
-                                },
-                                {
-                                    style: 2,
-                                    type: 2,
-                                    label: "Info Deskripsi",
-                                    custom_id: "feedback_info"
+                                    custom_id: "feedback_open_modal",
+                                    emoji: { name: "📝" }
                                 },
                                 {
                                     type: 2,
@@ -231,9 +227,10 @@ module.exports = {
                 }]
             };
 
-            // Kirim feedback TANPA thread
+            // Kirim feedback ke channel (TANPA thread)
             await channel.send(feedbackPayload);
 
+            // Reply ke user
             return await interaction.editReply({
                 content: `✅ **Thank you for your feedback!**\n\nYour ${ratingNum}-star review has been posted in <#${FEEDBACK_CHANNEL_ID}>.\n\n${starDisplay}\n\n> "${feedbackText}"`
             });
@@ -242,7 +239,12 @@ module.exports = {
             console.error('❌ Error handling feedback modal:', error);
             if (interaction.deferred) {
                 await interaction.editReply({
-                    content: '❌ An error occurred while submitting your feedback.'
+                    content: '❌ An error occurred while submitting your feedback. Please try again.'
+                }).catch(() => {});
+            } else if (!interaction.replied) {
+                await interaction.reply({
+                    content: '❌ An error occurred!',
+                    flags: MessageFlags.Ephemeral
                 }).catch(() => {});
             }
         }
