@@ -94,7 +94,8 @@ module.exports = {
 
             await thread.send(threadPayload);
 
-            suggestionVotes.set(sentMessage.id, { yes: 0, no: 0, voters: new Set() });
+            // Simpan data vote: Map<userId, 'yes' | 'no'>
+            suggestionVotes.set(sentMessage.id, new Map());
 
             console.log(`✅ Suggestion created with thread "Suggestion Discussion"`);
 
@@ -111,53 +112,75 @@ module.exports = {
         
         try {
             const parts = customId.split('_');
-            const action = parts[1];
+            const action = parts[1]; // 'yes' atau 'no'
             const authorId = parts[2];
             const timestamp = parts[3];
             
             if (action === 'yes' || action === 'no') {
-                let votes = suggestionVotes.get(message.id);
-                if (!votes) {
-                    votes = { yes: 0, no: 0, voters: new Set() };
-                    suggestionVotes.set(message.id, votes);
+                // Ambil atau buat vote data
+                let userVotes = suggestionVotes.get(message.id);
+                if (!userVotes) {
+                    userVotes = new Map();
+                    suggestionVotes.set(message.id, userVotes);
                 }
 
-                if (votes.voters.has(interaction.user.id)) {
-                    await interaction.deferUpdate().catch(() => {});
-                    return true;
+                const userId = interaction.user.id;
+                const currentVote = userVotes.get(userId); // 'yes', 'no', atau undefined
+
+                let yesCount = 0;
+                let noCount = 0;
+
+                // Hitung ulang total vote
+                for (const [uid, vote] of userVotes) {
+                    if (vote === 'yes') yesCount++;
+                    else if (vote === 'no') noCount++;
                 }
 
-                votes.voters.add(interaction.user.id);
-                if (action === 'yes') votes.yes++;
-                else votes.no++;
+                // Logika toggle vote
+                if (currentVote === action) {
+                    // Double click = hapus vote
+                    userVotes.delete(userId);
+                    if (action === 'yes') yesCount--;
+                    else noCount--;
+                } else if (currentVote === undefined) {
+                    // Belum vote, tambah vote baru
+                    userVotes.set(userId, action);
+                    if (action === 'yes') yesCount++;
+                    else noCount++;
+                } else {
+                    // Ganti vote (yes ↔ no)
+                    userVotes.set(userId, action);
+                    if (action === 'yes') {
+                        yesCount++;
+                        noCount--;
+                    } else {
+                        noCount++;
+                        yesCount--;
+                    }
+                }
 
-                // Build new components array dari awal
+                // Build new components array
                 const newComponents = [{
                     type: 17,
                     components: [
-                        // Section 1 - Header (tetap sama)
-                        message.components[0].components[0],
-                        // Separator
-                        message.components[0].components[1],
-                        // Section 2 - Catatan (tetap sama)
-                        message.components[0].components[2],
-                        // Separator
-                        message.components[0].components[3],
-                        // Action Row - Buttons (diupdate)
+                        message.components[0].components[0], // Header
+                        message.components[0].components[1], // Separator
+                        message.components[0].components[2], // Catatan
+                        message.components[0].components[3], // Separator
                         {
                             type: 1,
                             components: [
                                 {
                                     type: 2,
                                     style: 3,
-                                    label: `Yes (${votes.yes})`,
+                                    label: `Yes (${yesCount})`,
                                     emoji: { name: "👍" },
                                     custom_id: `suggest_yes_${authorId}_${timestamp}`
                                 },
                                 {
                                     type: 2,
                                     style: 4,
-                                    label: `No (${votes.no})`,
+                                    label: `No (${noCount})`,
                                     emoji: { name: "👎" },
                                     custom_id: `suggest_no_${authorId}_${timestamp}`
                                 }
