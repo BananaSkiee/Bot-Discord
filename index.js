@@ -7,18 +7,22 @@ const express = require("express");
 const config = require("./config");
 
 // 🧠 Custom modules & data log
+// const stickyHandler = require("./sticky");
 const autoGreeting = require("./modules/autoGreeting");
+// const welcomecard = require("./modules/welcomeCard");
 const invitesTracker = require("./modules/invitesTracker");
+// const webhookModule = require("./modules/webhook");
+// const srvName = require("./modules/srvName.js"); 
+// const { startAutoAnimation } = require("./modules/iconAnim");
+// const { logMemberAction, logFirstMessage, createLogEntryEmbed } = require("./modules/memberLogForum"); 
 const { handleIntroInteractions } = require('./modules/introCard');
 const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
 
 // ✅ TAMBAHAN: Import Suggestion & Feedback Systems
 const { handleSuggestionMessage, handleSuggestionButtons } = require('./modules/suggestionSystem');
 const { 
-    sendFeedbackPrompt, 
     handleFeedbackButtons, 
-    handleFeedbackModal,
-    handleFeedbackView 
+    handleFeedbackModal
 } = require('./modules/feedbackSystem');
 
 const client = new Client({
@@ -63,7 +67,7 @@ const server = app.listen(PORT, () => {
 // 🔄 Self-ping system (Tanpa Chat)
 function startSelfPing() {
   const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
-  const PING_INTERVAL = 5 * 60 * 1000;
+  const PING_INTERVAL = 5 * 60 * 1000; // Cukup tiap 5 menit
   
   setInterval(async () => {
     try {
@@ -84,11 +88,13 @@ fs.readdirSync("./events").forEach((file) => {
   }
 });
 
+// srvName(client); 🔥
+
 // 📌 Message Handler - ✅ TAMBAHAN: Suggestion handler
 client.on("messageCreate", async (message) => {
   if (message.author.bot || !message.guild) return;
 
-  // ✅ Handler untuk Suggestion System
+  // ✅ Handler untuk Suggestion System (chat langsung di channel suggestion)
   try {
     await handleSuggestionMessage(message);
   } catch (err) {
@@ -103,28 +109,39 @@ client.on("messageCreate", async (message) => {
     if (webCmds.includes(cmd)) {
        // return webhookModule.handleCommand(message);🔥
     }
-  }
-});
+  } // Tutup blok IF Startswith
+}); // Tutup event MessageCreate
 
-// 🔄 LOG: Perubahan Role
+// 🔄 LOG: Perubahan Role (Penting!)
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    // Cek apakah yang berubah HANYA role
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
     await handleVerificationUpdate(oldMember, newMember);
 
-    if (oldRoles.size === newRoles.size) return;
+    if (oldRoles.size === newRoles.size) return; // Tidak ada perubahan jumlah role
 
     const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
     const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
 
+    // Jika ada penambahan atau pencabutan role
     if (addedRoles.size > 0 || removedRoles.size > 0) {
+        
         const added = addedRoles.map(r => r.toString());
         const removed = removedRoles.map(r => r.toString());
+
         console.log(`✅ LOG ROLE: ${newMember.user.tag} - Ditambah: ${added.join(', ')} | Dicabut: ${removed.join(', ')}`);
+
+        // Log aksi ke Forum
+        /* await logMemberAction(newMember, 'ROLE_UPDATE', { 
+            roleChanges: { added, removed }
+        });
+      */
     }
 });
 
-// 💾 Invite Tracker
+
+// 💾 Invite Tracker (Pre-cache semua invite)
 client.on('ready', async () => {
     client.guilds.cache.forEach(async guild => {
         try {
@@ -134,11 +151,6 @@ client.on('ready', async () => {
             console.error(`❌ INVITE TRACKER: Gagal fetch invites untuk guild ${guild.id}.`, error.message);
         }
     });
-    
-    // ✅ TAMBAHAN: Kirim Feedback Prompt setelah ready (dengan delay)
-    setTimeout(async () => {
-        await sendFeedbackPrompt(client);
-    }, 5000);
 });
 
 client.on('inviteCreate', invite => {
@@ -151,7 +163,8 @@ client.on('inviteDelete', invite => {
     if (invites) invites.delete(invite.code);
 });
 
-// 🚀 Log ketika user join
+
+// 🚀 Log ketika user join (Event nyata)
 client.on("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
   await handleInitialRoles(member);
@@ -162,20 +175,31 @@ client.on("guildMemberAdd", async (member) => {
     const currentInvites = await member.guild.invites.fetch();
     const oldInvites = inviteCache.get(member.guild.id);
 
+    // Bandingkan cache lama dan baru untuk menemukan invite yang digunakan
     if (oldInvites) {
         inviteUsed = currentInvites.find(i => oldInvites.get(i.code) && oldInvites.get(i.code).uses < i.uses);
     }
     
+    // Update cache
     inviteCache.set(member.guild.id, currentInvites);
 
   } catch (error) {
     console.error("❌ INVITE TRACKER: Gagal melacak invite member baru.", error.message);
   }
+
+  // Log event Join nyata ke Forum (otomatis membuat thread)
+  const extraData = {
+    invite: inviteUsed ? { code: inviteUsed.code, inviter: inviteUsed.inviter } : null
+  };
+//  await logMemberAction(member, 'JOIN', extraData); 🔥
 });
 
-// 🚪 Log ketika user leave
+// 🚪 Log ketika user leave (Event nyata)
 client.on("guildMemberRemove", async (member) => {
+    // Hapus dari cache pesan pertama
     firstMessageCache.delete(member.id);
+    // Log event Leave nyata ke Forum
+//    await logMemberAction(member, 'LEAVE'); 🔥
 });
 
 // ✅ TAMBAHAN: Handler untuk Suggestion & Feedback Buttons + Modal
@@ -188,10 +212,6 @@ client.on('interactionCreate', async (interaction) => {
         // Cek feedback buttons
         const isFeedback = await handleFeedbackButtons(interaction);
         if (isFeedback) return;
-        
-        // Cek feedback view buttons
-        const isFeedbackView = await handleFeedbackView(interaction);
-        if (isFeedbackView) return;
         
         // Cek feedback modal
         const isFeedbackModal = await handleFeedbackModal(interaction);
@@ -209,14 +229,27 @@ process.on("unhandledRejection", (err) => {
 
 startSelfPing();
 
+// Monitoring Webhook Baru Otomatis
+client.on("webhookUpdate", async (channel) => {
+   /* setTimeout(async () => {
+        try {
+            const webhooks = await channel.fetchWebhooks();
+            const latest = webhooks.first();
+            if (latest) await webhookModule.monitorNewWebhook(latest);
+        } catch (e) {}
+    }, 1500);
+  */
+});
+
 // 🔐 Login bot
-client.login(config.token);
+ client.login(config.token);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('🛑 Received SIGTERM');
   
   try {
+    // Gunakan fetch supaya pasti dapet channel-nya walaupun cache lagi kosong
     const logChannel = await client.channels.fetch("1352800131933802547");
     if (logChannel) {
       await logChannel.send({
