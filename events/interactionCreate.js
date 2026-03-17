@@ -9,10 +9,10 @@ const filePath = path.join(__dirname, "../data/taggedUsers.json");
 const VerifySystem = require('../modules/verify');
 const verifySystem = new VerifySystem();
 
-// Import Shotgun system
+// Import Shotgun system - ✅ WAJIB ADA
 const { gameManager } = require('../commands/shotgunCommand');
 
-// Import introCard handler
+// ✅ TAMBAHAN: Import introCard handler
 const { handleIntroInteractions } = require('../modules/introCard');
 
 function saveTaggedUsers(data) {
@@ -47,7 +47,8 @@ module.exports = {
         return await command.execute(interaction);
       }
 
-      // ========== INTRO CARD HANDLER ==========
+      // ========== INTRO CARD HANDLER (TAMBAHAN) ==========
+      // ✅ Panggil introCard handler di sini, sebelum handler lain
       if (interaction.isButton() || interaction.isModalSubmit()) {
         const introIds = ['open_intro_modal', 'intro_modal_form', 'info_user_'];
         const isIntroInteraction = introIds.some(id => 
@@ -95,7 +96,7 @@ module.exports = {
         if (customId === 'back_to_verify') return await verifySystem.handleBackToVerify(interaction);
       }
 
-      // MODAL SUBMIT INTERACTIONS
+      // ✅ MODAL SUBMIT INTERACTIONS
       if (interaction.isModalSubmit()) {
         const { customId } = interaction;
         if (customId === 'input_rating_modal') return await verifySystem.handleRatingSubmit(interaction);
@@ -105,38 +106,48 @@ module.exports = {
         }
       }  
 
-      // ========== SHOTGUN DUELS HANDLER ==========
+      // ========== SHOTGUN DUELS HANDLER - VERSI DEWA BERKELAS DUNIA ==========
       if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
           try {
               const parts = interaction.customId.split('_');
-              const prefix = parts[0];
-              const action = parts[1];
+              const prefix = parts[0]; // sg
+              const action = parts[1]; // accept, reject, ready, shoot, item, surrender
               
               console.log(`🎮 [SHOTGUN] Action: ${action} | CustomID: ${interaction.customId}`);
               console.log(`🎮 [SHOTGUN] Parts: [${parts.join('][')}]`);
 
+              // ===== FORMAT PARSING =====
+              // accept:  sg_accept_{gameId}_{challengerId}_{opponentId}
+              // reject:  sg_reject_{gameId}_{challengerId}
+              // ready:   sg_ready_{gameId}_{playerId}
+              // shoot:   sg_shoot_{target}_{gameId}  ← PERHATIKAN: target dulu, gameId belakang
+              // item:    sg_item_{gameId}_{index}
+              // surrender: sg_surrender_{gameId}
+
               let gameId, param1, param2;
 
+              // Parse berdasarkan action
               switch(action) {
                   case 'accept':
                       gameId = parts[2];
-                      param1 = parts[3];
-                      param2 = parts[4];
+                      param1 = parts[3]; // challengerId
+                      param2 = parts[4]; // opponentId
                       break;
                   case 'reject':
                       gameId = parts[2];
                       break;
                   case 'ready':
                       gameId = parts[2];
-                      param1 = parts[3];
+                      param1 = parts[3]; // playerId
                       break;
                   case 'shoot':
-                      param1 = parts[2];
-                      gameId = parts[3];
+                      // FORMAT KHUSUS: sg_shoot_opp_gameId atau sg_shoot_self_gameId
+                      param1 = parts[2]; // target (opp/self)
+                      gameId = parts[3]; // gameId
                       break;
                   case 'item':
                       gameId = parts[2];
-                      param1 = parseInt(parts[3]);
+                      param1 = parseInt(parts[3]); // item index
                       break;
                   case 'surrender':
                       gameId = parts[2];
@@ -150,6 +161,7 @@ module.exports = {
 
               console.log(`🎮 [SHOTGUN] Parsed: gameId=${gameId}, param1=${param1}, param2=${param2}`);
 
+              // ===== HANDLE ACCEPT/REJECT (tidak perlu cek game) =====
               if (action === 'accept') {
                   return await gameManager.acceptDuel(gameId, interaction, param1, param2);
               }
@@ -157,10 +169,13 @@ module.exports = {
                   return await gameManager.rejectDuel(gameId, interaction);
               }
 
+              // ===== CEK GAME EXISTENCE =====
               const game = gameManager.getGame(gameId);
               if (!game) {
                   console.error(`🎮 [SHOTGUN] ERROR: Game ${gameId} not found!`);
+                  console.error(`🎮 [SHOTGUN] Available: ${gameManager.gamesList?.join(', ') || 'none'}`);
                   
+                  // Coba cari game yang mirip (tanpa timestamp)
                   const baseId = gameId?.split('-')[0];
                   const similarGame = Array.from(gameManager.games?.keys() || []).find(k => k.includes(baseId));
                   if (similarGame) {
@@ -173,7 +188,9 @@ module.exports = {
                   });
               }
 
+              // ===== HANDLE READY =====
               if (action === 'ready') {
+                  // Cek apakah tombol ini untuk pemain yang benar
                   if (param1 && interaction.user.id !== param1) {
                       return await interaction.reply({ 
                           content: '❌ Bukan tombolmu!', 
@@ -183,6 +200,7 @@ module.exports = {
                   return await gameManager.handleReady(gameId, interaction);
               }
 
+              // ===== CEK TURN (kecuali surrender) =====
               const currentPlayer = game.players[game.currentPlayer];
               if (action !== 'surrender' && interaction.user.id !== currentPlayer.id) {
                   return await interaction.reply({ 
@@ -191,6 +209,7 @@ module.exports = {
                   });
               }
 
+              // ===== HANDLE ACTIONS =====
               switch(action) {
                   case 'shoot':
                       console.log(`🎮 [SHOTGUN] Shoot: ${param1} (target) | Game: ${gameId}`);
@@ -214,7 +233,7 @@ module.exports = {
           }
       }
 
-      // ========== TAG SYSTEM ==========
+      // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
       if (!interaction.isButton()) return;
       
       const username = interaction.user.globalName ?? interaction.user.username;
@@ -268,16 +287,18 @@ module.exports = {
         }
       }
 
-      // Handler Unknown Button
+      // ✅ PERBAIKAN: Handler Unknown Button - tambahkan pengecekan introCard
       const verifyPrefixes = ['verify_', 'skip_', 'continue_', 'next_', 'welcome_', 'rate_', 'faqs_', 'give_', 'back_', 'auto_', 'custom_'];
       const introPrefixes = ['open_intro_modal', 'intro_modal_form', 'info_user_'];
       const externalPrefixes = ['suggest_', 'feedback_'];
       
+      // Cek apakah button sudah dihandle oleh introCard atau sistem lain
       const isHandled = introPrefixes.some(p => customId === p || customId.startsWith(p)) ||
                        verifyPrefixes.some(p => customId.startsWith(p)) ||
                        externalPrefixes.some(p => customId.startsWith(p));
       
       if (!isHandled) {
+        // ✅ PERBAIKAN: Cek dulu apakah sudah direspon
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "⚠️ Tombol tidak dikenali.", ephemeral: true });
         }
@@ -285,6 +306,7 @@ module.exports = {
 
     } catch (err) {
       console.error("❌ ERROR GLOBAL:", err);
+      // ✅ PERBAIKAN: Cek dengan benar sebelum reply error
       if (!interaction.replied && !interaction.deferred) {
         try {
           await interaction.reply({ content: "❌ Terjadi error internal.", ephemeral: true });
