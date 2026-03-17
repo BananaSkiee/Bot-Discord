@@ -14,6 +14,9 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const minecraftBot = require("../modules/minecraftBot");
 // const statusMC = require("../modules/statusMC");
 
+// ✅ TAMBAHAN: Import Feedback System
+const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
+
 const verifySystem = new VerifySystem();
 
 module.exports = {
@@ -159,7 +162,14 @@ if (logChannel) {
       console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
     }
 
-            // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
+    // ✅ TAMBAHAN: Kirim Feedback Prompt (hanya sekali saat ready)
+    try {
+      await sendFeedbackPrompt(client);
+    } catch (err) {
+      console.error("❌ Feedback prompt error:", err);
+    }
+
+    // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
     try {
         await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
     } catch (err) {
