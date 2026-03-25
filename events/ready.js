@@ -13,6 +13,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const { sendInitialCard } = require('../modules/introCard');
 // const minecraftBot = require("../modules/minecraftBot");
 // const statusMC = require("../modules/statusMC");
+const minecraftChecker = require('../modules/Minecraft/checker');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
@@ -43,6 +44,14 @@ module.exports = {
 } catch (err) {
     console.error("❌ Gagal inisialisasi StatusMC:", err);
 } */
+        
+    // ⛏️ Minecraft Status Checker (New Module)
+    try {
+      minecraftChecker(client);
+      console.log("✅ Minecraft Checker Module Active");
+    } catch (err) {
+      console.error("❌ Gagal inisialisasi Minecraft checker:", err);
+    }
     
     // ✅ Verify System
     try {
