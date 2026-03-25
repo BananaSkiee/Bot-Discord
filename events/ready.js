@@ -13,7 +13,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const { sendInitialCard } = require('../modules/introCard');
 // const minecraftBot = require("../modules/minecraftBot");
 // const statusMC = require("../modules/statusMC");
-const minecraftChecker = require('../modules/Minecraft/checker');
+const minecraftChecker = require('../modules/checker');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
