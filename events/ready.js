@@ -73,20 +73,17 @@ module.exports = {
             console.error("❌ Gagal inisialisasi AutoDelete Module:", err);
         }
 
-        // Jalankan Engine Verify
+  // Verify Member Dan Verify Hosting
     try {
-        verifyEngine(client, verifyConfig);
-        console.log(`[SYSTEM] 🛡️ Verification Engine: Operational on Port ${verifyConfig.port}`);
-    } catch (err) {
-        console.error(`[SYSTEM] ❌ Failed to Start Verification Engine:`, err);
-    }
-    
-    // ✅ Verify System
-    try {
+      // Jalankan sistem lama (Tombol/Chat)
       await verifySystem.initialize(client);
-      console.log("✅ Verify system initialized");
+      console.log("✅ Verify System (Lama) initialized");
+
+      // Jalankan sistem baru (Numpang Port 3000 index.js)
+      await verifyEngine(client, verifyConfig);
+      console.log("✅ Bio Verify Engine (Baru) Integrated");
     } catch (error) {
-      console.error("❌ Gagal initialize verify system:", error);
+      console.error("❌ Gagal initialize verifikasi:", error);
     }
 
     // 🧭 Server Info
