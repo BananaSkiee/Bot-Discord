@@ -3,9 +3,9 @@ const { ChannelType } = require("discord.js");
 // const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
 // Menghapus: const countValidator = require("../modules/countValidator");
-const autoSendMeme = require("../modules/autoMeme");
+// const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
-const beritaModule = require("../modules/autoNews");
+// const beritaModule = require("../modules/autoNews");
 // const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
 // const { startAutoAnimation } = require("../modules/iconAnim");
@@ -65,12 +65,12 @@ module.exports = {
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
     
-    //🌈 Rainbow role (interval aman 45 detik)
+/*    //🌈 Rainbow role (interval aman 45 detik)
     try {
       rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
     } catch (err) {
       console.error("❌ Rainbow role error:", err);
-    }
+    } "/
 
 // Leaderboard voice dan massage
     
@@ -109,14 +109,14 @@ module.exports = {
       console.error("❌ Gagal setup slash command:", err);
     }
 
-    // 📰 Auto berita
+/*    // 📰 Auto berita
     try {
       beritaModule(client);
     } catch (err) {
       console.error("❌ Auto berita error:", err);
-    }
+    } */
 
-/*    // 🟡 Auto status rotasi tiap 1 menit
+    // 🟡 Auto status rotasi tiap 1 menit
     const statuses = [
       "🌌 Menjaga BananaSkiee Community",
       "📖 Memandu member baru",
@@ -143,7 +143,7 @@ module.exports = {
       }
     };
     updateStatus();
-    setInterval(updateStatus, 60_000); */
+    setInterval(updateStatus, 60_000);
     
 const logChannel = client.channels.cache.get("1352800131933802547");
 if (logChannel) {
@@ -157,7 +157,7 @@ if (logChannel) {
   });
 }
 
-    // 🤣 Auto meme tiap 3 jam
+/*    // 🤣 Auto meme tiap 3 jam
     const memeChannelId = process.env.MEME_CHANNEL_ID;
     if (memeChannelId) {
       const memeChannel = client.channels.cache.get(memeChannelId);
@@ -169,7 +169,7 @@ if (logChannel) {
       }
     } else {
       console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
-    }
+    } */
 
     // ✅ TAMBAHAN: Kirim Feedback Prompt (hanya sekali saat ready)
    /* try {
