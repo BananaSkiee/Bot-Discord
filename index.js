@@ -49,19 +49,13 @@ const firstMessageCache = new Collection();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Health check endpoint
+module.exports = app; // <--- WAJIB ADA
+
 app.get("/", (_, res) => res.send("✅ Bot Akira aktif"));
-app.get("/health", (_, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage()
-  });
-});
+app.get("/health", (_, res) => res.status(200).json({ status: 'OK' }));
 
 const server = app.listen(PORT, () => {
-  console.log("🌐 Web server hidup di port " + PORT);
+  console.log("🌐 Web server pusat hidup di port " + PORT);
 });
 
 // 🔄 Self-ping system (Tanpa Chat)
