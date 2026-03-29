@@ -11,19 +11,11 @@ const FEEDBACK_CHANNEL_ID = '1352326384940220488';
 
 // Emoji reaksi berdasarkan rating
 const RATING_REACTIONS = {
-    1: '😞', // Kecewa
-    2: '😕', // Kurang puas
-    3: '😐', // Biasa saja
-    4: '🙂', // Puas
-    5: '🤩'  // Sangat puas
-};
-
-const RATING_MESSAGES = {
-    1: 'Kami mohon maaf atas pengalaman kurang memuaskan. Kami akan berusaha lebih baik!',
-    2: 'Terima kasih atas masukan Anda. Kami akan terus meningkatkan kualitas server.',
-    3: 'Terima kasih atas penilaian Anda. Ada yang bisa kami bantu lebih baik?',
-    4: 'Senang mendengar Anda puas! Terima kasih atas dukungannya.',
-    5: 'Luar biasa! Terima kasih banyak atas apresiasi Anda! 🎉'
+    1: '😢',      // Rating 1 - Sedih/Kecewa
+    2: '😕',      // Rating 2 - Kurang puas
+    3: '😐',      // Rating 3 - Biasa saja
+    4: '🙂',      // Rating 4 - Puas
+    5: '🤩'       // Rating 5 - Sangat puas/senang
 };
 
 module.exports = {
@@ -201,10 +193,6 @@ module.exports = {
             const timestamp = Math.floor(Date.now() / 1000);
             const username = interaction.user.globalName || interaction.user.username;
             
-            // Ambil emoji dan pesan berdasarkan rating
-            const reactionEmoji = RATING_REACTIONS[ratingNum];
-            const ratingMessage = RATING_MESSAGES[ratingNum];
-            
             const feedbackPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
@@ -214,7 +202,7 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# New Feedback ${reactionEmoji}\n> **"${feedbackText}"**\n\n **__Informasi__**\n> **Rating:** ${starDisplay} (${ratingNum}/5)\n> **Pengusul:** ${username}\n> **User ID:** ${interaction.user.id}\n> **Tanggal:** <t:${timestamp}:F>`
+                                content: `# New Feedback\n> **"${feedbackText}"**\n\n **__Informasi__**\n> **Rating:** ${starDisplay} (${ratingNum}/5)\n> **Pengusul:** ${username}\n> **User ID:** ${interaction.user.id}\n> **Tanggal:** <t:${timestamp}:F>`
                             }],
                             accessory: {
                                 type: 11,
@@ -226,7 +214,7 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `**__${ratingMessage}__**`
+                                content: `**__Terimakasih Banyak__**\n\n> Saran Anda membantu kami meningkatkan kualitas server kami.`
                             }],
                             accessory: {
                                 type: 2,
@@ -251,15 +239,22 @@ module.exports = {
                 }]
             };
 
+            // Kirim pesan feedback
             const sentMessage = await channel.send(feedbackPayload);
             
-            // ✅ TAMBAH REACTION EMOJI KHUSUS
-            try {
+            // Tambahkan reaction emoji berdasarkan rating
+            const reactionEmoji = RATING_REACTIONS[ratingNum];
+            if (reactionEmoji) {
                 await sentMessage.react(reactionEmoji);
-            } catch (reactError) {
-                console.error('❌ Failed to add reaction:', reactError);
             }
-
+            
+            // Opsional: Tambahkan juga reaksi bintang sesuai rating
+            if (ratingNum >= 4) {
+                await sentMessage.react('👍');
+            } else if (ratingNum <= 2) {
+                await sentMessage.react('💔');
+            }
+            
             await interaction.deferUpdate().catch(() => {});
             
         } catch (error) {
