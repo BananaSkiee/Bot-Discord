@@ -14,6 +14,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const minecraftBot = require("../modules/minecraftBot");
 // const statusMC = require("../modules/statusMC");
 const minecraftChecker = require('../modules/checker');
+const { initAutoDelete } = require('../modules/autoDelete');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
@@ -52,6 +53,14 @@ module.exports = {
     } catch (err) {
       console.error("❌ Gagal inisialisasi Minecraft checker:", err);
     }
+
+   // AutoDelete Module - EmpireBS
+        try {
+            initAutoDelete(client);
+            console.log("✅ AutoDelete Module Active | Channel: 1487876267339681813");
+        } catch (err) {
+            console.error("❌ Gagal inisialisasi AutoDelete Module:", err);
+        }
     
     // ✅ Verify System
     try {
