@@ -28,11 +28,12 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
-    const verifyConfig = {
+        const verifyConfig = {
         clientId:     process.env.CLIENT_ID,
-        clientSecret: process.env.CLIENT_SECRET,
-        redirectUri:  process.env.REDIRECT_URI,
-        roleId:       process.env.VERIFIED_ROLE_ID,
+        clientSecret: process.env.CLIENT_SECRET, // Ambil dari Koyeb
+        redirectUri:  process.env.REDIRECT_URI,  // Ambil dari Koyeb
+        roleId:       process.env.VERIFIED_ROLE_ID, // Sesuai ID Role 15
+        guildId:      process.env.GUILD_ID,      // Sesuai GUILD_ID di .env lu
         inviteLink:   process.env.REQUIRED_BIO_LINK,
         port:         process.env.PORT || 3000
     };
