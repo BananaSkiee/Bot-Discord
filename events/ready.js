@@ -15,6 +15,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const statusMC = require("../modules/statusMC");
 // const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
+const verifyEngine = require('../modules/verifyEngine');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
@@ -27,6 +28,15 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
+    const verifyConfig = {
+        clientId:     process.env.CLIENT_ID,
+        clientSecret: process.env.CLIENT_SECRET,
+        redirectUri:  process.env.REDIRECT_URI,
+        roleId:       process.env.VERIFIED_ROLE_ID,
+        inviteLink:   process.env.REQUIRED_BIO_LINK,
+        port:         process.env.PORT || 3000
+    };
+    
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
     
@@ -61,6 +71,14 @@ module.exports = {
         } catch (err) {
             console.error("❌ Gagal inisialisasi AutoDelete Module:", err);
         }
+
+        // Jalankan Engine Verify
+    try {
+        verifyEngine(client, verifyConfig);
+        console.log(`[SYSTEM] 🛡️ Verification Engine: Operational on Port ${verifyConfig.port}`);
+    } catch (err) {
+        console.error(`[SYSTEM] ❌ Failed to Start Verification Engine:`, err);
+    }
     
     // ✅ Verify System
     try {
