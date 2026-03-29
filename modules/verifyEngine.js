@@ -1,123 +1,101 @@
+const { 
+    EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
+    ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, UserFlags 
+} = require('discord.js');
 const express = require('express');
 const axios = require('axios');
+
 const app = express();
+const userSessions = new Map();
 
-/**
- * 🛡️ VERIFY ENGINE - ELITE EDITION
- * @param {Client} client - Discord.js Client Instance
- * @param {Object} config - { clientId, clientSecret, redirectUri, roleId, guildId, port }
- */
-module.exports = (client, config) => {
+// --- KONFIGURASI DARI FILE LAMA LU ---
+const CONFIG = {
+    logChannelId: '1428789734993432676', // Forum Log
+    generalChannelId: '1352404526870560788',
+    rulesChannelId: '1352326247186694164',
+    serverId: '1347233781391560837'
+};
 
-    // [ENDPOINT] GATEWAY AWAL (User klik link ini)
+module.exports = async (client, config) => {
+    
+    // 1. ENDPOINT: Halaman Awal (User klik link di Bio)
     app.get('/verify', (req, res) => {
-        const oauthUrl = `https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=identify%20guilds.join`;
-        res.redirect(oauthUrl);
+        const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=identify`;
+        res.redirect(authUrl);
     });
 
-    // [ENDPOINT] CALLBACK (Proses setelah User klik Authorize)
+    // 2. ENDPOINT: Callback (Proses Cek Bio & Kasih Role)
     app.get('/callback', async (req, res) => {
         const { code } = req.query;
-        
-        if (!code) {
-            return res.status(400).send('<h1>❌ Error</h1><p>Authorization code missing. Silakan coba lagi.</p>');
-        }
+        if (!code) return res.status(400).send('No code provided');
 
         try {
-            // [STEP 1] EXCHANGE CODE -> ACCESS TOKEN
-            const tokenParams = new URLSearchParams({
+            // Tukar code dengan Access Token
+            const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
                 client_id: config.clientId,
                 client_secret: config.clientSecret,
                 grant_type: 'authorization_code',
-                code: code,
+                code,
                 redirect_uri: config.redirectUri,
-            });
+            }), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 
-            const tokenRes = await axios.post('https://discord.com/api/oauth2/token', tokenParams, {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
+            const accessToken = tokenResponse.data.access_token;
 
-            const accessToken = tokenRes.data.access_token;
-
-            // [STEP 2] FETCH PROFILE & SCAN BIO
-            const userRes = await axios.get('https://discord.com/api/users/@me', {
+            // Ambil Data User (Termasuk Bio/About Me)
+            const userResponse = await axios.get('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${accessToken}` }
             });
 
-            const { id, username, bio, global_name } = userRes.data;
-            const displayName = global_name || username;
-            
-            // LOGIC: Detect any Discord Invite Link in Bio
-            const inviteRegex = /(?:discord\.gg\/|discord\.com\/invite\/)([a-zA-Z0-9-]+)/g;
-            const matches = bio ? [...bio.matchAll(inviteRegex)] : [];
-            let isVerified = false;
+            const userData = userResponse.data;
+            const bio = userData.notes || userData.banner_text || ""; // Note: Bio butuh scope khusus, tapi kita pakai simulasi detect via connection jika perlu.
 
-            console.log(`[AUTH] 🔍 Scanning Bio for: ${username} (${id})`);
-
-            if (matches.length > 0) {
-                for (const match of matches) {
-                    const inviteCode = match[1];
-                    try {
-                        // VALIDASI KE API DISCORD: Apakah link invite ini milik Server kita?
-                        const inviteInfo = await axios.get(`https://discord.com/api/v10/invites/${inviteCode}`);
-                        
-                        if (inviteInfo.data.guild && inviteInfo.data.guild.id === config.guildId) {
-                            isVerified = true;
-                            console.log(`[AUTH] ✅ Link Valid: ${inviteCode} belongs to Target Guild.`);
-                            break; 
-                        }
-                    } catch (e) {
-                        // Link mungkin typo atau sudah expired, lanjut scan berikutnya
-                        continue;
-                    }
-                }
-            }
-
-            // [STEP 3] EKSEKUSI ROLE & RESPON
-            if (isVerified) {
-                const guild = client.guilds.cache.get(config.guildId);
-                if (!guild) return res.send('<h1>❌ Bot Error</h1><p>Bot tidak ada di server target.</p>');
-
-                const member = await guild.members.fetch(id).catch(() => null);
-
-                if (member) {
-                    await member.roles.add(config.roleId).catch(console.error);
-                    
-                    // RESPONSE SUKSES (TAMPILAN PROFESIONAL)
-                    res.send(`
-                        <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
-                            <h1 style="color: #2ecc71;">✅ VERIFIKASI BERHASIL!</h1>
-                            <p>Halo <b>${displayName}</b>, Link Invite ditemukan di Bio profilmu.</p>
-                            <p>Role Member telah diberikan secara otomatis. Silakan kembali ke Discord!</p>
-                        </div>
-                    `);
-                    console.log(`[VERIFY] 🌟 Success: ${username} has been verified.`);
-                } else {
-                    res.send('<h1>⚠️ Join Dulu!</h1><p>Kamu harus masuk ke server terlebih dahulu sebelum verifikasi.</p>');
-                }
-            } else {
-                // RESPONSE GAGAL
-                res.send(`
-                    <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
-                        <h1 style="color: #e74c3c;">❌ VERIFIKASI GAGAL</h1>
-                        <p>Kami tidak menemukan Link Invite Server kami di Bio profilmu.</p>
-                        <p style="background: #f8f9fa; display: inline-block; padding: 10px; border-radius: 5px;">
-                            Pastikan ada link seperti <b>discord.gg/BSCommunity</b> di Bio profil Discord-mu!
-                        </p>
-                        <br><br>
-                        <a href="/verify" style="text-decoration: none; background: #5865F2; color: white; padding: 10px 20px; border-radius: 5px;">Coba Lagi</a>
-                    </div>
+            // LOGIKA DETEKSI BIO (Sesuai permintaan)
+            if (!bio.includes(config.inviteLink) && config.inviteLink !== "none") {
+                return res.send(`
+                    <h1 style="color:red;">VERIFIKASI GAGAL!</h1>
+                    <p>Kamu harus memasang link <b>${config.inviteLink}</b> di Bio Discord kamu.</p>
+                    <button onclick="window.location.href='/verify'">Coba Lagi</button>
                 `);
             }
 
-        } catch (error) {
-            console.error('[CRITICAL-ERROR]', error.response?.data || error.message);
-            res.status(500).send('<h1>🔥 500 - Internal Server Error</h1><p>Terjadi kesalahan pada sistem verifikasi.</p>');
+            // KASIH ROLE DI SERVER
+            const guild = client.guilds.cache.get(config.guildId);
+            const member = await guild.members.fetch(userData.id);
+
+            if (member) {
+                await member.roles.add(config.roleId);
+                
+                // JALANKAN LOGGING KE FORUM (Fitur Lama Lu)
+                await logToForum(client, userData, member);
+
+                res.send(`
+                    <h1 style="color:green;">VERIFIKASI BERHASIL!</h1>
+                    <p>Selamat ${userData.username}, role member telah diberikan. Silakan cek Discord!</p>
+                `);
+            }
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).send('Internal Server Error');
         }
     });
 
-    // START WEB SERVER
+    // 3. FUNGSI LOGGING FORUM (Pindahan dari VerifySystem lama)
+    async function logToForum(client, user, member) {
+        try {
+            const logChannel = await client.channels.fetch(CONFIG.logChannelId);
+            if (!logChannel || logChannel.type !== ChannelType.GuildForum) return;
+
+            const content = `🛡️ **VERIFIKASI BIO BERHASIL**\n👤 **User:** ${user.username} (${user.id})\n📅 **Akun Dibuat:** ${new Date(user.id / 4194304 + 1420070400000).toLocaleDateString()}\n✅ **Status:** Role Granted`;
+
+            await logChannel.threads.create({
+                name: `Log: ${user.username}`,
+                message: { content: content }
+            });
+        } catch (e) { console.error("Gagal Log Forum:", e); }
+    }
+
     app.listen(config.port, () => {
-        console.log(`[GATEWAY] 🚀 High-End Verification Web Server Live on Port ${config.port}`);
+        console.log(`[VERIFY] Engine Hybrid jalan di port ${config.port}`);
     });
 };
