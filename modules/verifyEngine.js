@@ -1,30 +1,19 @@
-const { 
-    EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
-    ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType, UserFlags 
-} = require('discord.js');
-const express = require('express');
+const { EmbedBuilder, ChannelType } = require('discord.js');
 const axios = require('axios');
 
-const app = express();
-const userSessions = new Map();
-
-// --- KONFIGURASI DARI FILE LAMA LU ---
-const CONFIG = {
-    logChannelId: '1428789734993432676', // Forum Log
-    generalChannelId: '1352404526870560788',
-    rulesChannelId: '1352326247186694164',
-    serverId: '1347233781391560837'
-};
+// Kita ambil 'app' dari index.js supaya GAK BENTROK PORT
+const app = require('../index'); 
 
 module.exports = async (client, config) => {
-    
-    // 1. ENDPOINT: Halaman Awal (User klik link di Bio)
+    console.log("🛠️ [VERIFY] Registering OAuth2 Routes to Main Server...");
+
+    // 1. Endpoint Awal (User klik link di Bio)
     app.get('/verify', (req, res) => {
         const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=identify`;
         res.redirect(authUrl);
     });
 
-    // 2. ENDPOINT: Callback (Proses Cek Bio & Kasih Role)
+    // 2. Callback OAuth2 (Proses Cek Bio & Kasih Role)
     app.get('/callback', async (req, res) => {
         const { code } = req.query;
         if (!code) return res.status(400).send('No code provided');
@@ -41,61 +30,63 @@ module.exports = async (client, config) => {
 
             const accessToken = tokenResponse.data.access_token;
 
-            // Ambil Data User (Termasuk Bio/About Me)
+            // Ambil Data User
             const userResponse = await axios.get('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${accessToken}` }
             });
 
             const userData = userResponse.data;
-            const bio = userData.notes || userData.banner_text || ""; // Note: Bio butuh scope khusus, tapi kita pakai simulasi detect via connection jika perlu.
+            // Ambil Bio (About Me)
+            const bio = userData.notes || userData.banner_text || ""; 
 
-            // LOGIKA DETEKSI BIO (Sesuai permintaan)
-            if (!bio.includes(config.inviteLink) && config.inviteLink !== "none") {
+            // LOGIKA DETEKSI BIO (Ganti config.inviteLink di .env)
+            if (config.inviteLink !== "none" && !bio.includes(config.inviteLink)) {
                 return res.send(`
-                    <h1 style="color:red;">VERIFIKASI GAGAL!</h1>
-                    <p>Kamu harus memasang link <b>${config.inviteLink}</b> di Bio Discord kamu.</p>
-                    <button onclick="window.location.href='/verify'">Coba Lagi</button>
+                    <body style="background:#2c2f33; color:white; font-family:sans-serif; text-align:center; padding:50px;">
+                        <h1 style="color:#f04747;">❌ VERIFIKASI GAGAL</h1>
+                        <p>Kamu belum memasang link: <b>${config.inviteLink}</b> di Bio Discord kamu.</p>
+                        <p>Silakan pasang dulu, lalu klik tombol di bawah:</p>
+                        <button onclick="window.location.href='/verify'" style="background:#7289da; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Coba Lagi</button>
+                    </body>
                 `);
             }
 
-            // KASIH ROLE DI SERVER
+            // KASIH ROLE
             const guild = client.guilds.cache.get(config.guildId);
             const member = await guild.members.fetch(userData.id);
 
             if (member) {
                 await member.roles.add(config.roleId);
                 
-                // JALANKAN LOGGING KE FORUM (Fitur Lama Lu)
+                // JALANKAN LOGGING KE FORUM (Fitur Sistem Lama)
                 await logToForum(client, userData, member);
 
                 res.send(`
-                    <h1 style="color:green;">VERIFIKASI BERHASIL!</h1>
-                    <p>Selamat ${userData.username}, role member telah diberikan. Silakan cek Discord!</p>
+                    <body style="background:#2c2f33; color:white; font-family:sans-serif; text-align:center; padding:50px;">
+                        <h1 style="color:#43b581;">✅ VERIFIKASI BERHASIL!</h1>
+                        <p>Selamat ${userData.username}, kamu sekarang adalah Verified Member.</p>
+                        <p>Silakan kembali ke Discord dan cek channel baru!</p>
+                    </body>
                 `);
             }
 
         } catch (err) {
-            console.error(err);
-            res.status(500).send('Internal Server Error');
+            console.error("❌ OAuth Error:", err.response?.data || err.message);
+            res.status(500).send('Terjadi kesalahan sistem. Coba lagi nanti.');
         }
     });
 
-    // 3. FUNGSI LOGGING FORUM (Pindahan dari VerifySystem lama)
+    // 3. FUNGSI LOGGING (Pindahan dari sistem lama lu)
     async function logToForum(client, user, member) {
         try {
-            const logChannel = await client.channels.fetch(CONFIG.logChannelId);
+            const logChannelId = "1428789734993432676"; // ID Forum Log Lu
+            const logChannel = await client.channels.fetch(logChannelId);
             if (!logChannel || logChannel.type !== ChannelType.GuildForum) return;
 
-            const content = `🛡️ **VERIFIKASI BIO BERHASIL**\n👤 **User:** ${user.username} (${user.id})\n📅 **Akun Dibuat:** ${new Date(user.id / 4194304 + 1420070400000).toLocaleDateString()}\n✅ **Status:** Role Granted`;
-
             await logChannel.threads.create({
-                name: `Log: ${user.username}`,
-                message: { content: content }
+                name: `Log Bio: ${user.username}`,
+                message: { content: `✅ **${user.username}** berhasil verifikasi bio!\n🆔 ID: ${user.id}\n🔗 Link Detect: ${config.inviteLink}` }
             });
         } catch (e) { console.error("Gagal Log Forum:", e); }
     }
-
-    app.listen(config.port, () => {
-        console.log(`[VERIFY] Engine Hybrid jalan di port ${config.port}`);
-    });
 };
