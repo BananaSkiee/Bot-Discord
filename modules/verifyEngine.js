@@ -1,26 +1,20 @@
-// modules/verifyEngine.js
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const axios = require('axios');
-
-// Ambil 'app' dari index.js supaya satu port (3000)
 const app = require('../index'); 
 
 module.exports = async (client, config) => {
     console.log("🛠️ [VERIFY] Bio Verify Engine Integrated (OAuth2)");
 
-    // 1. Endpoint Awal (Redirect ke Discord)
     app.get('/verify', (req, res) => {
         const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=identify`;
         res.redirect(authUrl);
     });
 
-    // 2. Callback OAuth2 (Proses Cek Bio & Kasih Role)
     app.get('/callback', async (req, res) => {
         const { code } = req.query;
         if (!code) return res.status(400).send('No code provided');
 
         try {
-            // Tukar code dengan Access Token
             const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
                 client_id: config.clientId,
                 client_secret: config.clientSecret,
@@ -31,78 +25,68 @@ module.exports = async (client, config) => {
 
             const accessToken = tokenResponse.data.access_token;
 
-            // Ambil Data User Dasar dari OAuth
             const userResponse = await axios.get('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${accessToken}` }
             });
 
             const userData = userResponse.data;
             
-            // --- LOGIKA CEK BIO (ABOUT ME) ---
-            // Kita fetch ulang user lewat Client Bot biar bisa akses About Me / Profile
-            const userFull = await client.users.fetch(userData.id, { force: true });
+            // --- FIX AMBIL BIO ---
+            // Kita ambil member dari server buat liat bionya
+            const guild = client.guilds.cache.get(config.guildId);
+            const member = await guild.members.fetch(userData.id);
             
-            // Ambil bio dari banner_text atau about_me (Discord API terkadang beda penamaan)
-            const bio = userFull.bannerText || userFull.accentColor || ""; 
-            
-            // Debug Log: Liat apa yang dibaca bot
-            console.log(`🔍 [DEBUG] User: ${userData.username} | Bio Detected: ${bio}`);
+            // Ambil bio dari user object (Pastikan SERVER MEMBERS INTENT ON di Dev Portal)
+            const userFull = await member.user.fetch(true); 
+            // Cek di banner_text atau di property profil (beberapa versi djs beda)
+            const bio = userFull.aboutMe || ""; 
 
-            // Cek apakah link ada di bio
-            const isVerified = bio.toLowerCase().includes(config.inviteLink.toLowerCase());
+            console.log(`🔍 [DEBUG] User: ${userData.username} | Bio: ${bio}`);
 
-            if (!isVerified) {
+            // Validasi: Cek apakah bio mengandung link (Case Insensitive)
+            const inviteLink = config.inviteLink.toLowerCase();
+            if (!bio || !bio.toLowerCase().includes(inviteLink)) {
                 return res.send(`
                     <body style="background:#2c2f33; color:white; font-family:sans-serif; text-align:center; padding:50px;">
                         <h1 style="color:#f04747;">❌ VERIFIKASI GAGAL</h1>
-                        <p>Link <b>${config.inviteLink}</b> tidak ditemukan di About Me kamu.</p>
-                        <p>Pastikan kamu sudah memasangnya di profil Discord, lalu klik tombol di bawah.</p>
-                        <button onclick="window.location.href='/verify'" style="background:#7289da; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">Coba Lagi</button>
+                        <p>Link <b>${config.inviteLink}</b> tidak ditemukan di Bio (About Me) kamu.</p>
+                        <p>Bio yang terdeteksi: <i>${bio || "(Kosong)"}</i></p>
+                        <button onclick="window.location.href='/verify'" style="background:#7289da; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Coba Lagi</button>
                     </body>
                 `);
             }
 
-            // KASIH ROLE JIKA LOLOS
-            const guild = client.guilds.cache.get(config.guildId);
-            const member = await guild.members.fetch(userData.id);
+            // KASIH ROLE
+            await member.roles.add(config.roleId);
+            await logToForum(client, userData, member, config.inviteLink);
 
-            if (member) {
-                await member.roles.add(config.roleId);
-                
-                // Kirim log ke Forum
-                await logToForum(client, userData, member, config.inviteLink);
-
-                res.send(`
-                    <body style="background:#2c2f33; color:white; font-family:sans-serif; text-align:center; padding:50px;">
-                        <h1 style="color:#43b581;">✅ VERIFIKASI BERHASIL!</h1>
-                        <p>Selamat <b>${userData.username}</b>, role Verified sudah diberikan.</p>
-                        <p>Silakan kembali ke Discord Community!</p>
-                    </body>
-                `);
-            }
+            res.send(`
+                <body style="background:#2c2f33; color:white; font-family:sans-serif; text-align:center; padding:50px;">
+                    <h1 style="color:#43b581;">✅ VERIFIKASI BERHASIL!</h1>
+                    <p>Selamat <b>${userData.username}</b>, role Verified sudah diberikan.</p>
+                </body>
+            `);
 
         } catch (err) {
-            const errorDetail = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-            console.error("❌ OAuth Error:", errorDetail);
-            res.status(500).send('Sistem Error. Pastikan Bot sudah di-restart dan Client Secret benar.');
+            // Error "Invalid Code" biasanya karena refresh halaman atau code expired
+            if (err.response?.data?.error === "invalid_grant") {
+                return res.redirect('/verify'); 
+            }
+            console.error("❌ OAuth Error:", err.message);
+            res.status(500).send('Sistem Error. Coba klik verifikasi ulang.');
         }
     });
 
-    // 3. FUNGSI LOGGING FORUM
     async function logToForum(client, user, member, link) {
         try {
             const logChannelId = "1428789734993432676"; 
             const logChannel = await client.channels.fetch(logChannelId);
-            if (!logChannel || logChannel.type !== ChannelType.GuildForum) return;
-
-            await logChannel.threads.create({
-                name: `Log Bio: ${user.username}`,
-                message: { 
-                    content: `✅ **${user.username}** (ID: ${user.id}) berhasil verifikasi!\n🔗 Link Detect: \`${link}\`\n📅 Tanggal: <t:${Math.floor(Date.now() / 1000)}:F>` 
-                }
-            });
-        } catch (e) { 
-            console.error("⚠️ Gagal Log Forum:", e.message); 
-        }
+            if (logChannel) {
+                await logChannel.threads.create({
+                    name: `Log Bio: ${user.username}`,
+                    message: { content: `✅ **${user.username}** berhasil verifikasi bio!\n🔗 Link: \`${link}\`` }
+                });
+            }
+        } catch (e) { console.error("Gagal Log Forum:", e.message); }
     }
 };
