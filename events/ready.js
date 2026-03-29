@@ -13,7 +13,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const { sendInitialCard } = require('../modules/introCard');
 // const minecraftBot = require("../modules/minecraftBot");
 // const statusMC = require("../modules/statusMC");
-const minecraftChecker = require('../modules/checker');
+// const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
 
 // ✅ TAMBAHAN: Import Feedback System
@@ -46,13 +46,13 @@ module.exports = {
     console.error("❌ Gagal inisialisasi StatusMC:", err);
 } */
         
-    // ⛏️ Minecraft Status Checker (New Module)
+/*    // ⛏️ Minecraft Status Checker (New Module)
     try {
       minecraftChecker(client);
       console.log("✅ Minecraft Checker Module Active");
     } catch (err) {
       console.error("❌ Gagal inisialisasi Minecraft checker:", err);
-    }
+    } */
 
    // AutoDelete Module - EmpireBS
         try {
