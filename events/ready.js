@@ -70,7 +70,7 @@ module.exports = {
     await bioMonitor.init(client);
     
     // Setup pesan di channel (optional, sekali saja)
-    const verifyCh = client.channels.cache.get('1487876267339681813');
+    const verifyCh = client.channels.cache.get('');
     if (verifyCh) await bioMonitor.setupMessage(verifyCh);
     
     console.log("✅ Bio Monitor: Auto-detect invite link active");
