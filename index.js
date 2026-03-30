@@ -6,6 +6,9 @@ const fs = require("fs");
 const express = require("express");
 const config = require("./config");
 
+// 🎯 TARGET SERVER ID - Hanya server ini yang bisa pakai fitur bot
+const TARGET_SERVER_ID = "1347233781391560837";
+
 // 🧠 Custom modules & data log
 // const stickyHandler = require("./sticky");
 const autoGreeting = require("./modules/autoGreeting");
@@ -72,20 +75,51 @@ function startSelfPing() {
   }, PING_INTERVAL);
 }
 
-// 📂 Load events
+// ⛔⛔⛔ SERVER GUARD FUNCTION ⛔⛔⛔
+// Cek apakah event dari server yang diizinkan
+function isTargetServer(guild) {
+  if (!guild) return false;
+  return guild.id === TARGET_SERVER_ID;
+}
+
+// Wrapper untuk silent ignore
+function guard(eventName, handler) {
+  return async (...args) => {
+    // Cari guild dari berbagai event patterns
+    const guild = args[0]?.guild || 
+                  args[0]?.member?.guild || 
+                  args[0]?.message?.guild || 
+                  args[0];
+    
+    // Jika bukan dari target server, silent return
+    if (!isTargetServer(guild)) {
+      // Debug mode: Uncomment baris bawah untuk log block
+      // console.log(`⛔ Blocked ${eventName} from: ${guild?.name || 'Unknown'} (${guild?.id || 'N/A'})`);
+      return;
+    }
+    
+    // Lanjutkan ke handler asli
+    return handler(...args);
+  };
+}
+
+// 📂 Load events (dengan guard)
 fs.readdirSync("./events").forEach((file) => {
   const event = require(`./events/${file}`);
+  
   if (event.once) {
+    // Event once (ready, dll) - tidak perlu guard
     client.once(event.name, (...args) => event.execute(...args, client));
   } else {
-    client.on(event.name, (...args) => event.execute(...args, client));
+    // Event lainnya - pakai guard
+    client.on(event.name, guard(event.name, (...args) => event.execute(...args, client)));
   }
 });
 
 // srvName(client); 🔥
 
-// 📌 Message Handler - ✅ TAMBAHAN: Suggestion handler
-client.on("messageCreate", async (message) => {
+// 📌 Message Handler - DENGAN GUARD
+client.on("messageCreate", guard("messageCreate", async (message) => {
   if (message.author.bot || !message.guild) return;
 
   // ✅ Handler untuk Suggestion System (chat langsung di channel suggestion)
@@ -104,10 +138,10 @@ client.on("messageCreate", async (message) => {
        // return webhookModule.handleCommand(message);🔥
     }
   } // Tutup blok IF Startswith
-}); // Tutup event MessageCreate
+})); // Tutup event MessageCreate
 
-// 🔄 LOG: Perubahan Role (Penting!)
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
+// 🔄 LOG: Perubahan Role (DENGAN GUARD)
+client.on('guildMemberUpdate', guard("guildMemberUpdate", async (oldMember, newMember) => {
     // Cek apakah yang berubah HANYA role
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
@@ -132,34 +166,37 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         });
       */
     }
-});
+}));
 
-
-// 💾 Invite Tracker (Pre-cache semua invite)
+// 💾 Invite Tracker (Pre-cache semua invite) - DENGAN GUARD
 client.on('ready', async () => {
-    client.guilds.cache.forEach(async guild => {
+    // Hanya fetch invites dari target server
+    const targetGuild = client.guilds.cache.get(TARGET_SERVER_ID);
+    if (targetGuild) {
         try {
-            const invites = await guild.invites.fetch();
-            inviteCache.set(guild.id, invites);
+            const invites = await targetGuild.invites.fetch();
+            inviteCache.set(targetGuild.id, invites);
+            console.log(`✅ Invite cache ready untuk server: ${targetGuild.name}`);
         } catch (error) {
-            console.error(`❌ INVITE TRACKER: Gagal fetch invites untuk guild ${guild.id}.`, error.message);
+            console.error(`❌ INVITE TRACKER: Gagal fetch invites.`, error.message);
         }
-    });
+    } else {
+        console.warn(`⚠️ Target server ${TARGET_SERVER_ID} tidak ditemukan di cache!`);
+    }
 });
 
-client.on('inviteCreate', invite => {
+client.on('inviteCreate', guard("inviteCreate", invite => {
     const invites = inviteCache.get(invite.guild.id) || new Collection();
     invites.set(invite.code, invite);
-});
+}));
 
-client.on('inviteDelete', invite => {
+client.on('inviteDelete', guard("inviteDelete", invite => {
     const invites = inviteCache.get(invite.guild.id);
     if (invites) invites.delete(invite.code);
-});
+}));
 
-
-// 🚀 Log ketika user join (Event nyata)
-client.on("guildMemberAdd", async (member) => {
+// 🚀 Log ketika user join (DENGAN GUARD)
+client.on("guildMemberAdd", guard("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
   await handleInitialRoles(member);
   
@@ -186,18 +223,18 @@ client.on("guildMemberAdd", async (member) => {
     invite: inviteUsed ? { code: inviteUsed.code, inviter: inviteUsed.inviter } : null
   };
 //  await logMemberAction(member, 'JOIN', extraData); 🔥
-});
+}));
 
-// 🚪 Log ketika user leave (Event nyata)
-client.on("guildMemberRemove", async (member) => {
+// 🚪 Log ketika user leave (DENGAN GUARD)
+client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
     // Hapus dari cache pesan pertama
     firstMessageCache.delete(member.id);
     // Log event Leave nyata ke Forum
 //    await logMemberAction(member, 'LEAVE'); 🔥
-});
+}));
 
-// ✅ TAMBAHAN: Handler untuk Suggestion & Feedback Buttons + Modal
-client.on('interactionCreate', async (interaction) => {
+// ✅ TAMBAHAN: Handler untuk Suggestion & Feedback Buttons + Modal (DENGAN GUARD)
+client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
     try {
         // Cek suggestion buttons
         const isSuggestion = await handleSuggestionButtons(interaction);
@@ -214,7 +251,7 @@ client.on('interactionCreate', async (interaction) => {
     } catch (err) {
         console.error('❌ Feedback/Suggestion interaction error:', err);
     }
-});
+}));
 
 // 🧯 Global Error Handler
 process.on("unhandledRejection", (err) => {
@@ -223,8 +260,8 @@ process.on("unhandledRejection", (err) => {
 
 startSelfPing();
 
-// Monitoring Webhook Baru Otomatis
-client.on("webhookUpdate", async (channel) => {
+// Monitoring Webhook Baru Otomatis (DENGAN GUARD)
+client.on("webhookUpdate", guard("webhookUpdate", async (channel) => {
    /* setTimeout(async () => {
         try {
             const webhooks = await channel.fetchWebhooks();
@@ -233,10 +270,10 @@ client.on("webhookUpdate", async (channel) => {
         } catch (e) {}
     }, 1500);
   */
-});
+}));
 
 // 🔐 Login bot
- client.login(config.token);
+client.login(config.token);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
