@@ -15,6 +15,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const statusMC = require("../modules/statusMC");
 // const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
+const roleManager = require('../modules/roleManager');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
@@ -53,6 +54,15 @@ module.exports = {
     } catch (err) {
       console.error("❌ Gagal inisialisasi Minecraft checker:", err);
     } */
+    
+   // 🛡️ ROLE MANAGER LOGIC (Tier Verification)
+    try {
+        roleManager(client); // <-- PANGGIL DI SINI
+        console.log("✅ RoleManager (Tier System) Active");
+    } catch (err) {
+        console.error("❌ Gagal inisialisasi RoleManager:", err);
+    }
+    
 
    // AutoDelete Module - EmpireBS
         try {
