@@ -72,11 +72,13 @@ module.exports = {
             console.error("❌ Gagal inisialisasi AutoDelete Module:", err);
         }
 
-  // Verify Member Dan Verify Hosting
+    // ✅ Verify System
     try {
-      // Jalankan sistem lama (Tombol/Chat)
       await verifySystem.initialize(client);
-      console.log("✅ Verify System (Lama) initialized");
+      console.log("✅ Verify system initialized");
+    } catch (error) {
+      console.error("❌ Gagal initialize verify system:", error);
+    }
 
     // 🧭 Server Info
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
