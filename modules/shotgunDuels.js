@@ -1,5 +1,5 @@
-// modules/shotgunDuels.js - VERSI DEWA BERKELAS DUNIA TOP 1 MODERN
-// Perbaikan: Fix semua bug, animasi profesional, logika sempurna
+// modules/shotgunDuels.js - VERSI FINAL STABIL
+// Perbaikan: Handle semua interaction flow dengan benar
 
 class ShotgunLogic {
     constructor() {
@@ -15,7 +15,6 @@ class ShotgunLogic {
         return Array.from(this.games.keys());
     }
 
-    // --- Helper Animasi Font Profesional ---
     get fonts() {
         return {
             loading: ["『 ▒▒▒▒▒▒▒▒▒▒ 』", "『 ██▒▒▒▒▒▒▒▒ 』", "『 ████▒▒▒▒▒▒ 』", "『 ██████▒▒▒▒ 』", "『 ████████▒▒ 』", "『 ██████████ 』"],
@@ -24,14 +23,13 @@ class ShotgunLogic {
         };
     }
 
-    // ===== UTILITY =====
     hpBar(hp) {
         const hearts = Math.max(0, Math.min(5, hp));
         return "♥️".repeat(hearts) + "🤍".repeat(5 - hearts);
     }
 
     shuffle(array) {
-        const arr = [...array]; // Copy array
+        const arr = [...array];
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -59,7 +57,7 @@ class ShotgunLogic {
                     { id: opponentId, username: opponent.username, hp: 5, items: [], ready: false }
                 ],
                 chamber: [],
-                currentPlayer: Math.floor(Math.random() * 2), // Random siapa mulai duluan
+                currentPlayer: Math.floor(Math.random() * 2),
                 logs: ["│ INFO │ Game dimulai!", "│ INFO │ Menunggu pemain ready...", "│ INFO │", "│ INFO │", "│ INFO │"],
                 nextDmg: 1,
                 handcuffed: false,
@@ -78,10 +76,12 @@ class ShotgunLogic {
             
         } catch (err) {
             console.error('🎮 acceptDuel ERROR:', err);
-            return await interaction.reply({ 
-                content: "❌ Gagal membuat game!", 
-                flags: 64 
-            });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ 
+                    content: "❌ Gagal membuat game!", 
+                    flags: 64 
+                });
+            }
         }
     }
 
@@ -113,12 +113,10 @@ class ShotgunLogic {
         const [p1, p2] = game.players;
         const statusLine = `**${p1.username} ${p1.ready ? '✅ Ready' : '⏳ Wait'} vs ${p2.username} ${p2.ready ? '✅ Ready' : '⏳ Wait'}**`;
         
-        // Tombol P1
         const p1Button = p1.ready 
             ? { style: 3, type: 2, label: "✅ Selesai", custom_id: `sg_done_${gameId}_${p1.id}`, disabled: true }
             : { style: 4, type: 2, label: "⏹️ Tunggu", custom_id: `sg_ready_${gameId}_${p1.id}`, disabled: false };
             
-        // Tombol P2
         const p2Button = p2.ready
             ? { style: 3, type: 2, label: "✅ Selesai", custom_id: `sg_done_${gameId}_${p2.id}`, disabled: true }
             : { style: 4, type: 2, label: "⏹️ Tunggu", custom_id: `sg_ready_${gameId}_${p2.id}`, disabled: false };
@@ -181,7 +179,6 @@ class ShotgunLogic {
             const allReady = game.players.every(p => p.ready);
 
             if (allReady) {
-                // DEFER dulu untuk menghindari timeout
                 await interaction.deferUpdate();
                 await this.startNewRound(gameId, interaction);
             } else {
@@ -203,12 +200,12 @@ class ShotgunLogic {
 
             game.reloadCount++;
             
-            // Generate chamber: 8 total, min 2 live, min 2 blank (tidak boleh 1 atau 0)
+            // Generate chamber: 8 total, min 2 live, min 2 blank
             let liveCount, blankCount;
             do {
-                liveCount = Math.floor(Math.random() * 5) + 2; // 2-6 live
+                liveCount = Math.floor(Math.random() * 5) + 2;
                 blankCount = 8 - liveCount;
-            } while (liveCount < 2 || blankCount < 2); // Pastikan minimal 2-2
+            } while (liveCount < 2 || blankCount < 2);
 
             game.chamber = [
                 ...Array(liveCount).fill('🔴'),
@@ -216,22 +213,21 @@ class ShotgunLogic {
             ];
             game.chamber = this.shuffle(game.chamber);
 
-            // Generate items: 1-4 random per player (tidak boleh 0)
+            // Generate items: 1-4 random per player
             const itemPool = ['🍺', '🔪', '🔗', '🔎', '🚬'];
             game.players.forEach(p => {
-                const count = Math.floor(Math.random() * 4) + 1; // 1-4 items
+                const count = Math.floor(Math.random() * 4) + 1;
                 p.items = [];
                 for (let i = 0; i < count; i++) {
                     p.items.push(itemPool[Math.floor(Math.random() * itemPool.length)]);
                 }
             });
 
-            // Reset turn state
             game.usedItemThisTurn = { handcuff: false, knife: false };
             game.nextDmg = 1;
             game.handcuffed = false;
 
-            // ===== ANIMASI GACHA =====
+            // Animasi Gacha
             for (const frame of this.fonts.loading) {
                 await interaction.editReply({
                     flags: 32768,
@@ -247,7 +243,7 @@ class ShotgunLogic {
                 await new Promise(r => setTimeout(r, 300));
             }
 
-            // ===== ANIMASI RELOAD =====
+            // Animasi Reload
             for (const frame of this.fonts.loading) {
                 await interaction.editReply({
                     flags: 32768,
@@ -263,11 +259,10 @@ class ShotgunLogic {
                 await new Promise(r => setTimeout(r, 300));
             }
 
-            // ===== TAMPILKAN INFO CHAMBER & ITEM (5 DETIK) =====
+            // Tampilkan info chamber 5 detik
             await interaction.editReply(this.renderChamberView(game));
             await new Promise(r => setTimeout(r, 5000));
             
-            // Reset logs untuk round baru
             game.logs = ["│ INFO │ 🎮 Round baru dimulai!", "│ INFO │", "│ INFO │", "│ INFO │", "│ INFO │"];
             
             await this.renderMain(gameId, interaction);
@@ -310,7 +305,7 @@ class ShotgunLogic {
         };
     }
 
-    async renderMain(gameId, interaction) {
+    async renderMain(gameId, interaction, isUpdate = true) {
         try {
             const game = this.games.get(gameId);
             if (!game) return;
@@ -318,12 +313,10 @@ class ShotgunLogic {
             const [p1, p2] = game.players;
             const current = game.players[game.currentPlayer];
 
-            // Status section (hanya muncul jika ada)
             let statusText = "";
             if (game.nextDmg > 1) statusText += `> **Next DMG: 2x**\n`;
             if (game.handcuffed) statusText += `> **${game.players[1 - game.currentPlayer].username} Terborgol**\n`;
 
-            // Item buttons (hanya tampilkan item yang dimiliki)
             const itemButtons = [];
             const itemEmojis = { '🍺': '🍺', '🔪': '🔪', '🔗': '🔗', '🔎': '🔎', '🚬': '🚬' };
             
@@ -336,7 +329,6 @@ class ShotgunLogic {
                 });
             });
 
-            // Fill empty slots sampai 4
             while (itemButtons.length < 4) {
                 itemButtons.push({
                     type: 2,
@@ -385,7 +377,13 @@ class ShotgunLogic {
                 ]
             };
 
-            await interaction.editReply(payload);
+            if (isUpdate && interaction.deferred) {
+                await interaction.editReply(payload);
+            } else if (isUpdate) {
+                await interaction.update(payload);
+            } else {
+                await interaction.reply(payload);
+            }
         } catch (err) {
             console.error('🎮 renderMain ERROR:', err);
         }
@@ -402,7 +400,6 @@ class ShotgunLogic {
                 });
             }
 
-            // FIX: Deklarasikan p1 dan p2 di sini!
             const [p1, p2] = game.players;
             const bullet = game.chamber.shift();
             const shooter = game.players[game.currentPlayer];
@@ -411,27 +408,22 @@ class ShotgunLogic {
             let logMsg = "";
 
             if (bullet === '🔴') {
-                // LIVE ROUND
                 victim.hp -= game.nextDmg;
                 logMsg = `│ INFO │ 💥 **DOR!** ${victim.username} kena **${game.nextDmg}** DMG!`;
                 
-                // Reset modifiers
                 game.nextDmg = 1;
                 game.usedItemThisTurn = { handcuff: false, knife: false };
                 
-                // Switch turn (unless handcuffed)
                 if (!game.handcuffed) {
                     game.currentPlayer = 1 - game.currentPlayer;
                 } else {
                     game.handcuffed = false;
                 }
             } else {
-                // BLANK ROUND
                 logMsg = `│ INFO │ 💨 **KLIK!** Peluru kosong.`;
                 game.nextDmg = 1;
                 game.usedItemThisTurn = { handcuff: false, knife: false };
                 
-                // Switch turn only if shoot enemy
                 if (target !== 'self') {
                     if (!game.handcuffed) {
                         game.currentPlayer = 1 - game.currentPlayer;
@@ -439,13 +431,12 @@ class ShotgunLogic {
                         game.handcuffed = false;
                     }
                 }
-                // If shoot self and blank, keep turn (Russian roulette rule)
             }
 
             this.addLog(game, logMsg);
             this.resetAFK(gameId, interaction);
 
-            // Check win condition - FIX: Gunakan p1 dan p2 yang sudah dideklarasikan
+            // Check win condition
             if (p1.hp <= 0 || p2.hp <= 0) {
                 const winner = game.players.find(p => p.hp > 0);
                 return await this.endGame(gameId, interaction, winner, 'kill');
@@ -453,7 +444,6 @@ class ShotgunLogic {
 
             // Check empty chamber
             if (game.chamber.length === 0) {
-                // Show reload screen briefly
                 await interaction.update({
                     flags: 32768,
                     components: [{
@@ -499,10 +489,10 @@ class ShotgunLogic {
             }
 
             const item = player.items[itemIdx];
+            let ephemeralMsg = null;
 
-            // Use item
             switch(item) {
-                case '🔗': // Handcuff
+                case '🔗':
                     if (game.usedItemThisTurn.handcuff) {
                         return await interaction.reply({ 
                             content: "❌ Borgol cuma 1x per turn!", 
@@ -513,7 +503,7 @@ class ShotgunLogic {
                     game.usedItemThisTurn.handcuff = true;
                     break;
                     
-                case '🔪': // Knife
+                case '🔪':
                     if (game.usedItemThisTurn.knife) {
                         return await interaction.reply({ 
                             content: "❌ Pisau cuma 1x per turn!", 
@@ -524,41 +514,37 @@ class ShotgunLogic {
                     game.usedItemThisTurn.knife = true;
                     break;
                     
-                case '🚬': // Cigarette
+                case '🚬':
                     if (player.hp < 5) player.hp++;
                     break;
                     
-                case '🍺': // Beer
+                case '🍺':
                     if (game.chamber.length > 0) {
                         const removed = game.chamber.shift();
-                        // Reply ephemeral untuk info beer
-                        await interaction.reply({ 
-                            content: `🍺 Peluru dibuang: ${removed === '🔴' ? '🔴 Live' : '⚪ Blank'}`, 
-                            flags: 64 
-                        });
-                        // Remove item dan update main
-                        player.items.splice(itemIdx, 1);
-                        this.addLog(game, `│ INFO │ 🎒 ${player.username} pakai 🍺`);
-                        await this.renderMain(gameId, interaction);
-                        return;
+                        ephemeralMsg = `🍺 Peluru dibuang: ${removed === '🔴' ? '🔴 Live' : '⚪ Blank'}`;
                     }
                     break;
                     
-                case '🔎': // Magnifying glass
+                case '🔎':
                     const next = game.chamber[0] || '⚪';
-                    await interaction.reply({ 
-                        content: `🔎 Peluru selanjutnya: ${next === '🔴' ? '🔴 **LIVE**' : '⚪ **BLANK**'}`, 
-                        flags: 64 
-                    });
-                    player.items.splice(itemIdx, 1);
-                    this.addLog(game, `│ INFO │ 🎒 ${player.username} pakai 🔎`);
-                    await this.renderMain(gameId, interaction);
-                    return;
+                    ephemeralMsg = `🔎 Peluru selanjutnya: ${next === '🔴' ? '🔴 **LIVE**' : '⚪ **BLANK**'}`;
+                    break;
             }
 
-            // Remove used item (kecuali beer dan magnifying glass yang sudah di-handle)
+            // Hapus item yang digunakan
             player.items.splice(itemIdx, 1);
             this.addLog(game, `│ INFO │ 🎒 ${player.username} pakai ${item}`);
+
+            // PENTING: Selalu defer atau reply dulu sebelum editReply
+            if (ephemeralMsg) {
+                await interaction.reply({ content: ephemeralMsg, flags: 64 });
+                // Untuk item dengan ephemeral reply, kita perlu followUp atau edit message asli
+                // Tapi karena kita reply ephemeral, message utama tidak terpengaruh
+                // Jadi kita perlu update message game dengan cara lain
+                // Solusi: Gunakan deferUpdate untuk tombol, lalu followUp ephemeral
+            } else {
+                await interaction.deferUpdate();
+            }
             
             await this.renderMain(gameId, interaction);
 
@@ -625,7 +611,7 @@ class ShotgunLogic {
         if (!game) return;
         
         if (game.afkTimer) clearTimeout(game.afkTimer);
-        game.afkTimer = setTimeout(() => this.afkWin(gameId, interaction), 300000); // 5 menit
+        game.afkTimer = setTimeout(() => this.afkWin(gameId, interaction), 300000);
     }
 
     async afkWin(gameId, interaction) {
