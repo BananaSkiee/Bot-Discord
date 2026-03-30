@@ -4,13 +4,12 @@
  */
 
 const IDS = {
-    // Role Verify (Permanen)
     V1: "1352286235233620108", V2: "1444248605761470595", V3: "1444248590305202247",
-    // Role Non-Verify (Sementara/Gantian)
     NV1: "1444248589051367435", NV2: "1444248606579097640", NV3: "1444248605245313156"
 };
 
 module.exports = (client) => {
+    // Logika saat member update role
     client.on('guildMemberUpdate', async (oldMember, newMember) => {
         const roles = newMember.roles.cache;
 
@@ -24,14 +23,16 @@ module.exports = (client) => {
             await newMember.roles.add(IDS.NV3).catch(() => null);
         }
 
-        // 3. CLEANUP LOGIC: Memastikan role Non-Verify dihapus jika Verify-nya sudah ada
-        if (roles.has(IDS.V1) && roles.has(IDS.NV1)) await newMember.roles.remove(IDS.NV1);
-        if (roles.has(IDS.V2) && roles.has(IDS.NV2)) await newMember.roles.remove(IDS.NV2);
-        if (roles.has(IDS.V3) && roles.has(IDS.NV3)) await newMember.roles.remove(IDS.NV3);
+        // 3. CLEANUP: Hapus Non-Verify jika Verify sudah didapat
+        if (roles.has(IDS.V1) && roles.has(IDS.NV1)) await newMember.roles.remove(IDS.NV1).catch(() => null);
+        if (roles.has(IDS.V2) && roles.has(IDS.NV2)) await newMember.roles.remove(IDS.NV2).catch(() => null);
+        if (roles.has(IDS.V3) && roles.has(IDS.NV3)) await newMember.roles.remove(IDS.NV3).catch(() => null);
     });
 
-    // Cek saat bot Ready atau Member baru Join
+    // Logika saat member baru join (Otomatis NV1)
     client.on('guildMemberAdd', async (member) => {
         await member.roles.add(IDS.NV1).catch(() => null);
     });
+    
+    console.log("✅ RoleManager Module: Monitoring active");
 };
