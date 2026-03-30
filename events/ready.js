@@ -15,9 +15,6 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const statusMC = require("../modules/statusMC");
 // const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
-const verifyEngine = require('../modules/verifyEngine');
-const bioMonitor = require('../modules/bioMonitorSystem');
-const tripleVerify = require('../modules/tripleVerifySystem');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
@@ -29,16 +26,6 @@ module.exports = {
   once: true,
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
-
-        const verifyConfig = {
-        clientId:     process.env.CLIENT_ID,
-        clientSecret: process.env.CLIENT_SECRET, // Ambil dari Koyeb
-        redirectUri:  process.env.REDIRECT_URI,  // Ambil dari Koyeb
-        roleId:       process.env.VERIFIED_ROLE_ID, // Sesuai ID Role 15
-        guildId:      process.env.GUILD_ID,      // Sesuai GUILD_ID di .env lu
-        inviteLink:   process.env.REQUIRED_BIO_LINK,
-        port:         process.env.PORT || 3000
-    };
     
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
@@ -67,64 +54,6 @@ module.exports = {
       console.error("❌ Gagal inisialisasi Minecraft checker:", err);
     } */
 
-    try {
-    await tripleVerify.init(client);
-    console.log("✅ Triple Verify System: Auto-progression active");
-} catch (err) {
-    console.error("❌ Triple Verify init error:", err);
-    }
-    
-    // ═══════════════════════════════════════════════════════════════
-    // BIO MONITOR SYSTEM - DENGAN AUTO-CLEANUP CHANNEL
-    // ═══════════════════════════════════════════════════════════════
-    try {
-      // STEP 1: Hapus semua pesan di channel verifikasi
-      const verifyCh = client.channels.cache.get('1487876267339681813');
-      if (verifyCh) {
-        console.log('🧹 Membersihkan channel verifikasi...');
-        
-        let deletedCount = 0;
-        let fetched;
-        
-        // Loop hapus sampai bersih (handle bulk delete)
-        do {
-          fetched = await verifyCh.messages.fetch({ limit: 100 });
-          
-          if (fetched.size > 0) {
-            // Bulk delete jika < 14 hari, individual jika > 14 hari
-            const deletable = fetched.filter(m => (Date.now() - m.createdTimestamp) < 1209600000);
-            const oldMessages = fetched.filter(m => (Date.now() - m.createdTimestamp) >= 1209600000);
-            
-            if (deletable.size > 0) {
-              await verifyCh.bulkDelete(deletable, true);
-              deletedCount += deletable.size;
-            }
-            
-            // Hapus pesan lama satu per satu
-            for (const [, msg] of oldMessages) {
-              await msg.delete().catch(() => {});
-              deletedCount++;
-              await new Promise(r => setTimeout(r, 100)); // Rate limit safety
-            }
-          }
-        } while (fetched.size >= 100);
-        
-        console.log(`✅ Channel dibersihkan: ${deletedCount} pesan dihapus`);
-      }
-
-      // STEP 2: Inisialisasi bio monitor
-      await bioMonitor.init(client);
-      
-      // STEP 3: Kirim pesan verifikasi baru (setelah channel bersih)
-      if (verifyCh) {
-        await bioMonitor.setupMessage(verifyCh);
-        console.log("✅ Bio Monitor: Embed verifikasi baru dikirim");
-      }
-      
-    } catch (err) {
-      console.error("❌ Bio Monitor init error:", err);
-            }
-
    // AutoDelete Module - EmpireBS
         try {
             initAutoDelete(client);
@@ -138,13 +67,6 @@ module.exports = {
       // Jalankan sistem lama (Tombol/Chat)
       await verifySystem.initialize(client);
       console.log("✅ Verify System (Lama) initialized");
-
-      // Jalankan sistem baru (Numpang Port 3000 index.js)
-      await verifyEngine(client, verifyConfig);
-      console.log("✅ Bio Verify Engine (Baru) Integrated");
-    } catch (error) {
-      console.error("❌ Gagal initialize verifikasi:", error);
-    }
 
     // 🧭 Server Info
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
