@@ -1,65 +1,67 @@
 const { EmbedBuilder } = require('discord.js');
 
-module.exports = {
-    config: {
-        channelId: '1487876516971806730', // Channel khusus verifikasi
-        roleId: '1444248590305202247',    // Role yang didapat
+module.exports = (client) => {
+    const config = {
+        channelId: '1487876516971806730', // Channel verifikasi
+        roleId: '1444248590305202247',    // Role reward
         inviteTrackerId: '409814402663448577' // ID Bot Invite Tracker
-    },
+    };
 
-    async handleVerify(message) {
-        const { channelId, roleId, inviteTrackerId } = this.config;
+    client.on('messageCreate', async (message) => {
+        if (message.author.bot || message.channel.id !== config.channelId) return;
 
-        // Cek apakah di channel & command yang benar
-        if (message.channel.id !== channelId) return;
-        if (message.content.toLowerCase() !== 'bs!verify invite') return;
+        if (message.content.toLowerCase() === 'bs!verify invite') {
+            // 1. Trigger bot Invite Tracker untuk keluarin data
+            // Gunakan command info invite (biasanya !invites atau /invites)
+            await message.channel.send(`!invites <@${message.author.id}>`);
 
-        await message.reply("⏳ Sedang mengecek data invite kamu... Mohon tunggu balasan dari Invite Tracker.");
+            // 2. Buat kolektor untuk baca jawaban dari Invite Tracker
+            const filter = m => m.author.id === config.inviteTrackerId && m.content.includes(message.author.id);
+            const collector = message.channel.createMessageCollector({ filter, time: 10000, max: 1 });
 
-        // Collector untuk menangkap pesan dari Invite Tracker
-        // Filter: Pengirim harus bot Invite Tracker & pesan mengandung mention user
-        const filter = m => m.author.id === inviteTrackerId && m.mentions.users.has(message.author.id);
-        const collector = message.channel.createMessageCollector({ filter, time: 15000, max: 1 });
+            collector.on('collect', async (inviteMsg) => {
+                // Ambil data dari teks Invite Tracker menggunakan Regex
+                const fakeMatch = inviteMsg.content.match(/Fake:\s*(\d+)/);
+                const usesMatch = inviteMsg.content.match(/Uses:\s*(\d+)/);
+                const totalMatch = inviteMsg.content.match(/Total:\s*(\d+)/);
 
-        collector.on('collect', async (inviteMsg) => {
-            // Ambil angka dari teks "Uses: X" dan "Fake: X"
-            const usesMatch = inviteMsg.content.match(/Uses:\s*(\d+)/);
-            const fakeMatch = inviteMsg.content.match(/Fake:\s*(\d+)/);
+                const fake = fakeMatch ? parseInt(fakeMatch[1]) : 0;
+                const uses = usesMatch ? parseInt(usesMatch[1]) : 0;
+                const total = totalMatch ? parseInt(totalMatch[1]) : 0;
 
-            const uses = usesMatch ? parseInt(usesMatch[1]) : 0;
-            const fake = fakeMatch ? parseInt(fakeMatch[1]) : 0;
+                // 3. Buat Embed Jawaban
+                const embed = new EmbedBuilder()
+                    .setTitle("🔍 Hasil Pengecekan Invite")
+                    .setColor(uses >= 1 && fake === 0 ? "#00FF00" : "#FF0000")
+                    .setDescription(`Halo <@${message.author.id}>, berikut statistik invite kamu:`)
+                    .addFields(
+                        { name: '✅ Real Uses (Akun > 30 hari)', value: `${uses}`, inline: true },
+                        { name: '⚠️ Fake (Akun Baru/Bot)', value: `${fake}`, inline: true },
+                        { name: '📊 Total Join', value: `${total}`, inline: true }
+                    )
+                    .setFooter({ text: "Syarat: Minimal 1 Real Use & 0 Fake" });
 
-            // LOGIKA VERIFIKASI
-            if (uses >= 1 && fake === 0) {
-                const role = message.guild.roles.cache.get(roleId);
-                
-                if (message.member.roles.cache.has(roleId)) {
-                    return message.reply("Kamu sudah terverifikasi sebelumnya!");
+                // 4. Logika Pemberian Role
+                if (uses >= 1 && fake === 0) {
+                    const role = message.guild.roles.cache.get(config.roleId);
+                    if (message.member.roles.cache.has(config.roleId)) {
+                        embed.addFields({ name: "Status", value: "✅ Kamu sudah punya role ini." });
+                    } else {
+                        await message.member.roles.add(role);
+                        embed.addFields({ name: "Status", value: "✅ Verifikasi Berhasil! Role diberikan." });
+                    }
+                } else {
+                    embed.addFields({ name: "Status", value: "❌ Verifikasi Gagal! Pastikan tidak ada akun Fake (baru) yang join lewat link kamu." });
                 }
 
-                try {
-                    await message.member.roles.add(role);
-                    const embedSuccess = new EmbedBuilder()
-                        .setColor('#00FF00')
-                        .setTitle('✅ Verifikasi Berhasil')
-                        .setDescription(`Akun kamu asli (umur > 30 hari). Kamu telah mengundang **${uses}** orang. Role diberikan!`)
-                        .setTimestamp();
-                    
-                    message.reply({ embeds: [embedSuccess] });
-                } catch (err) {
-                    message.reply("Gagal memberikan role. Pastikan role bot saya lebih tinggi!");
-                }
-            } else if (fake > 0) {
-                message.reply(`❌ **Verifikasi Gagal!** Terdeteksi **${fake} akun Fake** (akun baru < 30 hari). Gunakan akun asli!`);
-            } else {
-                message.reply("❌ **Gagal!** Kamu belum mengundang minimal 1 user asli ke server ini.");
-            }
-        });
+                message.reply({ embeds: [embed] });
+            });
 
-        collector.on('end', collected => {
-            if (collected.size === 0) {
-                message.reply("❌ Waktu habis! Invite Tracker tidak merespon. Pastikan bot tersebut online.");
-            }
-        });
-    }
+            collector.on('end', collected => {
+                if (collected.size === 0) {
+                    message.reply("❌ Invite Tracker tidak merespon. Pastikan bot Invite Tracker online dan prefix-nya benar.");
+                }
+            });
+        }
+    });
 };
