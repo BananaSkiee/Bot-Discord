@@ -1,8 +1,68 @@
 // modules/suggestionSystem.js
 const { MessageFlags } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 
 const SUGGESTION_CHANNEL_ID = '1430584708974252102';
-const suggestionVotes = new Map();
+
+// File untuk menyimpan data vote secara persisten
+const VOTES_FILE_PATH = path.join(__dirname, '..', 'data', 'suggestionVotes.json');
+
+// Map untuk menyimpan data vote di memory
+let suggestionVotes = new Map();
+
+// Fungsi untuk memastikan folder data ada
+function ensureDataDir() {
+    const dataDir = path.dirname(VOTES_FILE_PATH);
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
+}
+
+// Fungsi untuk load data dari file JSON
+function loadVotesData() {
+    try {
+        ensureDataDir();
+        if (fs.existsSync(VOTES_FILE_PATH)) {
+            const data = fs.readFileSync(VOTES_FILE_PATH, 'utf8');
+            const parsed = JSON.parse(data);
+            
+            // Convert object ke Map
+            suggestionVotes = new Map();
+            for (const [messageId, votes] of Object.entries(parsed)) {
+                suggestionVotes.set(messageId, new Map(Object.entries(votes)));
+            }
+            console.log('✅ Vote data loaded from file');
+        } else {
+            suggestionVotes = new Map();
+            console.log('📝 No existing vote data, starting fresh');
+        }
+    } catch (error) {
+        console.error('❌ Error loading vote data:', error);
+        suggestionVotes = new Map();
+    }
+}
+
+// Fungsi untuk save data ke file JSON
+function saveVotesData() {
+    try {
+        ensureDataDir();
+        
+        // Convert Map ke object untuk JSON
+        const dataToSave = {};
+        for (const [messageId, votes] of suggestionVotes) {
+            dataToSave[messageId] = Object.fromEntries(votes);
+        }
+        
+        fs.writeFileSync(VOTES_FILE_PATH, JSON.stringify(dataToSave, null, 2), 'utf8');
+        console.log('💾 Vote data saved to file');
+    } catch (error) {
+        console.error('❌ Error saving vote data:', error);
+    }
+}
+
+// Load data saat module di-load
+loadVotesData();
 
 module.exports = {
     name: 'suggestionSystem',
@@ -96,6 +156,9 @@ module.exports = {
 
             // Simpan data vote: Map<userId, 'yes' | 'no'>
             suggestionVotes.set(sentMessage.id, new Map());
+            
+            // Simpan ke file langsung
+            saveVotesData();
 
             console.log(`✅ Suggestion created with thread "Suggestion Discussion"`);
 
@@ -158,6 +221,9 @@ module.exports = {
                         yesCount--;
                     }
                 }
+
+                // Simpan ke file setiap kali ada perubahan vote
+                saveVotesData();
 
                 // Build new components array
                 const newComponents = [{
