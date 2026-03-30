@@ -106,74 +106,69 @@ module.exports = {
         }
       }  
 
-// ========== SHOTGUN DUELS HANDLER (V2) - FIXED ==========
-if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
-    const parts = interaction.customId.split('_');
-    const action = parts[1]; // accept, reject, ready, shoot, item, surrender, dec, done
-    const gameId = parts[2];
+      // ========== SHOTGUN DUELS HANDLER (V2) - FIXED & OPTIMIZED ==========
+      if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
+          const parts = interaction.customId.split('_');
+          const action = parts[1]; // accept, reject, ready, shoot, item, surrender, dec, done, empty
+          const gameId = parts[2];
 
-    console.log(`🎮 [SHOTGUN] Action: ${action} | CustomID: ${interaction.customId}`);
-    console.log(`🎮 [SHOTGUN] Parts:`, parts);
-    console.log(`🎮 [SHOTGUN] Parsed: gameId=${gameId}, param1=${parts[3]}, param2=${parts[4]}`);
+          console.log(`🔫 Shotgun action: ${action} for game ${gameId}`);
 
-    // 1. Handle Accept/Reject (Bebas Turn)
-    if (action === 'accept') {
-        return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
-    }
-    
-    if (action === 'reject') {
-        return await gameManager.rejectDuel(gameId, interaction);
-    }
+          // 1. Handle Accept/Reject (Bebas Turn)
+          if (action === 'accept') {
+              return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
+          }
+          
+          if (action === 'reject') {
+              return await gameManager.rejectDuel(gameId, interaction);
+          }
 
-    // 2. Load Game Data
-    const game = gameManager.getGame(gameId);
-    if (!game) {
-        return await interaction.reply({ 
-            content: '❌ Sesi game hilang atau bot baru restart!', 
-            flags: 64 // Ganti ephemeral: true dengan flags: 64
-        });
-    }
+          // 2. Load Game Data
+          const game = gameManager.getGame(gameId);
+          if (!game) {
+              return await interaction.reply({ 
+                  content: '❌ Sesi game hilang atau bot baru restart!', 
+                  ephemeral: true 
+              });
+          }
 
-    // 3. Handle Ready (Sebelum game mulai)
-    if (action === 'ready') {
-        return await gameManager.handleReady(gameId, interaction);
-    }
+          // 3. Handle Ready (Sebelum game mulai)
+          if (action === 'ready') {
+              return await gameManager.handleReady(gameId, interaction);
+          }
 
-    // 4. Handle decorative buttons (ignore)
-    if (action === 'dec' || action === 'done' || action === 'empty' || action === 'wait') {
-        return await interaction.deferUpdate();
-    }
+          // 4. Handle decorative/empty buttons (ignore)
+          if (action === 'dec' || action === 'done' || action === 'empty') {
+              return await interaction.deferUpdate();
+          }
 
-    // 5. Check Turn (Hanya pemain giliran, kecuali surrender)
-    const turnPlayer = game.players[game.currentPlayer];
-    if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
-        return await interaction.reply({ 
-            content: '❌ Bukan giliranmu!', 
-            flags: 64
-        });
-    }
+          // 5. Check Turn (Hanya pemain giliran, kecuali surrender)
+          const turnPlayer = game.players[game.currentPlayer];
+          if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
+              return await interaction.reply({ 
+                  content: '❌ Bukan giliranmu!', 
+                  ephemeral: true 
+              });
+          }
 
-    // 6. Execute Action
-    if (action === 'shoot') {
-        const target = parts[3]; // target: self / opp
-        console.log(`🎮 [SHOTGUN] Shoot: ${target} (target) | Game: ${gameId}`);
-        return await gameManager.handleShoot(gameId, target, interaction);
-    }
-    
-    if (action === 'item') {
-        const itemIndex = parseInt(parts[3]);
-        if (isNaN(itemIndex)) return;
-        console.log(`🎮 [SHOTGUN] Item: index ${itemIndex} | Game: ${gameId}`);
-        return await gameManager.handleItem(gameId, itemIndex, interaction);
-    }
-    
-    if (action === 'surrender') {
-        console.log(`🎮 [SHOTGUN] Surrender by ${interaction.user.tag} | Game: ${gameId}`);
-        return await gameManager.handleSurrender(gameId, interaction);
-    }
-    
-    return;
-}
+          // 6. Execute Action
+          if (action === 'shoot') {
+              const target = parts[3]; // target: self / opp
+              return await gameManager.handleShoot(gameId, target, interaction);
+          }
+          
+          if (action === 'item') {
+              const itemIndex = parseInt(parts[3]);
+              if (isNaN(itemIndex)) return;
+              return await gameManager.handleItem(gameId, itemIndex, interaction);
+          }
+          
+          if (action === 'surrender') {
+              return await gameManager.handleSurrender(gameId, interaction);
+          }
+          
+          return;
+      }
       
       // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
       if (!interaction.isButton()) return;
