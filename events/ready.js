@@ -16,6 +16,7 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
 const verifyEngine = require('../modules/verifyEngine');
+const bioMonitor = require('../modules/bioMonitorSystem');
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
@@ -64,6 +65,19 @@ module.exports = {
     } catch (err) {
       console.error("❌ Gagal inisialisasi Minecraft checker:", err);
     } */
+
+    try {
+    await bioMonitor.init(client);
+    
+    // Setup pesan di channel (optional, sekali saja)
+    const verifyCh = client.channels.cache.get('1487876267339681813');
+    if (verifyCh) await bioMonitor.setupMessage(verifyCh);
+    
+    console.log("✅ Bio Monitor: Auto-detect invite link active");
+} catch (err) {
+    console.error("❌ Bio Monitor init error:", err);
+    }
+    
 
    // AutoDelete Module - EmpireBS
         try {
