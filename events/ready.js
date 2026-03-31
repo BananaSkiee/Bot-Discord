@@ -16,11 +16,13 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 // const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
 const roleManager = require('../modules/roleManager');
+const VerifyInviteSystem = require("../modules/verifyInvite");
 
 // ✅ TAMBAHAN: Import Feedback System
 // const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
 
 const verifySystem = new VerifySystem();
+let verifyInviteSystem = null;
 
 module.exports = {
   name: "ready",
@@ -54,6 +56,19 @@ module.exports = {
     } catch (err) {
       console.error("❌ Gagal inisialisasi Minecraft checker:", err);
     } */
+
+    // ✅ INISIALISASI VERIFY INVITE SYSTEM
+    try {
+        verifyInviteSystem = new VerifyInviteSystem(client);
+        await verifyInviteSystem.connect();
+        console.log("✅ VerifyInvite System (Anti-Tumbal) Active");
+        
+        // Simpan ke client biar bisa diakses dari index.js
+        client.verifyInviteSystem = verifyInviteSystem;
+        
+    } catch (err) {
+        console.error("❌ Gagal inisialisasi VerifyInvite System:", err);
+    }
     
    // 🛡️ ROLE MANAGER LOGIC (Tier Verification)
     try {
