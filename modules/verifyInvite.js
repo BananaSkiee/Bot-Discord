@@ -1,15 +1,12 @@
 // modules/verifyInvite.js
 const { MongoClient } = require('mongodb');
-const { EmbedBuilder } = require('discord.js');
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
 const DB_NAME = "akira_bot";
 const COLLECTION_NAME = "invite_verifications";
 const SUSPICIOUS_COLLECTION = "suspicious_accounts";
 const JOIN_TRACKING = "join_tracking";
-const BONUS_HISTORY = "bonus_history";
 
-// ⚙️ KONFIGURASI
 const CONFIG = {
     VERIFY_CHANNEL_ID: "1487876516971806730",
     VERIFIED_ROLE_ID: "1444248590305202247",
@@ -18,8 +15,14 @@ const CONFIG = {
     MIN_STAY_HOURS: 24,
     MIN_ACCOUNT_AGE_DAYS: 30,
     GUILD_ID: "1347233781391560837",
-    // 🔴 ADMIN WHITELIST - Cuma user ini yang bisa manage bonus
     ADMIN_IDS: ["1346964077309595658"]
+};
+
+// Emoji IDs
+const EMOJI = {
+    LOADING: "<a:loading:1002404585358491658>",
+    SUCCESS: "<a:betul:728231880771764266>",
+    FAILED: "<a:silang:1001076112534810624>"
 };
 
 class VerifyInviteSystem {
@@ -30,7 +33,6 @@ class VerifyInviteSystem {
         this.collection = null;
         this.suspiciousCollection = null;
         this.joinTracking = null;
-        this.bonusHistory = null;
     }
 
     async connect() {
@@ -41,13 +43,11 @@ class VerifyInviteSystem {
             this.collection = this.db.collection(COLLECTION_NAME);
             this.suspiciousCollection = this.db.collection(SUSPICIOUS_COLLECTION);
             this.joinTracking = this.db.collection(JOIN_TRACKING);
-            this.bonusHistory = this.db.collection(BONUS_HISTORY);
             
             await this.collection.createIndex({ userId: 1 }, { unique: true });
             await this.suspiciousCollection.createIndex({ userId: 1 }, { unique: true });
             await this.joinTracking.createIndex({ userId: 1 });
             await this.joinTracking.createIndex({ inviterId: 1 });
-            await this.bonusHistory.createIndex({ userId: 1 });
             
             console.log("✅ MongoDB Connected untuk VerifyInvite System");
         } catch (error) {
@@ -56,12 +56,10 @@ class VerifyInviteSystem {
         }
     }
 
-    // 🔴 CEK ADMIN - Cuma user ID di whitelist
     isAdmin(userId) {
         return CONFIG.ADMIN_IDS.includes(userId);
     }
 
-    // 🔍 DETEKSI AKUN TUMBAL
     detectTumbal(member) {
         const user = member.user;
         const createdAt = user.createdAt;
@@ -98,7 +96,6 @@ class VerifyInviteSystem {
         return { isTumbal: isTumbal || score >= 50, score, flags, accountAgeDays };
     }
 
-    // Track saat user join
     async trackJoin(member, inviteUsed) {
         try {
             if (!inviteUsed?.inviter) return;
@@ -143,10 +140,8 @@ class VerifyInviteSystem {
                     { $set: { ...tumbalCheck, detectedAt: new Date(), inviterId } },
                     { upsert: true }
                 );
-                console.log(`🚨 TUMBAL: ${member.user.tag} invited by ${inviteUsed.inviter.tag}`);
             } else {
                 updateOps.$inc = { "stats.regular": 1, "stats.total": 1 };
-                console.log(`✅ VALID: ${member.user.tag} invited by ${inviteUsed.inviter.tag}`);
             }
 
             await this.collection.updateOne({ userId: inviterId }, updateOps, { upsert: true });
@@ -156,7 +151,6 @@ class VerifyInviteSystem {
         }
     }
 
-    // Track saat user leave
     async trackLeave(member) {
         try {
             const userId = member.id;
@@ -176,9 +170,25 @@ class VerifyInviteSystem {
         }
     }
 
-    // Cek eligible invites untuk verify
+    // 🔥 FIX: Cek eligible invites termasuk yang ada bonus
     async getEligibleInvites(inviterId) {
         try {
+            // Ambil data inviter
+            const inviterData = await this.collection.findOne({ userId: inviterId });
+            
+            // Kalau ada bonus, langsung eligible (bonus = auto verify)
+            if (inviterData && inviterData.stats && inviterData.stats.bonus > 0) {
+                return [{
+                    userId: "BONUS",
+                    userTag: "Bonus Invite",
+                    joinedAt: new Date(),
+                    hoursStayed: 999,
+                    hasMemberRole: true,
+                    isBonus: true
+                }];
+            }
+
+            // Kalau nggak ada bonus, cek invited users
             const invitedUsers = await this.joinTracking.find({ 
                 inviterId: inviterId,
                 isTumbal: false
@@ -212,14 +222,13 @@ class VerifyInviteSystem {
         }
     }
 
-    // 🎯 COMMAND VERIFY
     async handleVerifyCommand(message) {
         if (message.channel.id !== CONFIG.VERIFY_CHANNEL_ID) return;
 
         const member = message.member;
 
         if (!member.roles.cache.has(CONFIG.REQUIRED_ROLE_ID)) {
-            await this.sendFailMessage(message, "Anda tidak memiliki role yang diperlukan", "user must have role");
+            await this.sendFailMessage(message, "Anda tidak memiliki role yang diperlukan");
             return;
         }
 
@@ -229,7 +238,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: "### ✅ **Anda sudah terverifikasi!**" },
+                        { type: 10, content: `### ${EMOJI.SUCCESS} **Anda sudah terverifikasi!**` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Verified Invite" }
                     ]
@@ -246,7 +255,7 @@ class VerifyInviteSystem {
                 type: 17,
                 components: [
                     { type: 14 },
-                    { type: 10, content: `### <a:loading:1002404585358491658> **Scanning invite...**\n> **Target: \`${member.user.tag}\`**` },
+                    { type: 10, content: `### ${EMOJI.LOADING} **Scanning invite for verification...**\n> **Target: \`${member.user.tag}\`**` },
                     { type: 14 },
                     { type: 10, content: "-# EmpireBS - Verified Invite" }
                 ]
@@ -260,12 +269,14 @@ class VerifyInviteSystem {
         const eligible = await this.getEligibleInvites(member.id);
 
         if (eligible.length > 0) {
+            const isBonus = eligible[0].isBonus;
+            
             await loadingMsg.edit({
                 components: [{
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `### <a:betul:728231880771764266> **Verification Successful!**\n> Anda telah diberikan peran **Verified Member**.\n> Target: \`${member.user.tag}\`\n\n> **Akses Terbuka!** Periksa catagory <#1487714895842644089>` },
+                        { type: 10, content: `### ${EMOJI.SUCCESS} **Verification Successful!**\n> Anda telah diberikan peran **Verified Member**.\n> Target: \`${member.user.tag}\`\n\n> **Akses Terbuka!** Periksa catagory <#1487714895842644089>` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Verified Invite" }
                     ]
@@ -277,6 +288,15 @@ class VerifyInviteSystem {
                 try {
                     const role = message.guild.roles.cache.get(CONFIG.VERIFIED_ROLE_ID);
                     if (role) await member.roles.add(role);
+                    
+                    // Kalau bonus, kurangi 1
+                    if (isBonus) {
+                        await this.collection.updateOne(
+                            { userId: member.id },
+                            { $inc: { "stats.bonus": -1 } }
+                        );
+                    }
+                    
                     await this.cleanChannel(message.channel);
                 } catch (err) {
                     console.error("Error giving role:", err);
@@ -284,12 +304,12 @@ class VerifyInviteSystem {
             }, 5000);
         } else {
             const invitedUsers = await this.joinTracking.find({ inviterId: member.id }).toArray();
-            let failReason = "";
+            
+            let failReason = "Invite Empty";
             let details = [];
 
             if (invitedUsers.length === 0) {
-                failReason = "Invite Empty";
-                details.push("> <invite user ke server ini. Invite user asli bukan fake akun mu>(Server Empty)");
+                details.push("Invite user ke server ini. Invite user asli bukan fake akun mu");
             } else {
                 let hasFake = false, noRole = false, notStay = false;
 
@@ -307,16 +327,16 @@ class VerifyInviteSystem {
                 }
 
                 if (hasFake) {
-                    failReason = failReason || "Fake User";
-                    details.push("> <Pastikan invite user asli bukan fake akun mu invit ke server>(Fake User)");
+                    failReason = "Fake User";
+                    details.push("Pastikan invite user asli bukan fake akun mu invit ke server");
                 }
                 if (noRole) {
-                    failReason = failReason || "user must have role";
-                    details.push("> <Pastikan user yang di invite sudah mempunyai role 『〽️』ᴍᴇᴍʙᴇʀ>(user must have role 『〽️』ᴍᴇᴍʙᴇʀ)");
+                    failReason = "user must have role";
+                    details.push("Pastikan user yang di invite sudah mempunyai role Member");
                 }
                 if (notStay) {
-                    failReason = failReason || "user must stay on server for 1 day";
-                    details.push("> <Pastikan user yang di invite, harus berada di server selama 1 hari>(user must stay on server for 1 day)");
+                    failReason = "user must stay on server for 1 day";
+                    details.push("Pastikan user yang di invite, harus berada di server selama 1 hari");
                 }
             }
 
@@ -325,7 +345,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `## <a:silang:1001076112534810624> **Verification Failed.**\n> Tidak dapat mengkonfirmasi verified \`${failReason}\`.\n\n${details.join('\n')}` },
+                        { type: 10, content: `## ${EMOJI.FAILED} **Verification Failed.**\n> Tidak dapat mengkonfirmasi verified \`${failReason}\`.\n\n${details.map(d => `> ${d}`).join('\n')}` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Verified Invite" }
                     ]
@@ -339,13 +359,13 @@ class VerifyInviteSystem {
         }
     }
 
-    async sendFailMessage(message, title, reason) {
+    async sendFailMessage(message, title) {
         const msg = await message.reply({
             components: [{
                 type: 17,
                 components: [
                     { type: 14 },
-                    { type: 10, content: `## <a:silang:1001076112534810624> **Verification Failed.**\n> ${title}\n\n> ${reason}` },
+                    { type: 10, content: `## ${EMOJI.FAILED} **Verification Failed.**\n> ${title}` },
                     { type: 14 },
                     { type: 10, content: "-# EmpireBS - Verified Invite" }
                 ]
@@ -372,7 +392,7 @@ class VerifyInviteSystem {
         }
     }
 
-    // 📊 STATS COMMANDS
+    // 🔥 FIX: Stats dengan default value
     async handleStatsCommand(message, args) {
         if (message.channel.id === CONFIG.VERIFY_CHANNEL_ID) {
             const msg = await message.reply({
@@ -380,7 +400,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: "## <a:silang:1001076112534810624> **Wrong Channel**\n> Gunakan channel lain untuk cek stats." },
+                        { type: 10, content: `## ${EMOJI.FAILED} **Wrong Channel**\n> Gunakan channel lain untuk cek stats.` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Invite System" }
                     ]
@@ -399,7 +419,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: "### 🏆 **Invite Leaderboard**\n\n" + board },
+                        { type: 10, content: `### 🏆 **Invite Leaderboard**\n\n${board}` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Invite System" }
                     ]
@@ -415,13 +435,14 @@ class VerifyInviteSystem {
         let target = message.mentions.users.first() || message.author;
         const stats = await this.getUserInviteStats(target.id);
 
+        // 🔥 FIX: Handle kalau stats null
         if (!stats) {
             const embed = {
                 components: [{
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `### 📊 **Invite Stats**\n> <@${target.id}> belum memiliki data invite.` },
+                        { type: 10, content: `### 📊 **Invite Stats**\n> <@${target.id}> belum memiliki data invite.\n> Total: 0 invites. (0 regular, 0 left, 0 fake, 0 bonus)` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Invite System" }
                     ]
@@ -434,7 +455,7 @@ class VerifyInviteSystem {
             return;
         }
 
-        const statsLine = `\`${stats.userTag}\` • **${stats.total}** invites. (**${stats.regular}** regular, **${stats.left}** left, **${stats.fake}** fake, **${stats.bonus}** bonus)`;
+        const statsLine = `<@${stats.userId}> • **${stats.total}** invites. (**${stats.regular}** regular, **${stats.left}** left, **${stats.fake}** fake, **${stats.bonus}** bonus)`;
         
         const embed = {
             components: [{
@@ -454,22 +475,36 @@ class VerifyInviteSystem {
         setTimeout(() => msg.delete().catch(() => {}), 15000);
     }
 
+    // 🔥 FIX: Default stats kalau null
     async getUserInviteStats(userId) {
         try {
             const data = await this.collection.findOne({ userId: userId });
-            if (!data) return null;
+            
+            // Kalau belum ada data, return default
+            if (!data) {
+                return {
+                    userId: userId,
+                    userTag: null, // Akan diisi dari message
+                    total: 0,
+                    regular: 0,
+                    left: 0,
+                    fake: 0,
+                    bonus: 0,
+                    currentActive: 0
+                };
+            }
             
             const stats = data.stats || { regular: 0, left: 0, fake: 0, bonus: 0, total: 0 };
             
             return {
                 userId: data.userId,
                 userTag: data.userTag,
-                total: stats.total,
-                regular: stats.regular,
-                left: stats.left,
-                fake: stats.fake,
-                bonus: stats.bonus,
-                currentActive: Math.max(0, stats.regular - stats.left)
+                total: stats.total || 0,
+                regular: stats.regular || 0,
+                left: stats.left || 0,
+                fake: stats.fake || 0,
+                bonus: stats.bonus || 0,
+                currentActive: Math.max(0, (stats.regular || 0) - (stats.left || 0))
             };
         } catch (err) {
             console.error("❌ Get user stats error:", err);
@@ -489,6 +524,8 @@ class VerifyInviteSystem {
                 .limit(limit)
                 .toArray();
 
+            if (users.length === 0) return "Belum ada data invite.";
+
             return users.map((u, i) => this.formatStatsLine(i + 1, {
                 userId: u.userId,
                 userTag: u.userTag,
@@ -504,16 +541,14 @@ class VerifyInviteSystem {
         }
     }
 
-    // 🎁 BONUS SYSTEM - Cuma admin ID 1346964077309595658
     async handleBonusCommand(message, args) {
-        // ❌ Block di channel verify
         if (message.channel.id === CONFIG.VERIFY_CHANNEL_ID) {
             const msg = await message.reply({
                 components: [{
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: "## <a:silang:1001076112534810624> **Wrong Channel**\n> Command admin tidak bisa di channel verify." },
+                        { type: 10, content: `## ${EMOJI.FAILED} **Wrong Channel**\n> Command admin tidak bisa di channel verify.` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Admin Only" }
                     ]
@@ -525,14 +560,13 @@ class VerifyInviteSystem {
             return;
         }
 
-        // 🔴 CEK ADMIN - Cuma ID 1346964077309595658
         if (!this.isAdmin(message.author.id)) {
             const msg = await message.reply({
                 components: [{
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: "## <a:silang:1001076112534810624> **Access Denied**\n> Anda tidak memiliki izin mengelola bonus invite." },
+                        { type: 10, content: `## ${EMOJI.FAILED} **Access Denied**\n> Anda tidak memiliki izin mengelola bonus invite.` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Admin Only" }
                     ]
@@ -547,7 +581,6 @@ class VerifyInviteSystem {
         const subCmd = args[0]?.toLowerCase();
         const target = message.mentions.users.first();
         
-        // bs!bonus @user <amount> [reason]
         if (!subCmd || (target && !['remove', 'reset', 'log'].includes(subCmd))) {
             const amount = parseInt(args[1]);
             const reason = args.slice(2).join(" ") || "Bonus dari admin";
@@ -558,7 +591,7 @@ class VerifyInviteSystem {
                         type: 17,
                         components: [
                             { type: 14 },
-                            { type: 10, content: "### ⚠️ **Usage**\n> `bs!bonus @user <jumlah> [alasan]`\n> `bs!bonus remove @user <jumlah>`\n> `bs!bonus reset @user`\n> `bs!bonus log @user`" },
+                            { type: 10, content: `### ⚠️ **Usage**\n> bs!bonus @user <jumlah> [alasan]\n> bs!bonus remove @user <jumlah>\n> bs!bonus reset @user\n> bs!bonus log @user` },
                             { type: 14 },
                             { type: 10, content: "-# EmpireBS - Bonus System" }
                         ]
@@ -578,7 +611,7 @@ class VerifyInviteSystem {
                         type: 17,
                         components: [
                             { type: 14 },
-                            { type: 10, content: `### <a:betul:728231880771764266> **Bonus Added**\n> **Target:** <@${target.id}>\n> **Amount:** +${amount} invites\n> **Reason:** ${reason}\n> **By:** <@${message.author.id}>` },
+                            { type: 10, content: `### ${EMOJI.SUCCESS} **Bonus Added**\n> **Target:** <@${target.id}>\n> **Amount:** +${amount} invites\n> **Reason:** ${reason}\n> **By:** <@${message.author.id}>` },
                             { type: 14 },
                             { type: 10, content: "-# EmpireBS - Bonus System" }
                         ]
@@ -600,7 +633,7 @@ class VerifyInviteSystem {
                         type: 17,
                         components: [
                             { type: 14 },
-                            { type: 10, content: "### ⚠️ **Usage:** `bs!bonus remove @user <jumlah>`" },
+                            { type: 10, content: `### ⚠️ **Usage:** bs!bonus remove @user <jumlah>` },
                             { type: 14 },
                             { type: 10, content: "-# EmpireBS - Bonus System" }
                         ]
@@ -618,7 +651,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `### <a:betul:728231880771764266> **Bonus Removed**\n> **Target:** <@${target.id}>\n> **Amount:** -${amount} invites` },
+                        { type: 10, content: `### ${EMOJI.SUCCESS} **Bonus Removed**\n> **Target:** <@${target.id}>\n> **Amount:** -${amount} invites` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Bonus System" }
                     ]
@@ -629,7 +662,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `## <a:silang:1001076112534810624> **Failed**\n> ${result.error}` },
+                        { type: 10, content: `## ${EMOJI.FAILED} **Failed**\n> ${result.error}` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Bonus System" }
                     ]
@@ -650,7 +683,7 @@ class VerifyInviteSystem {
                         type: 17,
                         components: [
                             { type: 14 },
-                            { type: 10, content: "### ⚠️ **Usage:** `bs!bonus reset @user`" },
+                            { type: 10, content: `### ⚠️ **Usage:** bs!bonus reset @user` },
                             { type: 14 },
                             { type: 10, content: "-# EmpireBS - Bonus System" }
                         ]
@@ -668,7 +701,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `### <a:betul:728231880771764266> **Bonus Reset**\n> **Target:** <@${target.id}>\n> **Reset Amount:** ${result.amount} invites` },
+                        { type: 10, content: `### ${EMOJI.SUCCESS} **Bonus Reset**\n> **Target:** <@${target.id}>\n> **Reset Amount:** ${result.amount} invites` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Bonus System" }
                     ]
@@ -679,7 +712,7 @@ class VerifyInviteSystem {
                     type: 17,
                     components: [
                         { type: 14 },
-                        { type: 10, content: `## <a:silang:1001076112534810624> **Failed**\n> ${result.error}` },
+                        { type: 10, content: `## ${EMOJI.FAILED} **Failed**\n> ${result.error}` },
                         { type: 14 },
                         { type: 10, content: "-# EmpireBS - Bonus System" }
                     ]
@@ -706,7 +739,7 @@ class VerifyInviteSystem {
                             { type: 10, content: `### 📋 **Bonus History**\n> <@${logTarget.id}> tidak memiliki history bonus.` },
                             { type: 14 },
                             { type: 10, content: "-# EmpireBS - Bonus System" }
-                        ]
+                    ]
                     }],
                     flags: 32768
                 };
@@ -719,7 +752,7 @@ class VerifyInviteSystem {
             const historyText = history.map(h => {
                 const date = new Date(h.timestamp).toLocaleDateString('id-ID');
                 const sign = h.amount > 0 ? "+" : "";
-                return `> \`${date}\` ${sign}${h.amount} • ${h.reason} • ${h.type}`;
+                return `> ${date} ${sign}${h.amount} • ${h.reason} • ${h.type}`;
             }).join('\n');
             
             const embed = {
