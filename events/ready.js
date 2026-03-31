@@ -1,25 +1,11 @@
-// events/ready.js
 const { ChannelType } = require("discord.js");
-// const stickyHandler = require("../sticky");
 const autoGreeting = require("../modules/autoGreeting");
-// Menghapus: const countValidator = require("../modules/countValidator");
-// const autoSendMeme = require("../modules/autoMeme");
 const slashCommandSetup = require("../modules/slashCommandSetup");
-// const beritaModule = require("../modules/autoNews");
-// const rainbowRole = require("../modules/rainbowRole");
 const VerifySystem = require("../modules/verify");
-// const { startAutoAnimation } = require("../modules/iconAnim");
+const VerifyInviteSystem = require("../modules/verifyInvite");
 const { setInitialBotRoles } = require("../modules/autoBotRole"); 
-// const { sendInitialCard } = require('../modules/introCard');
-// const minecraftBot = require("../modules/minecraftBot");
-// const statusMC = require("../modules/statusMC");
-// const minecraftChecker = require('../modules/checker');
 const { initAutoDelete } = require('../modules/autoDelete');
 const roleManager = require('../modules/roleManager');
-const VerifyInviteSystem = require("../modules/verifyInvite");
-
-// ✅ TAMBAHAN: Import Feedback System
-// const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
 
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
@@ -33,61 +19,29 @@ module.exports = {
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
     
-    /*    // ⛏️ Minecraft bot init (New Module)
     try {
-        minecraftBot.init(client); 
-      console.log("✅ Minecraft Bot Module Active");
+      verifyInviteSystem = new VerifyInviteSystem(client);
+      await verifyInviteSystem.connect();
+      client.verifyInviteSystem = verifyInviteSystem;
+      console.log("✅ VerifyInvite System (Anti-Tumbal) Active");
     } catch (err) {
-        console.error("❌ Gagal inisialisasi Minecraft bot:", err);
-    } */
-
-    // Tambahkan ini di bawah minecraftBot.init(client);
-/* try {
-    await statusMC.init(client);
-    console.log("✅ StatusMC Module Active (Channel: 1457830508867223626)");
-} catch (err) {
-    console.error("❌ Gagal inisialisasi StatusMC:", err);
-} */
-        
-/*    // ⛏️ Minecraft Status Checker (New Module)
-    try {
-      minecraftChecker(client);
-      console.log("✅ Minecraft Checker Module Active");
-    } catch (err) {
-      console.error("❌ Gagal inisialisasi Minecraft checker:", err);
-    } */
-
-    // ✅ INISIALISASI VERIFY INVITE SYSTEM
-    try {
-        verifyInviteSystem = new VerifyInviteSystem(client);
-        await verifyInviteSystem.connect();
-        console.log("✅ VerifyInvite System (Anti-Tumbal) Active");
-        
-        // Simpan ke client biar bisa diakses dari index.js
-        client.verifyInviteSystem = verifyInviteSystem;
-        
-    } catch (err) {
-        console.error("❌ Gagal inisialisasi VerifyInvite System:", err);
+      console.error("❌ Gagal inisialisasi VerifyInvite System:", err);
     }
     
-   // 🛡️ ROLE MANAGER LOGIC (Tier Verification)
     try {
-        roleManager(client); // <-- PANGGIL DI SINI
-        console.log("✅ RoleManager (Tier System) Active");
+      roleManager(client);
+      console.log("✅ RoleManager (Tier System) Active");
     } catch (err) {
-        console.error("❌ Gagal inisialisasi RoleManager:", err);
+      console.error("❌ Gagal inisialisasi RoleManager:", err);
     }
     
+    try {
+      initAutoDelete(client);
+      console.log("✅ AutoDelete Module Active | Channel: 1487876267339681813");
+    } catch (err) {
+      console.error("❌ Gagal inisialisasi AutoDelete Module:", err);
+    }
 
-   // AutoDelete Module - EmpireBS
-        try {
-            initAutoDelete(client);
-            console.log("✅ AutoDelete Module Active | Channel: 1487876267339681813");
-        } catch (err) {
-            console.error("❌ Gagal inisialisasi AutoDelete Module:", err);
-        }
-
-    // ✅ Verify System
     try {
       await verifySystem.initialize(client);
       console.log("✅ Verify system initialized");
@@ -95,129 +49,37 @@ module.exports = {
       console.error("❌ Gagal initialize verify system:", error);
     }
 
-    // 🧭 Server Info
     console.log(`🧩 Bot berada di ${client.guilds.cache.size} server:`);
     client.guilds.cache.forEach((g) => console.log(`- ${g.name} (ID: ${g.id})`));
     
-/*    //🌈 Rainbow role (interval aman 45 detik)
-    try {
-      rainbowRole(client, 45_000); // DIUBAH MENJADI 45.000 ms (45 detik)
-    } catch (err) {
-      console.error("❌ Rainbow role error:", err);
-    } "/
-
-// Leaderboard voice dan massage
-    
-/*    try {
-        // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
-        await sendInitialCard(client, ''); 
-    } catch (err) {
-        console.error("❌ Intro Card gagal dipicu:", err.message);
-    } */
-    
-/*    // 🧷 Sticky handler
-    try {
-      stickyHandler(client);
-    } catch (err) {
-      console.error("❌ Sticky handler error:", err);
-    } */
-
-    // 👋 Auto greeting
     try {
       autoGreeting(client);
     } catch (err) {
       console.error("❌ Auto greeting error:", err);
     }
 
-/*    // 🧠 Auto animasi icon server
-    try {
-      startAutoAnimation(client);
-    } catch (err) {
-      console.error("❌ Icon anim error:", err);
-    }.  */
-
-    // 📝 Slash command register
     try {
       await slashCommandSetup(client);
     } catch (err) {
       console.error("❌ Gagal setup slash command:", err);
     }
-
-/*    // 📰 Auto berita
-    try {
-      beritaModule(client);
-    } catch (err) {
-      console.error("❌ Auto berita error:", err);
-    } */
-
-/*    // 🟡 Auto status rotasi tiap 1 menit
-    const statuses = [
-      "🌌 Menjaga BananaSkiee Community",
-      "📖 Memandu member baru",
-      "🎧 Mendengarkan komunitas",
-      "🧠 Belajar bersama member",
-      "🗝️ Mengamankan server",
-      "🕊️ Menyebar positivity",
-      "⚙️ Melayani BananaSkiee",
-      "🌙 Standby 24/7",
-      "🔮 Masa depan cerah",
-      "🌟 Cahaya komunitas",
-      "🛡️ Proteksi maksimal",
-      "📡 Terhubung dengan semua",
-      "⏳ Setia menemani",
-    ];
-    let index = 0;
-    const updateStatus = () => {
-      try {
-        const status = statuses[index % statuses.length];
-        client.user.setActivity(status, { type: 0 });
-        index++;
-      } catch (err) {
-        console.error("❌ Update status error:", err);
-      }
-    };
-    updateStatus();
-    setInterval(updateStatus, 60_000); */
     
-const logChannel = client.channels.cache.get("1352800131933802547");
-if (logChannel) {
-  logChannel.send({
-    embeds: [{
-      color: 0x3498db, // Biru (Reload/Online)
-      title: "🔄 Sistem Reload",
-      description: "✅ **Status:** Online & Siap Melayani.",
-      timestamp: new Date()
-    }]
-  });
-}
-
-/*    // 🤣 Auto meme tiap 3 jam
-    const memeChannelId = process.env.MEME_CHANNEL_ID;
-    if (memeChannelId) {
-      const memeChannel = client.channels.cache.get(memeChannelId);
-      if (memeChannel) {
-        setInterval(() => autoSendMeme(memeChannel), 10_800_000);
-        console.log("✅ Fitur auto meme aktif.");
-      } else {
-        console.error("❌ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
-      }
-    } else {
-      console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
-    } */
-
-    // ✅ TAMBAHAN: Kirim Feedback Prompt (hanya sekali saat ready)
-   /* try {
-      await sendFeedbackPrompt(client);
-    } catch (err) {
-      console.error("❌ Feedback prompt error:", err);
-    } */
-
-    // 🛡️ ROLE BOT OTOMATIS (Sesuai permintaan Anda: Semua bot yang sudah ada)
-    try {
-        await setInitialBotRoles(client); // <--- TAMBAHKAN BARIS INI
-    } catch (err) {
-        console.error("❌ Auto Bot Role (Initial) error:", err);
+    const logChannel = client.channels.cache.get("1352800131933802547");
+    if (logChannel) {
+      logChannel.send({
+        embeds: [{
+          color: 0x3498db,
+          title: "🔄 Sistem Reload",
+          description: "✅ **Status:** Online & Siap Melayani.",
+          timestamp: new Date()
+        }]
+      });
     }
-    
+
+    try {
+      await setInitialBotRoles(client);
+    } catch (err) {
+      console.error("❌ Auto Bot Role (Initial) error:", err);
+    }
   },
 };
