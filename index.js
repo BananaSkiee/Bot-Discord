@@ -146,6 +146,19 @@ client.on("messageCreate", guard("messageCreate", async (message) => {
         }
         return;
     }
+
+    // ✅ BONUS COMMAND
+if (message.content.toLowerCase().startsWith("bs!bonus")) {
+    try {
+        if (client.verifyInviteSystem) {
+            const args = message.content.trim().split(/\s+/).slice(1);
+            await client.verifyInviteSystem.handleBonusCommand(message, args);
+        }
+    } catch (err) {
+        console.error("❌ Bonus error:", err);
+    }
+    return;
+}
     
   const webCmds = ["helpweb", "registerweb", "createweb", "listweb", "gettoken", "nukeweb", "sendweb", "broadweb", "clearweb"];
   
