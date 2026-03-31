@@ -1,446 +1,353 @@
-// modules/verifyInvite.js
-const { MongoClient } = require('mongodb');
-const { EmbedBuilder } = require('discord.js');
+// Tambahin di bagian atas CONFIG
+const CONFIG = {
+    VERIFY_CHANNEL_ID: "1487876516971806730",
+    VERIFIED_ROLE_ID: "1444248590305202247",
+    REQUIRED_ROLE_ID: "1444248605761470595",
+    MEMBER_ROLE_ID: "1352286235233620108",
+    MIN_STAY_HOURS: 24,
+    MIN_ACCOUNT_AGE_DAYS: 30,
+    GUILD_ID: "1347233781391560837",
+    ADMIN_ROLES: ["1352286235233620108", "1444248590305202247"] // Role yang bisa manage bonus
+};
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
-const DB_NAME = "akira_bot";
-const COLLECTION_NAME = "invite_verifications";
-const SUSPICIOUS_COLLECTION = "suspicious_accounts";
+// Tambahin method di class VerifyInviteSystem:
 
-class VerifyInviteSystem {
-    constructor(client) {
-        this.discordClient = client; // Simpan discord client
-        this.mongoClient = null;
-        this.db = null;
-        this.collection = null;
-        this.suspiciousCollection = null;
-        
-        // ⚙️ KONFIGURASI DETEKSI AKUN TUMBAL
-        this.detectionConfig = {
-            minAccountAgeDays: 30,
-            suspiciousUsernamePatterns: [
-                /^\d{8,}$/,                    
-                /^[a-z]{1,2}\d{6,}$/i,         
-                /^\d{4,}[a-z]{1,2}$/i,         
-                /(.)\1{4,}/i,                  
-            ],
-            checkDefaultAvatar: true,
-        };
-    }
+// Cek apakah user adalah admin
+isAdmin(member) {
+    return CONFIG.ADMIN_ROLES.some(roleId => member.roles.cache.has(roleId));
+}
 
-    async connect() {
-        try {
-            this.mongoClient = new MongoClient(MONGO_URI);
-            await this.mongoClient.connect();
-            this.db = this.mongoClient.db(DB_NAME);
-            this.collection = this.db.collection(COLLECTION_NAME);
-            this.suspiciousCollection = this.db.collection(SUSPICIOUS_COLLECTION);
-            
-            await this.collection.createIndex({ userId: 1 }, { unique: true });
-            await this.collection.createIndex({ inviterId: 1 });
-            await this.suspiciousCollection.createIndex({ userId: 1 }, { unique: true });
-            await this.suspiciousCollection.createIndex({ detectedAt: -1 });
-            
-            console.log("✅ MongoDB Connected untuk VerifyInvite System (with Anti-Tumbal)");
-        } catch (error) {
-            console.error("❌ MongoDB Connection Error:", error);
-            throw error;
-        }
-    }
-
-    // 🔍 DETEKSI AKUN TUMBAL/FAKE
-    detectSuspiciousAccount(member) {
-        const user = member.user;
-        const createdAt = user.createdAt;
-        const now = new Date();
-        const accountAgeMs = now - createdAt;
-        const accountAgeDays = Math.floor(accountAgeMs / (1000 * 60 * 60 * 24));
-        
-        const flags = [];
-        let isTumbal = false;
-        let suspicionScore = 0;
-
-        if (accountAgeDays < this.detectionConfig.minAccountAgeDays) {
-            flags.push({
-                type: "NEW_ACCOUNT",
-                severity: "HIGH",
-                message: `Akun dibuat ${accountAgeDays} hari yang lalu (< ${this.detectionConfig.minAccountAgeDays} hari)`,
-                details: `Created: ${createdAt.toLocaleDateString('id-ID')}`
-            });
-            isTumbal = true;
-            suspicionScore += 50;
-        }
-
-        for (const pattern of this.detectionConfig.suspiciousUsernamePatterns) {
-            if (pattern.test(user.username)) {
-                flags.push({
-                    type: "SUSPICIOUS_USERNAME",
-                    severity: "MEDIUM",
-                    message: `Username pattern mencurigakan: ${user.username}`,
-                    pattern: pattern.toString()
-                });
-                suspicionScore += 25;
-                break;
-            }
-        }
-
-        if (this.detectionConfig.checkDefaultAvatar) {
-            const isDefaultAvatar = user.displayAvatarURL().includes('/embed/avatars/');
-            if (isDefaultAvatar) {
-                flags.push({
-                    type: "DEFAULT_AVATAR",
-                    severity: "LOW",
-                    message: "Menggunakan avatar default Discord"
-                });
-                suspicionScore += 10;
-            }
-        }
-
-        if (user.username.length <= 6 && /\d{3,}/.test(user.username)) {
-            flags.push({
-                type: "SHORT_RANDOM_NAME",
-                severity: "MEDIUM",
-                message: "Username pendek dengan angka random"
-            });
-            suspicionScore += 15;
-        }
-
-        let status = "CLEAN";
-        if (isTumbal || suspicionScore >= 50) {
-            status = "TUMBAL";
-        } else if (suspicionScore >= 25) {
-            status = "SUSPICIOUS";
-        }
-
-        return {
-            userId: user.id,
-            userTag: user.tag,
-            status: status,
-            suspicionScore: suspicionScore,
-            accountAgeDays: accountAgeDays,
-            createdAt: createdAt,
-            flags: flags,
-            detectedAt: new Date()
-        };
-    }
-
-    async trackInvite(member, inviteUsed) {
-        try {
-            if (!inviteUsed || !inviteUsed.inviter) return;
-
-            const inviterId = inviteUsed.inviter.id;
-            const joinedUserId = member.id;
-            const guildId = member.guild.id;
-
-            const detectionResult = this.detectSuspiciousAccount(member);
-            
-            if (detectionResult.status !== "CLEAN") {
-                await this.suspiciousCollection.updateOne(
-                    { userId: joinedUserId },
-                    { 
-                        $set: detectionResult,
-                        $push: {
-                            joinHistory: {
-                                guildId: guildId,
-                                joinedAt: new Date(),
-                                inviteCode: inviteUsed.code,
-                                inviterId: inviterId
-                            }
-                        }
-                    },
-                    { upsert: true }
-                );
-                
-                console.log(`🚨 DETECTED ${detectionResult.status}: ${member.user.tag} - Score: ${detectionResult.suspicionScore}`);
-            }
-
-            const isValidInvite = detectionResult.status !== "TUMBAL";
-            
-            const updateData = {
-                $setOnInsert: { 
-                    userId: inviterId,
-                    userTag: inviteUsed.inviter.tag,
-                    verifiedAt: null,
-                    isVerified: false,
-                    guildId: guildId,
-                    createdAt: new Date()
-                }
-            };
-
-            if (isValidInvite) {
-                updateData.$push = { 
-                    successfulInvites: {
-                        invitedUserId: joinedUserId,
-                        invitedUserTag: member.user.tag,
-                        joinedAt: new Date(),
-                        inviteCode: inviteUsed.code,
-                        isValid: true,
-                        accountAgeDays: detectionResult.accountAgeDays
-                    }
-                };
-                updateData.$inc = { validInviteCount: 1 };
-                
-                console.log(`✅ VALID INVITE: ${inviteUsed.inviter.tag} invited ${member.user.tag}`);
-            } else {
-                updateData.$push = { 
-                    successfulInvites: {
-                        invitedUserId: joinedUserId,
-                        invitedUserTag: member.user.tag,
-                        joinedAt: new Date(),
-                        inviteCode: inviteUsed.code,
-                        isValid: false,
-                        isTumbal: true,
-                        rejectionReason: detectionResult.flags.map(f => f.type).join(', '),
-                        accountAgeDays: detectionResult.accountAgeDays
-                    },
-                    rejectedInvites: {
-                        invitedUserId: joinedUserId,
-                        reason: detectionResult.flags.map(f => f.message).join('; '),
-                        detectedAt: new Date()
-                    }
-                };
-                updateData.$inc = { tumbalInviteCount: 1 };
-                
-                console.log(`❌ REJECTED (TUMBAL): ${inviteUsed.inviter.tag} invited ${member.user.tag}`);
-            }
-
-            await this.collection.updateOne(
-                { userId: inviterId },
-                updateData,
-                { upsert: true }
-            );
-
-            if (!isValidInvite) {
-                await this.notifyInviterAboutTumbal(inviteUsed.inviter, member, detectionResult);
-            }
-
-        } catch (error) {
-            console.error("❌ Error tracking invite:", error);
-        }
-    }
-
-    async notifyInviterAboutTumbal(inviter, tumbalMember, detectionResult) {
-        try {
-            const guild = tumbalMember.guild;
-            const inviterMember = await guild.members.fetch(inviter.id).catch(() => null);
-            
-            if (inviterMember) {
-                const embed = new EmbedBuilder()
-                    .setColor(0xe74c3c)
-                    .setTitle("⚠️ Invite Ditolak")
-                    .setDescription(`Invite mu untuk **${tumbalMember.user.tag}** ditolak karena terdeteksi akun tumbal/fake.`)
-                    .addFields(
-                        { name: "Alasan", value: detectionResult.flags.map(f => `• ${f.message}`).join('\n'), inline: false },
-                        { name: "💡 Tips", value: "Invite teman yang pakai akun asli/lama (minimal 1 bulan)", inline: false }
-                    )
-                    .setFooter({ text: "BananaSkiee Anti-Tumbal System" })
-                    .setTimestamp();
-
-                await inviter.send({ embeds: [embed] }).catch(() => {});
-            }
-        } catch (err) {}
-    }
-
-    async hasValidInvited(userId) {
-        try {
-            const data = await this.collection.findOne({ userId: userId });
-            if (!data) return false;
-            
-            const validInvites = data.successfulInvites?.filter(inv => inv.isValid === true) || [];
-            return validInvites.length > 0;
-        } catch (error) {
-            console.error("❌ Error checking valid invites:", error);
-            return false;
-        }
-    }
-
-    async getUserStats(userId) {
-        try {
-            const data = await this.collection.findOne({ userId: userId });
-            if (!data) return null;
-
-            const validInvites = data.successfulInvites?.filter(inv => inv.isValid === true) || [];
-            const invalidInvites = data.successfulInvites?.filter(inv => inv.isValid === false) || [];
-            
-            return {
-                totalInvites: data.successfulInvites?.length || 0,
-                validInvites: validInvites.length,
-                invalidInvites: invalidInvites.length,
-                tumbalDetected: invalidInvites.length,
-                isVerified: data.isVerified || false,
-                verifiedAt: data.verifiedAt,
-                rejectedInvites: data.rejectedInvites || []
-            };
-        } catch (error) {
-            console.error("❌ Error getting user stats:", error);
-            return null;
-        }
-    }
-
-    async markVerified(userId) {
-        try {
-            await this.collection.updateOne(
-                { userId: userId },
-                { 
-                    $set: { 
-                        isVerified: true,
-                        verifiedAt: new Date()
+// Kasih bonus invite ke user
+async addBonus(userId, amount, givenBy, reason = "No reason") {
+    try {
+        await this.collection.updateOne(
+            { userId: userId },
+            {
+                $inc: { "stats.bonus": amount, "stats.total": amount },
+                $push: {
+                    bonusHistory: {
+                        amount: amount,
+                        givenBy: givenBy,
+                        reason: reason,
+                        type: "ADD",
+                        timestamp: new Date()
                     }
                 }
-            );
-        } catch (error) {
-            console.error("❌ Error marking verified:", error);
-        }
-    }
-
-    async handleVerifyCommand(message, config) {
-        const { VERIFY_CHANNEL_ID, VERIFIED_ROLE_ID } = config;
-        
-        if (message.channel.id !== VERIFY_CHANNEL_ID) {
-            return { success: false, error: "wrong_channel" };
-        }
-
-        const member = message.member;
-        if (member.roles.cache.has(VERIFIED_ROLE_ID)) {
-            const embed = new EmbedBuilder()
-                .setColor(0x3498db)
-                .setDescription("✅ **Lu udah verified sebelumnya!**")
-                .setFooter({ text: "BananaSkiee Verify System" });
-            
-            await message.reply({ embeds: [embed] });
-            return { success: true, alreadyVerified: true };
-        }
-
-        const hasValidInvited = await this.hasValidInvited(message.author.id);
-        const stats = await this.getUserStats(message.author.id);
-
-        if (hasValidInvited) {
-            const role = message.guild.roles.cache.get(VERIFIED_ROLE_ID);
-            if (!role) {
-                await message.reply("❌ **Role verified tidak ditemukan!** Contact admin.");
-                return { success: false, error: "role_not_found" };
-            }
-
-            await member.roles.add(role);
-            await this.markVerified(message.author.id);
-
-            const successEmbed = new EmbedBuilder()
-                .setColor(0x2ecc71)
-                .setTitle("🎉 Verification Success!")
-                .setDescription(`Selamat **${message.author}**! Lu berhasil verified!`)
-                .addFields(
-                    { 
-                        name: "📊 Statistik Invite", 
-                        value: `✅ Valid: ${stats.validInvites}\n❌ Tumbal: ${stats.tumbalDetected}\n📈 Total: ${stats.totalInvites}`, 
-                        inline: true 
-                    },
-                    { name: "✨ Status", value: "Verified Member", inline: true }
-                )
-                .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-                .setTimestamp()
-                .setFooter({ text: "BananaSkiee Community | Anti-Tumbal System Active" });
-
-            await message.reply({ embeds: [successEmbed] });
-            
-            console.log(`✅ ${message.author.tag} berhasil verify via invite system`);
-            
-            return { success: true, alreadyVerified: false };
-        } else {
-            let description = `**${message.author}**, `;
-            let fields = [];
-            
-            if (stats && stats.totalInvites > 0 && stats.validInvites === 0) {
-                description += `lu udah invite ${stats.totalInvites} orang, tapi semuanya terdeteksi **akun tumbal/fake**!`;
-                fields.push({
-                    name: "🚫 Kenapa Ditolak?",
-                    value: stats.rejectedInvites?.map(r => `• ${r.reason}`).join('\n') || "Akun terlalu baru (< 30 hari)",
-                    inline: false
-                });
-            } else {
-                description += `lu belum pernah invite siapapun yang join ke server ini!`;
-            }
-
-            const failEmbed = new EmbedBuilder()
-                .setColor(0xe74c3c)
-                .setTitle("❌ Verification Failed")
-                .setDescription(description)
-                .addFields(
-                    { 
-                        name: "📖 Cara Verify yang Benar:", 
-                        value: 
-                            "1️⃣ Buat invite link\n" +
-                            "2️⃣ Share ke **temen dekat** yang pakai akun **asli/lama**\n" +
-                            "3️⃣ Pastikan akun temen lu **udah 1 bulan+** dibuatnya\n" +
-                            "4️⃣ Tunggu mereka **join server**\n" +
-                            "5️⃣ Ketik `bs!verify invite` lagi",
-                        inline: false 
-                    },
-                    ...fields,
-                    {
-                        name: "🛡️ Anti-Tumbal System",
-                        value: "Kami otomatis menolak akun yang dibuat < 30 hari atau terdeteksi fake!",
-                        inline: false
-                    }
-                )
-                .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-                .setFooter({ text: "BananaSkiee Verify System | Auto-Detect Tumbal" });
-
-            await message.reply({ embeds: [failEmbed] });
-            return { success: false, error: "no_valid_invites" };
-        }
-    }
-
-    async getValidLeaderboard(guildId, limit = 10) {
-        try {
-            return await this.collection
-                .aggregate([
-                    { $match: { guildId: guildId } },
-                    { 
-                        $project: {
-                            userId: 1,
-                            userTag: 1,
-                            validInviteCount: { 
-                                $size: { 
-                                    $filter: {
-                                        input: "$successfulInvites",
-                                        as: "invite",
-                                        cond: { $eq: ["$$invite.isValid", true] }
-                                    }
-                                }
-                            },
-                            totalInvites: { $size: { $ifNull: ["$successfulInvites", []] } },
-                            tumbalBlocked: { $size: { $ifNull: ["$rejectedInvites", []] } }
-                        }
-                    },
-                    { $sort: { validInviteCount: -1 } },
-                    { $limit: limit }
-                ])
-                .toArray();
-        } catch (error) {
-            console.error("❌ Error getting leaderboard:", error);
-            return [];
-        }
-    }
-
-    async getSuspiciousAccounts(guildId, limit = 20) {
-        try {
-            return await this.suspiciousCollection
-                .find({ "joinHistory.guildId": guildId })
-                .sort({ detectedAt: -1 })
-                .limit(limit)
-                .toArray();
-        } catch (error) {
-            console.error("❌ Error getting suspicious accounts:", error);
-            return [];
-        }
-    }
-
-    async close() {
-        if (this.mongoClient) {
-            await this.mongoClient.close();
-            console.log("🔌 MongoDB Connection Closed");
-        }
+            },
+            { upsert: true }
+        );
+        return true;
+    } catch (err) {
+        console.error("❌ Add bonus error:", err);
+        return false;
     }
 }
 
-module.exports = VerifyInviteSystem;
+// Kurangi bonus
+async removeBonus(userId, amount, givenBy, reason = "No reason") {
+    try {
+        const data = await this.collection.findOne({ userId: userId });
+        const currentBonus = data?.stats?.bonus || 0;
+        
+        if (currentBonus < amount) {
+            return { success: false, error: "Insufficient bonus balance" };
+        }
+        
+        await this.collection.updateOne(
+            { userId: userId },
+            {
+                $inc: { "stats.bonus": -amount, "stats.total": -amount },
+                $push: {
+                    bonusHistory: {
+                        amount: -amount,
+                        givenBy: givenBy,
+                        reason: reason,
+                        type: "REMOVE",
+                        timestamp: new Date()
+                    }
+                }
+            }
+        );
+        return { success: true };
+    } catch (err) {
+        console.error("❌ Remove bonus error:", err);
+        return { success: false, error: "Database error" };
+    }
+}
+
+// Reset bonus user
+async resetBonus(userId, resetBy) {
+    try {
+        const data = await this.collection.findOne({ userId: userId });
+        const currentBonus = data?.stats?.bonus || 0;
+        
+        if (currentBonus === 0) {
+            return { success: false, error: "User has no bonus" };
+        }
+        
+        await this.collection.updateOne(
+            { userId: userId },
+            {
+                $inc: { "stats.bonus": -currentBonus, "stats.total": -currentBonus },
+                $push: {
+                    bonusHistory: {
+                        amount: -currentBonus,
+                        givenBy: resetBy,
+                        reason: "Reset by admin",
+                        type: "RESET",
+                        timestamp: new Date()
+                    }
+                }
+            }
+        );
+        return { success: true, amount: currentBonus };
+    } catch (err) {
+        console.error("❌ Reset bonus error:", err);
+        return { success: false, error: "Database error" };
+    }
+}
+
+// Get bonus history user
+async getBonusHistory(userId, limit = 10) {
+    try {
+        const data = await this.collection.findOne({ userId: userId });
+        if (!data || !data.bonusHistory) return [];
+        
+        return data.bonusHistory
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, limit);
+    } catch (err) {
+        console.error("❌ Get bonus history error:", err);
+        return [];
+    }
+}
+
+// Command handler untuk bonus system
+async handleBonusCommand(message, args) {
+    // Cek admin
+    if (!this.isAdmin(message.member)) {
+        const embed = {
+            components: [{
+                type: 17,
+                components: [
+                    { type: 14 },
+                    { type: 10, content: "## <a:silang:1001076112534810624> **Access Denied**\n> Anda tidak memiliki izin untuk mengelola bonus invite." },
+                    { type: 14 },
+                    { type: 10, content: "-# EmpireBS - Admin Only" }
+                ]
+            }],
+            flags: 32768
+        };
+        const msg = await message.reply(embed);
+        setTimeout(() => message.delete().catch(() => {}), 100);
+        setTimeout(() => msg.delete().catch(() => {}), 5000);
+        return;
+    }
+
+    const subCmd = args[0]?.toLowerCase();
+    
+    // bs!bonus @user <amount> [reason]
+    if (!subCmd || message.mentions.users.first()) {
+        const target = message.mentions.users.first();
+        const amount = parseInt(args[1]);
+        const reason = args.slice(2).join(" ") || "Bonus dari admin";
+        
+        if (!target || isNaN(amount) || amount <= 0) {
+            const embed = {
+                components: [{
+                    type: 17,
+                    components: [
+                        { type: 14 },
+                        { type: 10, content: "### ⚠️ **Usage**\n> `bs!bonus @user <jumlah> [alasan]`\n> `bs!bonus remove @user <jumlah>`\n> `bs!bonus reset @user`\n> `bs!bonus log @user`" },
+                        { type: 14 },
+                        { type: 10, content: "-# EmpireBS - Bonus System" }
+                    ]
+                }],
+                flags: 32768
+            };
+            const msg = await message.reply(embed);
+            setTimeout(() => message.delete().catch(() => {}), 100);
+            setTimeout(() => msg.delete().catch(() => {}), 10000);
+            return;
+        }
+        
+        const success = await this.addBonus(target.id, amount, message.author.id, reason);
+        
+        if (success) {
+            const embed = {
+                components: [{
+                    type: 17,
+                    components: [
+                        { type: 14 },
+                        { type: 10, content: `### <a:betul:728231880771764266> **Bonus Added**\n> **Target:** <@${target.id}>\n> **Amount:** +${amount} invites\n> **Reason:** ${reason}\n> **By:** <@${message.author.id}>` },
+                        { type: 14 },
+                        { type: 10, content: "-# EmpireBS - Bonus System" }
+                    ]
+                }],
+                flags: 32768
+            };
+            const msg = await message.reply(embed);
+            setTimeout(() => message.delete().catch(() => {}), 100);
+            setTimeout(() => msg.delete().catch(() => {}), 10000);
+        }
+        return;
+    }
+    
+    // bs!bonus remove @user <amount>
+    if (subCmd === "remove") {
+        const target = message.mentions.users.first();
+        const amount = parseInt(args[2]);
+        
+        if (!target || isNaN(amount) || amount <= 0) {
+            const msg = await message.reply({
+                components: [{
+                    type: 17,
+                    components: [
+                        { type: 14 },
+                        { type: 10, content: "### ⚠️ **Usage:** `bs!bonus remove @user <jumlah>`" },
+                        { type: 14 },
+                        { type: 10, content: "-# EmpireBS - Bonus System" }
+                    ]
+                }],
+                flags: 32768
+            });
+            setTimeout(() => message.delete().catch(() => {}), 100);
+            setTimeout(() => msg.delete().catch(() => {}), 5000);
+            return;
+        }
+        
+        const result = await this.removeBonus(target.id, amount, message.author.id, "Removed by admin");
+        
+        const embed = result.success ? {
+            components: [{
+                type: 17,
+                components: [
+                    { type: 14 },
+                    { type: 10, content: `### <a:betul:728231880771764266> **Bonus Removed**\n> **Target:** <@${target.id}>\n> **Amount:** -${amount} invites\n> **By:** <@${message.author.id}>` },
+                    { type: 14 },
+                    { type: 10, content: "-# EmpireBS - Bonus System" }
+                ]
+            }],
+            flags: 32768
+        } : {
+            components: [{
+                type: 17,
+                components: [
+                    { type: 14 },
+                    { type: 10, content: `## <a:silang:1001076112534810624> **Failed**\n> ${result.error}` },
+                    { type: 14 },
+                    { type: 10, content: "-# EmpireBS - Bonus System" }
+                ]
+            }],
+            flags: 32768
+        };
+        
+        const msg = await message.reply(embed);
+        setTimeout(() => message.delete().catch(() => {}), 100);
+        setTimeout(() => msg.delete().catch(() => {}), result.success ? 10000 : 5000);
+        return;
+    }
+    
+    // bs!bonus reset @user
+    if (subCmd === "reset") {
+        const target = message.mentions.users.first();
+        
+        if (!target) {
+            const msg = await message.reply({
+                components: [{
+                    type: 17,
+                    components: [
+                        { type: 14 },
+                        { type: 10, content: "### ⚠️ **Usage:** `bs!bonus reset @user`" },
+                        { type: 14 },
+                        { type: 10, content: "-# EmpireBS - Bonus System" }
+                    ]
+                }],
+                flags: 32768
+            });
+            setTimeout(() => message.delete().catch(() => {}), 100);
+            setTimeout(() => msg.delete().catch(() => {}), 5000);
+            return;
+        }
+        
+        const result = await this.resetBonus(target.id, message.author.id);
+        
+        const embed = result.success ? {
+            components: [{
+                type: 17,
+                components: [
+                    { type: 14 },
+                    { type: 10, content: `### <a:betul:728231880771764266> **Bonus Reset**\n> **Target:** <@${target.id}>\n> **Reset Amount:** ${result.amount} invites\n> **By:** <@${message.author.id}>` },
+                    { type: 14 },
+                    { type: 10, content: "-# EmpireBS - Bonus System" }
+                ]
+            }],
+            flags: 32768
+        } : {
+            components: [{
+                type: 17,
+                components: [
+                    { type: 14 },
+                    { type: 10, content: `## <a:silang:1001076112534810624> **Failed**\n> ${result.error}` },
+                    { type: 14 },
+                    { type: 10, content: "-# EmpireBS - Bonus System" }
+                ]
+            }],
+            flags: 32768
+        };
+        
+        const msg = await message.reply(embed);
+        setTimeout(() => message.delete().catch(() => {}), 100);
+        setTimeout(() => msg.delete().catch(() => {}), result.success ? 10000 : 5000);
+        return;
+    }
+    
+    // bs!bonus log @user
+    if (subCmd === "log") {
+        const target = message.mentions.users.first() || message.author;
+        const history = await this.getBonusHistory(target.id, 10);
+        
+        if (history.length === 0) {
+            const embed = {
+                components: [{
+                    type: 17,
+                    components: [
+                        { type: 14 },
+                        { type: 10, content: `### 📋 **Bonus History**\n> <@${target.id}> tidak memiliki history bonus.` },
+                        { type: 14 },
+                        { type: 10, content: "-# EmpireBS - Bonus System" }
+                    ]
+                }],
+                flags: 32768
+            };
+            const msg = await message.reply(embed);
+            setTimeout(() => message.delete().catch(() => {}), 100);
+            setTimeout(() => msg.delete().catch(() => {}), 5000);
+            return;
+        }
+        
+        const historyText = history.map(h => {
+            const date = new Date(h.timestamp).toLocaleDateString('id-ID');
+            const sign = h.amount > 0 ? "+" : "";
+            return `> \`${date}\` ${sign}${h.amount} • ${h.reason} • ${h.type}`;
+        }).join('\n');
+        
+        const embed = {
+            components: [{
+                type: 17,
+                components: [
+                    { type: 14 },
+                    { type: 10, content: `### 📋 **Bonus History - ${target.username}**\n${historyText}` },
+                    { type: 14 },
+                    { type: 10, content: "-# EmpireBS - Bonus System" }
+                ]
+            }],
+            flags: 32768
+        };
+        
+        const msg = await message.reply(embed);
+        setTimeout(() => message.delete().catch(() => {}), 100);
+        setTimeout(() => msg.delete().catch(() => {}), 30000);
+        return;
+    }
+}
