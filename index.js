@@ -108,8 +108,16 @@ fs.readdirSync("./events").forEach((file) => {
   const event = require(`./events/${file}`);
   
   if (event.once) {
-    // Event once (ready, dll) - tidak perlu guard
-    client.once(event.name, (...args) => event.execute(...args, client));
+    // Handle ready/clientReady event
+    if (event.name === "ready" || event.name === "clientReady") {
+      // Support both old and new discord.js
+      client.once("ready", (...args) => event.execute(...args, client));
+      client.once("clientReady", (...args) => event.execute(...args, client));
+      console.log(`📥 Loaded once event: ${event.name} (ready/clientReady compatible)`);
+    } else {
+      // Event once lainnya - tidak perlu guard
+      client.once(event.name, (...args) => event.execute(...args, client));
+    }
   } else {
     // Event lainnya - pakai guard
     client.on(event.name, guard(event.name, (...args) => event.execute(...args, client)));
