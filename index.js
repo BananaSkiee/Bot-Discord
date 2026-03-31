@@ -129,6 +129,24 @@ client.on("messageCreate", guard("messageCreate", async (message) => {
     console.error('❌ Suggestion message handler error:', err);
   }
 
+    // ✅ VERIFY INVITE COMMAND - PAKAI INSTANCE DARI READY.JS
+    if (message.content.toLowerCase().startsWith("bs!verify invite")) {
+        try {
+            if (client.verifyInviteSystem) {
+                await client.verifyInviteSystem.handleVerifyCommand(message, {
+                    VERIFY_CHANNEL_ID: "1487876516971806730",
+                    VERIFIED_ROLE_ID: "1444248590305202247"
+                });
+            } else {
+                message.reply("❌ Sistem verify belum siap. Coba lagi nanti!");
+            }
+        } catch (err) {
+            console.error("❌ Verify Invite Error:", err);
+            message.reply("❌ Terjadi error saat verify. Coba lagi nanti!");
+        }
+        return;
+    }
+    
   const webCmds = ["helpweb", "registerweb", "createweb", "listweb", "gettoken", "nukeweb", "sendweb", "broadweb", "clearweb"];
   
   if (message.content.startsWith("!")) {
@@ -213,6 +231,11 @@ client.on("guildMemberAdd", guard("guildMemberAdd", async (member) => {
     
     // Update cache
     inviteCache.set(member.guild.id, currentInvites);
+
+    // ✅ PAKAI INSTANCE DARI READY.JS
+    if (inviteUsed && client.verifyInviteSystem) {
+    await client.verifyInviteSystem.trackInvite(member, inviteUsed);
+ }
 
   } catch (error) {
     console.error("❌ INVITE TRACKER: Gagal melacak invite member baru.", error.message);
