@@ -301,7 +301,15 @@ client.login(config.token);
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('🛑 Received SIGTERM');
-  
+
+try {
+        if (client.verifyInviteSystem) {
+            await client.verifyInviteSystem.close();
+        }
+    } catch (err) {
+        console.error("Error closing MongoDB:", err);
+}
+    
   try {
     // Gunakan fetch supaya pasti dapet channel-nya walaupun cache lagi kosong
     const logChannel = await client.channels.fetch("1352800131933802547");
