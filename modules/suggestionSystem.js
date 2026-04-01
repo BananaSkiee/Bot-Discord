@@ -4,52 +4,65 @@ const { MongoClient } = require('mongodb');
 
 const SUGGESTION_CHANNEL_ID = '1430584708974252102';
 
-// MongoDB Connection URI
 const MONGO_URI = 'mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX';
-const DB_NAME = 'AeroX';
-const COLLECTION_NAME = 'suggestionVotes';
+// Database baru - lowercase & deskriptif
+const DB_NAME = 'suggestions_akira';
+const COLLECTION_NAME = 'votes';
 
 let client = null;
-let db = null;
 let collection = null;
+let isConnecting = false;
+let connectionPromise = null;
 
-// Fungsi untuk connect ke MongoDB
 async function connectDB() {
-    if (client) return;
+    if (collection) return;
+    if (isConnecting) {
+        await connectionPromise;
+        return;
+    }
     
+    isConnecting = true;
+    connectionPromise = (async () => {
+        try {
+            client = new MongoClient(MONGO_URI);
+            await client.connect();
+            const db = client.db(DB_NAME);
+            collection = db.collection(COLLECTION_NAME);
+            console.log(`✅ MongoDB connected: ${DB_NAME}.${COLLECTION_NAME}`);
+        } catch (error) {
+            console.error('❌ MongoDB error:', error);
+            throw error;
+        } finally {
+            isConnecting = false;
+        }
+    })();
+    
+    await connectionPromise;
+}
+
+async function getVotes(messageId) {
     try {
-        client = new MongoClient(MONGO_URI);
-        await client.connect();
-        db = client.db(DB_NAME);
-        collection = db.collection(COLLECTION_NAME);
-        console.log('✅ Connected to MongoDB');
+        await connectDB();
+        const doc = await collection.findOne({ _id: messageId });
+        return doc ? doc.votes : {};
     } catch (error) {
-        console.error('❌ MongoDB connection error:', error);
-        throw error;
+        console.error('❌ Get votes error:', error);
+        return {};
     }
 }
 
-// Fungsi untuk mendapatkan vote data dari MongoDB
-async function getVotes(messageId) {
-    await connectDB();
-    const doc = await collection.findOne({ _id: messageId });
-    return doc ? doc.votes : {};
-}
-
-// Fungsi untuk menyimpan vote data ke MongoDB
 async function saveVotes(messageId, votes) {
-    await connectDB();
-    await collection.updateOne(
-        { _id: messageId },
-        { $set: { votes: votes, updatedAt: new Date() } },
-        { upsert: true }
-    );
-}
-
-// Fungsi untuk menghapus vote data
-async function deleteVotes(messageId) {
-    await connectDB();
-    await collection.deleteOne({ _id: messageId });
+    try {
+        await connectDB();
+        await collection.updateOne(
+            { _id: messageId },
+            { $set: { votes, updatedAt: new Date() } },
+            { upsert: true }
+        );
+    } catch (error) {
+        console.error('❌ Save votes error:', error);
+        throw error;
+    }
 }
 
 module.exports = {
@@ -127,25 +140,16 @@ module.exports = {
                 reason: 'Suggestion discussion thread'
             });
 
-            const threadPayload = {
+            await thread.send({
                 flags: MessageFlags.IsComponentsV2,
                 components: [{
                     type: 17,
-                    components: [
-                        {
-                            type: 10,
-                            content: "Anda dapat berdiskusi di sini tentang saran tersebut."
-                        }
-                    ]
+                    components: [{ type: 10, content: "Anda dapat berdiskusi di sini tentang saran tersebut." }]
                 }]
-            };
+            });
 
-            await thread.send(threadPayload);
-
-            // Simpan data vote ke MongoDB (empty object)
             await saveVotes(sentMessage.id, {});
-
-            console.log(`✅ Suggestion created with thread "Suggestion Discussion"`);
+            console.log(`✅ Suggestion created: ${sentMessage.id}`);
 
         } catch (error) {
             console.error('❌ Error handling suggestion:', error);
@@ -160,61 +164,52 @@ module.exports = {
         
         try {
             const parts = customId.split('_');
-            const action = parts[1]; // 'yes' atau 'no'
+            const action = parts[1];
             const authorId = parts[2];
             const timestamp = parts[3];
             
-            if (action === 'yes' || action === 'no') {
-                // Ambil data vote dari MongoDB
-                const votes = await getVotes(message.id);
-                
-                const userId = interaction.user.id;
-                const currentVote = votes[userId]; // 'yes', 'no', atau undefined
+            if (action !== 'yes' && action !== 'no') return false;
+            
+            const votes = await getVotes(message.id);
+            const userId = interaction.user.id;
+            const currentVote = votes[userId];
 
-                let yesCount = 0;
-                let noCount = 0;
+            let yesCount = 0;
+            let noCount = 0;
 
-                // Hitung ulang total vote
-                for (const [uid, vote] of Object.entries(votes)) {
-                    if (vote === 'yes') yesCount++;
-                    else if (vote === 'no') noCount++;
-                }
+            for (const vote of Object.values(votes)) {
+                if (vote === 'yes') yesCount++;
+                else if (vote === 'no') noCount++;
+            }
 
-                // Logika toggle vote
-                if (currentVote === action) {
-                    // Double click = hapus vote
-                    delete votes[userId];
-                    if (action === 'yes') yesCount--;
-                    else noCount--;
-                } else if (currentVote === undefined) {
-                    // Belum vote, tambah vote baru
-                    votes[userId] = action;
-                    if (action === 'yes') yesCount++;
-                    else noCount++;
-                } else {
-                    // Ganti vote (yes ↔ no)
-                    votes[userId] = action;
-                    if (action === 'yes') {
-                        yesCount++;
-                        noCount--;
-                    } else {
-                        noCount++;
-                        yesCount--;
-                    }
-                }
+            // Toggle logic
+            if (currentVote === action) {
+                delete votes[userId];
+                action === 'yes' ? yesCount-- : noCount--;
+            } else if (!currentVote) {
+                votes[userId] = action;
+                action === 'yes' ? yesCount++ : noCount++;
+            } else {
+                votes[userId] = action;
+                if (action === 'yes') { yesCount++; noCount--; }
+                else { noCount++; yesCount--; }
+            }
 
-                // Simpan ke MongoDB
-                await saveVotes(message.id, votes);
+            await saveVotes(message.id, votes);
 
-                // Components V2 structure: message.components[0] adalah Container
-                // Container memiliki property components (bukan .components[0].components)
-                const container = message.components[0];
-                
-                // Build new components array - preserve all original components except the button row
-                const newContainerComponents = [
-                    container.components[0], // Header Section
+            const container = message.components[0];
+            if (!container?.components) {
+                console.error('❌ Invalid components structure');
+                await interaction.deferUpdate().catch(() => {});
+                return true;
+            }
+
+            const newComponents = [{
+                type: 17,
+                components: [
+                    container.components[0], // Header
                     container.components[1], // Separator
-                    container.components[2], // Catatan Section  
+                    container.components[2], // Catatan
                     container.components[3], // Separator
                     {
                         type: 1,
@@ -235,31 +230,20 @@ module.exports = {
                             }
                         ]
                     }
-                ];
+                ]
+            }];
 
-                const newComponents = [{
-                    type: 17,
-                    components: newContainerComponents
-                }];
-
-                await message.edit({ 
-                    components: newComponents,
-                    flags: MessageFlags.IsComponentsV2
-                });
-                
-                await interaction.deferUpdate().catch(() => {});
-                return true;
-            }
+            await message.edit({ components: newComponents, flags: MessageFlags.IsComponentsV2 });
+            await interaction.deferUpdate().catch(() => {});
+            return true;
 
         } catch (error) {
-            console.error('❌ Error handling suggestion button:', error);
+            console.error('❌ Error handling button:', error);
             await interaction.deferUpdate().catch(() => {});
+            return true;
         }
-        
-        return true;
     },
     
-    // Cleanup function untuk disconnect MongoDB saat bot shutdown
     async disconnect() {
         if (client) {
             await client.close();
