@@ -206,34 +206,40 @@ module.exports = {
                 // Simpan ke MongoDB
                 await saveVotes(message.id, votes);
 
-                // Build new components array
+                // Components V2 structure: message.components[0] adalah Container
+                // Container memiliki property components (bukan .components[0].components)
+                const container = message.components[0];
+                
+                // Build new components array - preserve all original components except the button row
+                const newContainerComponents = [
+                    container.components[0], // Header Section
+                    container.components[1], // Separator
+                    container.components[2], // Catatan Section  
+                    container.components[3], // Separator
+                    {
+                        type: 1,
+                        components: [
+                            {
+                                type: 2,
+                                style: 3,
+                                label: `Yes (${yesCount})`,
+                                emoji: { name: "👍" },
+                                custom_id: `suggest_yes_${authorId}_${timestamp}`
+                            },
+                            {
+                                type: 2,
+                                style: 4,
+                                label: `No (${noCount})`,
+                                emoji: { name: "👎" },
+                                custom_id: `suggest_no_${authorId}_${timestamp}`
+                            }
+                        ]
+                    }
+                ];
+
                 const newComponents = [{
                     type: 17,
-                    components: [
-                        message.components[0].components[0], // Header
-                        message.components[0].components[1], // Separator
-                        message.components[0].components[2], // Catatan
-                        message.components[0].components[3], // Separator
-                        {
-                            type: 1,
-                            components: [
-                                {
-                                    type: 2,
-                                    style: 3,
-                                    label: `Yes (${yesCount})`,
-                                    emoji: { name: "👍" },
-                                    custom_id: `suggest_yes_${authorId}_${timestamp}`
-                                },
-                                {
-                                    type: 2,
-                                    style: 4,
-                                    label: `No (${noCount})`,
-                                    emoji: { name: "👎" },
-                                    custom_id: `suggest_no_${authorId}_${timestamp}`
-                                }
-                            ]
-                        }
-                    ]
+                    components: newContainerComponents
                 }];
 
                 await message.edit({ 
@@ -261,4 +267,3 @@ module.exports = {
         }
     }
 };
-                
