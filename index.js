@@ -14,6 +14,7 @@ const { handleIntroInteractions } = require('./modules/introCard');
 const { handleInitialRoles, handleVerificationUpdate } = require("./modules/autoBotRole");
 const { handleSuggestionMessage, handleSuggestionButtons } = require('./modules/suggestionSystem');
 const { handleFeedbackButtons, handleFeedbackModal } = require('./modules/feedbackSystem');
+const generator = require('./modules/generator.js');
 
 const client = new Client({
   intents: [
@@ -89,6 +90,8 @@ fs.readdirSync("./events").forEach((file) => {
 client.on("messageCreate", guard("messageCreate", async (message) => {
   if (message.author.bot || !message.guild) return;
 
+  await generator.execute(message);
+  
   try {
     await handleSuggestionMessage(message);
   } catch (err) {
