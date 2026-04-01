@@ -1,68 +1,56 @@
 // modules/suggestionSystem.js
 const { MessageFlags } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { MongoClient } = require('mongodb');
 
 const SUGGESTION_CHANNEL_ID = '1430584708974252102';
 
-// File untuk menyimpan data vote secara persisten
-const VOTES_FILE_PATH = path.join(__dirname, '..', 'data', 'suggestionVotes.json');
+// MongoDB Connection URI
+const MONGO_URI = 'mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX';
+const DB_NAME = 'AeroX';
+const COLLECTION_NAME = 'suggestionVotes';
 
-// Map untuk menyimpan data vote di memory
-let suggestionVotes = new Map();
+let client = null;
+let db = null;
+let collection = null;
 
-// Fungsi untuk memastikan folder data ada
-function ensureDataDir() {
-    const dataDir = path.dirname(VOTES_FILE_PATH);
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-    }
-}
-
-// Fungsi untuk load data dari file JSON
-function loadVotesData() {
+// Fungsi untuk connect ke MongoDB
+async function connectDB() {
+    if (client) return;
+    
     try {
-        ensureDataDir();
-        if (fs.existsSync(VOTES_FILE_PATH)) {
-            const data = fs.readFileSync(VOTES_FILE_PATH, 'utf8');
-            const parsed = JSON.parse(data);
-            
-            // Convert object ke Map
-            suggestionVotes = new Map();
-            for (const [messageId, votes] of Object.entries(parsed)) {
-                suggestionVotes.set(messageId, new Map(Object.entries(votes)));
-            }
-            console.log('✅ Vote data loaded from file');
-        } else {
-            suggestionVotes = new Map();
-            console.log('📝 No existing vote data, starting fresh');
-        }
+        client = new MongoClient(MONGO_URI);
+        await client.connect();
+        db = client.db(DB_NAME);
+        collection = db.collection(COLLECTION_NAME);
+        console.log('✅ Connected to MongoDB');
     } catch (error) {
-        console.error('❌ Error loading vote data:', error);
-        suggestionVotes = new Map();
+        console.error('❌ MongoDB connection error:', error);
+        throw error;
     }
 }
 
-// Fungsi untuk save data ke file JSON
-function saveVotesData() {
-    try {
-        ensureDataDir();
-        
-        // Convert Map ke object untuk JSON
-        const dataToSave = {};
-        for (const [messageId, votes] of suggestionVotes) {
-            dataToSave[messageId] = Object.fromEntries(votes);
-        }
-        
-        fs.writeFileSync(VOTES_FILE_PATH, JSON.stringify(dataToSave, null, 2), 'utf8');
-        console.log('💾 Vote data saved to file');
-    } catch (error) {
-        console.error('❌ Error saving vote data:', error);
-    }
+// Fungsi untuk mendapatkan vote data dari MongoDB
+async function getVotes(messageId) {
+    await connectDB();
+    const doc = await collection.findOne({ _id: messageId });
+    return doc ? doc.votes : {};
 }
 
-// Load data saat module di-load
-loadVotesData();
+// Fungsi untuk menyimpan vote data ke MongoDB
+async function saveVotes(messageId, votes) {
+    await connectDB();
+    await collection.updateOne(
+        { _id: messageId },
+        { $set: { votes: votes, updatedAt: new Date() } },
+        { upsert: true }
+    );
+}
+
+// Fungsi untuk menghapus vote data
+async function deleteVotes(messageId) {
+    await connectDB();
+    await collection.deleteOne({ _id: messageId });
+}
 
 module.exports = {
     name: 'suggestionSystem',
@@ -154,11 +142,8 @@ module.exports = {
 
             await thread.send(threadPayload);
 
-            // Simpan data vote: Map<userId, 'yes' | 'no'>
-            suggestionVotes.set(sentMessage.id, new Map());
-            
-            // Simpan ke file langsung
-            saveVotesData();
+            // Simpan data vote ke MongoDB (empty object)
+            await saveVotes(sentMessage.id, {});
 
             console.log(`✅ Suggestion created with thread "Suggestion Discussion"`);
 
@@ -180,21 +165,17 @@ module.exports = {
             const timestamp = parts[3];
             
             if (action === 'yes' || action === 'no') {
-                // Ambil atau buat vote data
-                let userVotes = suggestionVotes.get(message.id);
-                if (!userVotes) {
-                    userVotes = new Map();
-                    suggestionVotes.set(message.id, userVotes);
-                }
-
+                // Ambil data vote dari MongoDB
+                const votes = await getVotes(message.id);
+                
                 const userId = interaction.user.id;
-                const currentVote = userVotes.get(userId); // 'yes', 'no', atau undefined
+                const currentVote = votes[userId]; // 'yes', 'no', atau undefined
 
                 let yesCount = 0;
                 let noCount = 0;
 
                 // Hitung ulang total vote
-                for (const [uid, vote] of userVotes) {
+                for (const [uid, vote] of Object.entries(votes)) {
                     if (vote === 'yes') yesCount++;
                     else if (vote === 'no') noCount++;
                 }
@@ -202,17 +183,17 @@ module.exports = {
                 // Logika toggle vote
                 if (currentVote === action) {
                     // Double click = hapus vote
-                    userVotes.delete(userId);
+                    delete votes[userId];
                     if (action === 'yes') yesCount--;
                     else noCount--;
                 } else if (currentVote === undefined) {
                     // Belum vote, tambah vote baru
-                    userVotes.set(userId, action);
+                    votes[userId] = action;
                     if (action === 'yes') yesCount++;
                     else noCount++;
                 } else {
                     // Ganti vote (yes ↔ no)
-                    userVotes.set(userId, action);
+                    votes[userId] = action;
                     if (action === 'yes') {
                         yesCount++;
                         noCount--;
@@ -222,8 +203,8 @@ module.exports = {
                     }
                 }
 
-                // Simpan ke file setiap kali ada perubahan vote
-                saveVotesData();
+                // Simpan ke MongoDB
+                await saveVotes(message.id, votes);
 
                 // Build new components array
                 const newComponents = [{
@@ -270,5 +251,14 @@ module.exports = {
         }
         
         return true;
+    },
+    
+    // Cleanup function untuk disconnect MongoDB saat bot shutdown
+    async disconnect() {
+        if (client) {
+            await client.close();
+            console.log('👋 MongoDB disconnected');
+        }
     }
 };
+                
