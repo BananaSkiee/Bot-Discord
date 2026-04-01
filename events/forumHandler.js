@@ -1,6 +1,7 @@
+//events/forumHandler.js
 /**
  * @event threadCreate
- * @description Handle Forum Auto-Response for ID 1487704896055541870
+ * @description Professional Forum Response - Single Message Edition
  */
 
 module.exports = {
@@ -8,9 +9,8 @@ module.exports = {
     async execute(thread) {
         const FORUM_ID = "1487704896055541870";
         
-        // Cek apakah thread dibuat di forum tujuan
         if (thread.parentId === FORUM_ID) {
-            // Kasih delay biar thread bener-bener siap di API Discord
+            // Berikan sedikit delay 2 detik agar thread terdaftar sempurna
             setTimeout(async () => {
                 try {
                     await thread.send({
@@ -22,9 +22,9 @@ module.exports = {
                         }]
                     });
                 } catch (err) {
-                    console.error("❌ Forum Response Error:", err.message);
+                    console.error("❌ Forum Response Failure:", err.message);
                 }
-            }, 3000);
+            }, 2000);
         }
     }
 };
