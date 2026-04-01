@@ -1,44 +1,37 @@
 /**
  * @module RoleManager
- * @description Logic Tier Verification - Tier 1 to Tier 2 Automator
+ * @description Logic Tier Verification - Real-time Only (No Scanner)
+ * @author BananaSkiee Systems
  */
 
 const IDS = {
     V1: "1352286235233620108",
-    NV1: "1444248589051367435",
     NV2: "1444248606579097640"
 };
 
-module.exports = async (client) => {
-    console.log("💎 [RoleManager] Logic Tier 1 Active | World Class Performance");
+module.exports = (client) => {
+    console.log("💎 [RoleManager] Real-time Monitoring Active | Zero-Lag Mode");
 
-    // --- STARTUP SCAN (Human Only) ---
-    const guild = client.guilds.cache.first();
-    if (guild) {
-        try {
-            const members = await guild.members.fetch();
-            members.forEach(m => {
-                if (m.user.bot) return;
-                // Jika punya V1 tapi belum punya NV2, sinkronkan.
-                if (m.roles.cache.has(IDS.V1) && !m.roles.cache.has(IDS.NV2)) {
-                    m.roles.add(IDS.NV2).catch(() => null);
-                }
-            });
-        } catch (e) { console.error("Startup Scan Error:", e); }
-    }
+    // --- LOGIKA REAL-TIME (Hanya jalan saat role berubah) ---
+    client.on('guildMemberUpdate', async (oldMember, newMember) => {
+        // Abaikan Bot agar hemat resource
+        if (newMember.user.bot) return;
 
-    // --- REAL-TIME SINKRONISASI ---
-    client.on('guildMemberUpdate', async (oldM, newM) => {
-        if (newM.user.bot) return;
+        const hadV1 = oldMember.roles.cache.has(IDS.V1);
+        const hasV1 = newMember.roles.cache.has(IDS.V1);
+        const hasNV2 = newMember.roles.cache.has(IDS.NV2);
 
-        const hadV1 = oldM.roles.cache.has(IDS.V1);
-        const hasV1 = newM.roles.cache.has(IDS.V1);
-
-        // Jika baru dapet V1
+        // LOGIKA UTAMA: Jika member BARU dapet V1
         if (!hadV1 && hasV1) {
-            if (!newM.roles.cache.has(IDS.NV2)) await newM.roles.add(IDS.NV2).catch(() => null);
-            if (newM.roles.cache.has(IDS.NV1)) await newM.roles.remove(IDS.NV1).catch(() => null);
-            console.log(`✨ [Tier-Up] ${newM.user.tag} upgraded to Tier 2`);
+            // Pastikan dia belum punya NV2 sebelum ditambahin
+            if (!hasNV2) {
+                await newMember.roles.add(IDS.NV2).catch(err => {
+                    console.error(`[Error] Gagal tambah NV2 ke ${newMember.user.tag}:`, err.message);
+                });
+                console.log(`✨ [Tier-Up] ${newMember.user.tag} automatically received NV2`);
+            }
         }
     });
+
+    // Info: Scanner dihapus untuk menghindari Gateway Rate Limit
 };
