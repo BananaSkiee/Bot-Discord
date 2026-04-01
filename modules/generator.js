@@ -1,4 +1,8 @@
-const { Client, GatewayIntentBits } = require('discord.js');
+//modules/generator.js
+/**
+ * Create Name Channels Generator Module
+ * Spesifikasi: Small Caps, Professional Alignment, Category Normal Font
+ */
 
 function toSmallCaps(text) {
     const map = {
@@ -10,8 +14,8 @@ function toSmallCaps(text) {
     return text.toLowerCase().split('').map(char => map[char] || char).join('');
 }
 
-// Fungsi agar Category Font Normal & Huruf Besar di Awal
 function toCategoryFormat(text) {
+    // Font normal, Huruf Besar di awal kata
     return text.split(' ')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ');
@@ -19,7 +23,7 @@ function toCategoryFormat(text) {
 
 module.exports = {
     async execute(message) {
-        // LOCK CHANNEL ID
+        // LOCK CHANNEL ID (Wajib di channel ini)
         if (message.channel.id !== '1488537737488371772') return;
         if (message.author.bot) return;
 
@@ -29,20 +33,28 @@ module.exports = {
         if (message.content.startsWith('yes!')) {
             const input = message.content.slice(4).trim();
             const spaceIndex = input.indexOf(' ');
-            if (spaceIndex === -1) return; // Jika cuma yes!100 tanpa teks
-
-            prefixTag = input.substring(0, spaceIndex); // Ambil 100, ❤️, atau BS
-            rawContent = input.substring(spaceIndex + 1); // Ambil "Verify hosting"
+            
+            if (spaceIndex === -1) {
+                // Jika cuma yes!❤️ tanpa teks tambahan
+                prefixTag = input;
+                rawContent = ""; 
+            } else {
+                prefixTag = input.substring(0, spaceIndex); // Ambil emoji/angka/huruf
+                rawContent = input.substring(spaceIndex + 1); // Ambil sisanya
+            }
         } 
         else if (message.content.startsWith('no!')) {
             prefixTag = ""; // Kosongkan kurungan
             rawContent = message.content.slice(3).trim();
         } 
-        else return;
+        else {
+            return; // Bukan command yes! atau no!
+        }
 
         const smallText = toSmallCaps(rawContent);
         const categoryText = toCategoryFormat(rawContent);
 
+        // Template Output High-End & Simetris
         const responseContent = `### Create Name Channels Generator | for +help
 **Channles :**
 > **Dashboard:** \`˚⊹\` <:00:1360567203325542431> **Announce:.**\`˚₊\`
@@ -62,9 +74,14 @@ module.exports = {
 > \`╰━━━・${categoryText}\`
 `;
 
-        await message.channel.send({
-            flags: 32768,
-            content: responseContent
-        });
+        try {
+            await message.channel.send({
+                // Menggunakan flags 32768 (Ephemeral-style feel atau bypass filter tertentu jika ada)
+                flags: 32768,
+                content: responseContent
+            });
+        } catch (err) {
+            console.error("❌ Generator Error:", err);
+        }
     }
 };
