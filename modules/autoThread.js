@@ -1,44 +1,68 @@
 /**
- * @module RoleManager
- * @description Logic Tier Verification - Tier 1 to Tier 2 Automator
+ * @module AutoThread
+ * @description Professional Thread & Media Protection with Advanced V2 Components
  */
 
-const IDS = {
-    V1: "1352286235233620108",
-    NV1: "1444248589051367435",
-    NV2: "1444248606579097640"
-};
+module.exports = {
+    async handleAutoThread(m) {
+        if (m.author.bot) return;
 
-module.exports = async (client) => {
-    console.log("💎 [RoleManager] Logic Tier 1 Active | World Class Performance");
+        const CH_MEDIA = "1477430329517277407";
+        const CH_UPDATE = "1488059638074314832";
+        const CH_QUEST = "1443255215460585563";
 
-    // --- STARTUP SCAN (Human Only) ---
-    const guild = client.guilds.cache.first();
-    if (guild) {
-        try {
-            const members = await guild.members.fetch();
-            members.forEach(m => {
-                if (m.user.bot) return;
-                // Jika punya V1 tapi belum punya NV2, sinkronkan.
-                if (m.roles.cache.has(IDS.V1) && !m.roles.cache.has(IDS.NV2)) {
-                    m.roles.add(IDS.NV2).catch(() => null);
-                }
-            });
-        } catch (e) { console.error("Startup Scan Error:", e); }
-    }
+        // 🖼️ 1. GALLERY PROTECTION (Wajib Gambar/Video)
+        if (m.channel.id === CH_MEDIA) {
+            const hasMedia = m.attachments.size > 0 || m.content.includes("https://");
+            
+            if (!hasMedia) {
+                await m.delete().catch(() => null);
+                // Kirim Peringatan pake Template V2 lo
+                const warn = await m.channel.send({
+                    flags: 32768,
+                    components: [{
+                        type: 17, components: [
+                            { type: 10, content: "## <a:merah:1361623714541604894> You can't send messages without pictures/videos" },
+                            { type: 14 },
+                            { type: 10, content: `**Hey <@${m.author.id}>, tidak boleh hanya mengirim pesan di <#1477430329517277407>**\n> Kamu harus tambahkan gambar untuk mengirimnya` },
+                            { type: 14 },
+                            { type: 10, content: "-# ( EmpireBS - Auto Detect Messages" }
+                        ]
+                    }]
+                });
+                return setTimeout(() => warn.delete().catch(() => null), 6000);
+            }
 
-    // --- REAL-TIME SINKRONISASI ---
-    client.on('guildMemberUpdate', async (oldM, newM) => {
-        if (newM.user.bot) return;
-
-        const hadV1 = oldM.roles.cache.has(IDS.V1);
-        const hasV1 = newM.roles.cache.has(IDS.V1);
-
-        // Jika baru dapet V1
-        if (!hadV1 && hasV1) {
-            if (!newM.roles.cache.has(IDS.NV2)) await newM.roles.add(IDS.NV2).catch(() => null);
-            if (newM.roles.cache.has(IDS.NV1)) await newM.roles.remove(IDS.NV1).catch(() => null);
-            console.log(`✨ [Tier-Up] ${newM.user.tag} upgraded to Tier 2`);
+            // Jika Valid (Ada Media)
+            await m.react('❤️').catch(() => null);
+            const t = await m.startThread({ name: "Tulis Komentar Disini...", autoArchiveDuration: 1440 });
+            if (t) {
+                await t.send({
+                    flags: 32768,
+                    components: [{
+                        type: 17, components: [{
+                            type: 10, content: "Anda dapat berkomentar di sini, komentar yang positif"
+                        }]
+                    }]
+                }).catch(() => null);
+            }
         }
-    });
+
+        // 📢 2. DISCORD UPDATE & QUEST
+        if (m.channel.id === CH_UPDATE || m.channel.id === CH_QUEST) {
+            const isUpdate = m.channel.id === CH_UPDATE;
+            const tName = isUpdate ? "Discord Update Thread" : "Discord Quest Discussion Thread";
+            const tContent = isUpdate ? "Anda dapat berdiskusi di sini tentang update tersebut." : "Anda dapat berdiskusi di sini tentang quest tersebut.";
+            
+            const t = await m.startThread({ name: tName });
+            if (t) {
+                await t.send({
+                    flags: 32768,
+                    components: [{
+                        type: 17, components: [{ type: 10, content: tContent }]
+                    }]
+                }).catch(() => null);
+            }
+        }
+    }
 };
