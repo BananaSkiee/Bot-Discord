@@ -1,41 +1,44 @@
 /**
  * @module RoleManager
- * @description Logic Tier Verification - Hanya V1 ke NV2
+ * @description Logic Tier Verification - Tier 1 to Tier 2 Automator
  */
 
 const IDS = {
     V1: "1352286235233620108",
+    NV1: "1444248589051367435",
     NV2: "1444248606579097640"
 };
 
 module.exports = async (client) => {
-    console.log("🔍 [RoleManager] Monitoring V1 -> NV2 Active");
+    console.log("💎 [RoleManager] Logic Tier 1 Active | World Class Performance");
 
-    // --- STARTUP SCAN (1x Saat Reload) ---
+    // --- STARTUP SCAN (Human Only) ---
     const guild = client.guilds.cache.first();
     if (guild) {
         try {
             const members = await guild.members.fetch();
-            members.forEach(member => {
-                if (member.user.bot) return;
-                // Jika punya V1 tapi belum punya NV2, langsung kasih
-                if (member.roles.cache.has(IDS.V1) && !member.roles.cache.has(IDS.NV2)) {
-                    member.roles.add(IDS.NV2).catch(() => null);
+            members.forEach(m => {
+                if (m.user.bot) return;
+                // Jika punya V1 tapi belum punya NV2, sinkronkan.
+                if (m.roles.cache.has(IDS.V1) && !m.roles.cache.has(IDS.NV2)) {
+                    m.roles.add(IDS.NV2).catch(() => null);
                 }
             });
-        } catch (err) { console.error("Error Startup Scan:", err); }
+        } catch (e) { console.error("Startup Scan Error:", e); }
     }
 
-    // --- REAL-TIME LOGIC ---
-    client.on('guildMemberUpdate', async (oldMember, newMember) => {
-        if (newMember.user.bot) return;
-        
-        // Logika Utama: Dapet V1 otomatis dapet NV2
-        if (!oldMember.roles.cache.has(IDS.V1) && newMember.roles.cache.has(IDS.V1)) {
-            if (!newMember.roles.cache.has(IDS.NV2)) {
-                await newMember.roles.add(IDS.NV2).catch(() => null);
-                console.log(`[V1-DETECT] ${newMember.user.tag} diberikan NV2.`);
-            }
+    // --- REAL-TIME SINKRONISASI ---
+    client.on('guildMemberUpdate', async (oldM, newM) => {
+        if (newM.user.bot) return;
+
+        const hadV1 = oldM.roles.cache.has(IDS.V1);
+        const hasV1 = newM.roles.cache.has(IDS.V1);
+
+        // Jika baru dapet V1
+        if (!hadV1 && hasV1) {
+            if (!newM.roles.cache.has(IDS.NV2)) await newM.roles.add(IDS.NV2).catch(() => null);
+            if (newM.roles.cache.has(IDS.NV1)) await newM.roles.remove(IDS.NV1).catch(() => null);
+            console.log(`✨ [Tier-Up] ${newM.user.tag} upgraded to Tier 2`);
         }
     });
 };
