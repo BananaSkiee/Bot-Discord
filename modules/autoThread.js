@@ -1,84 +1,44 @@
 /**
- * @module AutoThread
- * @description Auto Thread, Media Protection, & Forum Response
+ * @module RoleManager
+ * @description Logic Tier Verification - Tier 1 to Tier 2 Automator
  */
 
-module.exports = (client) => {
-    const CHANNELS = {
-        MEDIA: "1477430329517277407",
-        DISCORD_UPDATE: "1488059638074314832",
-        QUEST: "1443255215460585563",
-        FORUM: "1487704896055541870"
-    };
+const IDS = {
+    V1: "1352286235233620108",
+    NV1: "1444248589051367435",
+    NV2: "1444248606579097640"
+};
 
-    client.on('messageCreate', async (message) => {
-        if (message.author.bot) return;
+module.exports = async (client) => {
+    console.log("💎 [RoleManager] Logic Tier 1 Active | World Class Performance");
 
-        // --- PROTEKSI & AUTO THREAD CHANNEL MEDIA ---
-        if (message.channel.id === CHANNELS.MEDIA) {
-            const hasMedia = message.attachments.size > 0;
-            
-            if (!hasMedia) {
-                // Jika hanya teks, hapus dan beri peringatan
-                await message.delete().catch(() => null);
-                const warn = await message.channel.send(`⚠️ <@${message.author.id}>, di channel ini wajib mengirim gambar/video!`).catch(() => null);
-                setTimeout(() => warn.delete().catch(() => null), 5000);
-                return;
-            }
+    // --- STARTUP SCAN (Human Only) ---
+    const guild = client.guilds.cache.first();
+    if (guild) {
+        try {
+            const members = await guild.members.fetch();
+            members.forEach(m => {
+                if (m.user.bot) return;
+                // Jika punya V1 tapi belum punya NV2, sinkronkan.
+                if (m.roles.cache.has(IDS.V1) && !m.roles.cache.has(IDS.NV2)) {
+                    m.roles.add(IDS.NV2).catch(() => null);
+                }
+            });
+        } catch (e) { console.error("Startup Scan Error:", e); }
+    }
 
-            // Jika ada media, beri reaksi ❤️ dan buat thread
-            await message.react('❤️').catch(() => null);
-            const thread = await message.startThread({
-                name: "Tulis Komentar Disini...",
-                autoArchiveDuration: 1440
-            }).catch(() => null);
+    // --- REAL-TIME SINKRONISASI ---
+    client.on('guildMemberUpdate', async (oldM, newM) => {
+        if (newM.user.bot) return;
 
-            if (thread) {
-                await thread.send({
-                    content: "Anda dapat berkomentar di sini, komentar yang positif"
-                }).catch(() => null);
-            }
-        }
+        const hadV1 = oldM.roles.cache.has(IDS.V1);
+        const hasV1 = newM.roles.cache.has(IDS.V1);
 
-        // --- AUTO THREAD CHANNEL UPDATE ---
-        if (message.channel.id === CHANNELS.DISCORD_UPDATE) {
-            const thread = await message.startThread({
-                name: "Discord Update Thread",
-                autoArchiveDuration: 1440
-            }).catch(() => null);
-            if (thread) {
-                await thread.send({
-                    content: "Anda dapat berdiskusi di sini tentang update tersebut."
-                }).catch(() => null);
-            }
-        }
-
-        // --- AUTO THREAD CHANNEL QUEST ---
-        if (message.channel.id === CHANNELS.QUEST) {
-            const thread = await message.startThread({
-                name: "Discord Quest Discussion Thread",
-                autoArchiveDuration: 1440
-            }).catch(() => null);
-            if (thread) {
-                await thread.send({
-                    content: "Anda dapat berdiskusi di sini tentang quest tersebut."
-                }).catch(() => null);
-            }
+        // Jika baru dapet V1
+        if (!hadV1 && hasV1) {
+            if (!newM.roles.cache.has(IDS.NV2)) await newM.roles.add(IDS.NV2).catch(() => null);
+            if (newM.roles.cache.has(IDS.NV1)) await newM.roles.remove(IDS.NV1).catch(() => null);
+            console.log(`✨ [Tier-Up] ${newM.user.tag} upgraded to Tier 2`);
         }
     });
-
-    // --- AUTO RESPONSE FORUM ---
-    client.on('threadCreate', async (thread) => {
-        if (thread.parentId === CHANNELS.FORUM) {
-            // Tunggu sebentar agar thread benar-benar siap
-            setTimeout(async () => {
-                const ownerId = thread.ownerId;
-                await thread.send({
-                    content: `<@${ownerId}> harap tunggu, kami akan segera membantu Anda.`
-                }).catch(() => null);
-            }, 2000);
-        }
-    });
-
-    console.log("✅ AutoThread & Forum Module Active");
 };
