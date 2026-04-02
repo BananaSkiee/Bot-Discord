@@ -632,41 +632,35 @@ async logVerification(interaction, codeData) {
         const member = interaction.member;
         const user = interaction.user;
         
-        const duration = session?.createdAt 
-            ? Math.round((Date.now() - session.createdAt) / 1000) 
-            : 0;
+        // Kalkulasi data di luar string agar aman
+        const duration = session?.createdAt ? Math.round((Date.now() - session.createdAt) / 1000) : 0;
         const minutes = Math.floor(duration / 60);
         const seconds = duration % 60;
-        
-        // Hitung account age
         const accountAge = Math.floor((Date.now() - user.createdTimestamp) / 86400000);
-        
-        // Format timestamp
+        const discordTimestamp = Math.floor(user.createdTimestamp / 1000);
+
         const verifiedAt = new Date().toLocaleString('id-ID', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
         });
 
-        // Component V2 Container yang lebih detail
+        // Struktur info user yang sudah di-fix syntax-nya
+        const userInfo = `**👤 Informasi User**\n` +
+            `> **Username:** ${user.tag}\n` +
+            `> **ID:** \`${user.id}\`\n` +
+            `> **Display Name:** ${user.globalName || user.username}\n` +
+            `> **Akun Dibuat:** <t:${discordTimestamp}:R> (${accountAge} hari)`;
+
         const logContainer = {
             type: 17,
             components: [
-                {
-                    type: 10,
-                    content: `## ✅ ${user.username} BERHASIL VERIFIED`
-                },
+                { type: 10, content: `## ✅ ${user.username} BERHASIL VERIFIED` },
+                { type: 14 },
+                { type: 10, content: userInfo },
                 { type: 14 },
                 {
                     type: 10,
-                    content: `**👤 Informasi User**\n> **Username:** ${user.tag}\n> **ID:** \\`${user.id}\\`\n> **Display Name:** ${user.globalName || user.username}\n> **Akun Dibuat:** <t:${Math.floor(user.createdTimestamp / 1000)}:R> (${accountAge} hari)`
-                },
-                { type: 14 },
-                {
-                    type: 10,
-                    content: `**📊 Detail Verifikasi**\n> **Waktu Selesai:** ${verifiedAt}\n> **Total Durasi:** ${minutes}m ${seconds}s\n> **Kode Digunakan:** ||${codeData.code}||\n> **Percobaan:** ${codeData.attempts + 1}x\n> **Pesan Perkenalan:** "${session?.messageContent?.substring(0, 80) || 'N/A'}${session?.messageContent?.length > 80 ? '...' : ''}"`
+                    content: `**📊 Detail Verifikasi**\n> **Waktu Selesai:** ${verifiedAt}\n> **Total Durasi:** ${minutes}m ${seconds}s\n> **Kode Digunakan:** ||${codeData.code}||\n> **Percobaan:** ${codeData.attempts + 1}x\n> **Pesan Perkenalan:** "${session?.messageContent?.substring(0, 80) || 'N/A'}..."`
                 },
                 { type: 14 },
                 {
@@ -674,10 +668,7 @@ async logVerification(interaction, codeData) {
                     content: `**🛡️ Security Info**\n> **Status:** ✅ CLEAN\n> **Bot:** ${user.bot ? '❌ YES' : '✅ NO'}\n> **Boost:** ${member.premiumSince ? '✅ YES' : '❌ NO'}\n> **System:** Component V2 + MongoDB`
                 },
                 { type: 14 },
-                {
-                    type: 10,
-                    content: `-# Log ID: VRF-${user.id}-${Date.now().toString(36).toUpperCase()}`
-                }
+                { type: 10, content: `-# Log ID: VRF-${user.id}-${Date.now().toString(36).toUpperCase()}` }
             ]
         };
 
@@ -686,17 +677,15 @@ async logVerification(interaction, codeData) {
             message: {
                 flags: 32768,
                 components: [logContainer]
-            },
-            appliedTags: [] // Bisa tambah tag jika ada
+            }
         });
 
         console.log(`📋 Log created: ${user.username} verified`);
-
     } catch (error) {
         console.error('Log error:', error);
     }
 }
-
+    
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
