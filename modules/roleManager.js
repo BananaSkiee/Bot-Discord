@@ -8,51 +8,56 @@
 const IDS = {
     V1: "1352286235233620108",
     NV2: "1444248606579097640",
-    TRIGGER_ROLE: "1444248605761470595", // Role pemicu
-    NEW_ROLE: "1444248605245313156"      // Role yang akan ditambah
+    TRIGGER_ROLE: "1444248605761470595", 
+    V2_ROLE: "1444248590305202247",      // Role yang baru didapat
+    OLD_V2_LOG: "1444248605245313156"    // Role yang wajib dihapus saat dapet V2_ROLE
 };
 
 module.exports = (client) => {
     console.log("💎 [RoleManager] Real-time Monitoring Active | Zero-Lag Mode");
 
-    // --- LOGIKA REAL-TIME (Hanya jalan saat role berubah) ---
     client.on('guildMemberUpdate', async (oldMember, newMember) => {
-        // Abaikan Bot agar hemat resource
         if (newMember.user.bot) return;
 
+        // Cache checks
         const hadV1 = oldMember.roles.cache.has(IDS.V1);
         const hasV1 = newMember.roles.cache.has(IDS.V1);
-        const hasNV2 = newMember.roles.cache.has(IDS.NV2);
-
-        // Check kondisi untuk TRIGGER_ROLE baru
+        
         const hadTrigger = oldMember.roles.cache.has(IDS.TRIGGER_ROLE);
         const hasTrigger = newMember.roles.cache.has(IDS.TRIGGER_ROLE);
 
-        // 1. LOGIKA UTAMA: Jika member BARU dapet V1
+        const hadV2 = oldMember.roles.cache.has(IDS.V2_ROLE);
+        const hasV2 = newMember.roles.cache.has(IDS.V2_ROLE);
+
+        // 1. Jika member BARU dapet V1 -> Kasih NV2
         if (!hadV1 && hasV1) {
-            if (!hasNV2) {
-                await newMember.roles.add(IDS.NV2).catch(err => {
-                    console.error(`[Error] Gagal tambah NV2 ke ${newMember.user.tag}:`, err.message);
-                });
-                console.log(`✨ [Tier-Up] ${newMember.user.tag} automatically received NV2`);
+            if (!newMember.roles.cache.has(IDS.NV2)) {
+                await newMember.roles.add(IDS.NV2).catch(e => console.error(`[Error] V1-Add: ${e.message}`));
+                console.log(`✨ [Tier-Up] ${newMember.user.tag} received NV2`);
             }
         }
 
-        // 2. LOGIKA TAMBAHAN: Jika member BARU dapet TRIGGER_ROLE
+        // 2. Jika member BARU dapet TRIGGER_ROLE -> Hapus NV2 & Tambah V2_ROLE
         if (!hadTrigger && hasTrigger) {
             try {
-                // Hapus NV2 dan Tambah NEW_ROLE secara bersamaan
                 await Promise.all([
-                    newMember.roles.remove(IDS.NV2).catch(() => null), // Gunakan catch null jika role memang tidak ada
-                    newMember.roles.add(IDS.NEW_ROLE)
+                    newMember.roles.remove(IDS.NV2).catch(() => null),
+                    newMember.roles.add(IDS.V2_ROLE)
                 ]);
-                
-                console.log(`🚀 [Transition] ${newMember.user.tag}: Removed NV2 & Added New Role`);
-            } catch (err) {
-                console.error(`[Error] Gagal update transition role untuk ${newMember.user.tag}:`, err.message);
+                console.log(`🚀 [Transition] ${newMember.user.tag}: NV2 Removed & V2_ROLE Added`);
+            } catch (e) {
+                console.error(`[Error] Transition Logic: ${e.message}`);
+            }
+        }
+
+        // 3. LOGIKA BARU: Jika dapet V2_ROLE -> Wajib hapus OLD_V2_LOG (1444248605245313156)
+        if (!hadV2 && hasV2) {
+            if (newMember.roles.cache.has(IDS.OLD_V2_LOG)) {
+                await newMember.roles.remove(IDS.OLD_V2_LOG).catch(e => 
+                    console.error(`[Error] Gagal hapus role lama: ${e.message}`)
+                );
+                console.log(`🗑️ [Cleanup] ${newMember.user.tag}: Removed old role ${IDS.OLD_V2_LOG} because they got V2_ROLE`);
             }
         }
     });
-
-    // Info: Scanner dihapus untuk menghindari Gateway Rate Limit
 };
