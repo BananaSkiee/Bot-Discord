@@ -1,5 +1,9 @@
 const { 
-    ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType,
+    ActionRowBuilder, // ✅ WAJIB ADA
+    ModalBuilder, 
+    TextInputBuilder, 
+    TextInputStyle, 
+    ChannelType,
     MessageFlags
 } = require('discord.js');
 const { MongoClient } = require('mongodb');
