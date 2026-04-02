@@ -9,7 +9,7 @@ const IDS = {
     V1: "1352286235233620108",
     NV2: "1444248606579097640",
     TRIGGER_ROLE: "1444248605761470595", // Role pemicu
-    NEW_ROLE: "1444248590305202247"      // Role yang akan ditambah
+    NEW_ROLE: "1444248605245313156"      // Role yang akan ditambah
 };
 
 module.exports = (client) => {
