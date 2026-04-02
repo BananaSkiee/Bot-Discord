@@ -61,12 +61,17 @@ module.exports = {
         }
       }
 
-      // ========== VERIFY SYSTEM HANDLERS ==========
+// ========== VERIFY SYSTEM HANDLERS ==========
       if (interaction.isButton()) {
         const { customId } = interaction;
         console.log(`🔘 Button clicked: ${customId}`);
 
+        // ✅ HANDLER BARU UNTUK SISTEM KODE VERIFIKASI
         if (customId === 'verify_account') return await verifySystem.handleVerify(interaction);
+        if (customId === 'input_verify_code') return await verifySystem.handleCodeInput(interaction);
+        if (customId === 'resend_code') return await verifySystem.handleResendCode(interaction);
+        
+        // ✅ HANDLER LAMA (bisa dihapus jika tidak dipakai, tapi tetap ada untuk kompatibilitas)
         if (customId === 'skip_verify') return await verifySystem.handleSkipVerify(interaction);
         if (customId === 'continue_verify') return await verifySystem.handleContinueVerify(interaction);
         if (customId === 'next_verify') return await verifySystem.handleNextVerify(interaction);
@@ -87,6 +92,7 @@ module.exports = {
           return interaction.reply({ content: "⚠️ Fitur Custom Message belum aktif.", ephemeral: true });
         }
         
+        // Handler lama (rating, faqs, feedback) - bisa dihapus nanti
         if (customId === 'input_rating') return await verifySystem.handleInputRating(interaction);
         if (customId === 'give_feedback') return await verifySystem.handleGiveFeedback(interaction);
         if (customId === 'next_final') return await verifySystem.handleNextFinal(interaction);
@@ -99,6 +105,11 @@ module.exports = {
       // ✅ MODAL SUBMIT INTERACTIONS
       if (interaction.isModalSubmit()) {
         const { customId } = interaction;
+        
+        // ✅ HANDLER BARU UNTUK KODE VERIFIKASI
+        if (customId === 'verify_code_modal') return await verifySystem.handleCodeSubmit(interaction);
+        
+        // Handler lama
         if (customId === 'input_rating_modal') return await verifySystem.handleRatingSubmit(interaction);
         if (customId === 'give_feedback_modal') return await verifySystem.handleFeedbackSubmit(interaction);
         if (customId === 'custom_message_modal') {
