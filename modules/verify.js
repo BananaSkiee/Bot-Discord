@@ -1,8 +1,7 @@
 const { 
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, 
     ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType,
-    ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder,
-    MessageFlags, MediaGalleryBuilder, ThumbnailBuilder
+    MessageFlags
 } = require('discord.js');
 
 class VerifySystem {
@@ -16,81 +15,226 @@ class VerifySystem {
             memberRoleId: '1352286235233620108',
             generalChannelId: '1352404526870560788',
             serverId: '1347233781391560837',
-            rulesChannelId: '1352326247186694164',
-            guideChannelId: '1352311290432983182', // @home
-            verifyForumChannelId: '1428789734993432676' // Forum untuk log (opsional jika ingin log terpisah)
+            rulesChannelId: '1352326247186694164'
         };
         
         this.userSessions = new Map();
         this.verificationQueue = new Map();
-        this.verificationCodes = new Map(); // Store codes: userId -> code
+        this.verificationCodes = new Map();
         
         this.verificationSteps = [
-            { name: "Security Check", emoji: "🔐", duration: 2500 },
-            { name: "Account Analysis", emoji: "🔍", duration: 2200 },
-            { name: "Server Sync", emoji: "⚡", duration: 2800 },
-            { name: "Final Preparation", emoji: "🎯", duration: 2000 }
+            { name: "Security Check", emoji: "🔐", duration: 2500, tasks: ["Verifikasi email", "Cek usia akun", "Scan aktivitas"] },
+            { name: "AI Analysis", emoji: "🤖", duration: 2200, tasks: ["Pattern recognition", "Behavior analysis", "Risk assessment"] },
+            { name: "Database Check", emoji: "🗄️", duration: 2800, tasks: ["Cross-reference data", "Identity confirmation", "Access provisioning"] },
+            { name: "Final Verification", emoji: "🎯", duration: 2000, tasks: ["Security clearance", "Member access", "System integration"] }
         ];
     }
 
-    // ========== COMPONENT V2 BUILDERS ==========
+    // ========== COMPONENT V2 BUILDERS (Raw JSON) ==========
     
-    createLoadingContainer(step, progress, totalSteps) {
-        const container = new ContainerBuilder();
-        
-        // Header Section with Thumbnail
-        const headerSection = new SectionBuilder()
-            .addTextDisplay(
-                new TextDisplayBuilder().setContent(`# ${step.emoji} VERIFIKASI ACCOUNT\n**Step ${progress}/${totalSteps}:** ${step.name}`)
-            )
-            .setThumbnail(new ThumbnailBuilder({ url: 'https://cdn.discordapp.com/emojis/verify.png' }));
-        
-        container.addSection(headerSection);
-        container.addSeparator(new SeparatorBuilder().setSpacing(1));
-        
-        // Progress Bar
-        const percentage = Math.round((progress / totalSteps) * 100);
-        const filled = '█'.repeat(Math.round(percentage / 5));
-        const empty = '▒'.repeat(20 - Math.round(percentage / 5));
-        
-        container.addTextDisplay(
-            new TextDisplayBuilder().setContent(`\`${filled}${empty}\` **${percentage}%**`)
-        );
-        
-        // Status Section
-        const statusText = progress === totalSteps 
-            ? '✅ Verifikasi hampir selesai...' 
-            : '🔄 Memproses data akun...';
-            
-        container.addTextDisplay(
-            new TextDisplayBuilder().setContent(`\n${statusText}\n⏱️ Estimasi: ${(totalSteps - progress) * 2} detik`)
-        );
-        
-        return container;
+    createMainContainer() {
+        return {
+            type: 17, // Container
+            components: [
+                {
+                    type: 10, // TextDisplay
+                    content: "## 🎯 VERIFIKASI PREMIUM ACCESS"
+                },
+                { type: 14 }, // Separator
+                {
+                    type: 10,
+                    content: "**Sebelum unlock area eksklusif, Verify terlebih dahulu**\n\n**Verify Untuk Membuka:**\n> - Unlock Partnership\n> - Unlock Events Server\n> - Unlock Giveaway Server\n> - Unlock Channels Eksklusif"
+                },
+                { type: 14 },
+                {
+                    type: 1, // ActionRow
+                    components: [
+                        {
+                            type: 2, // Button
+                            style: 3, // Success
+                            label: "Verify My Account",
+                            custom_id: "verify_account",
+                            emoji: { name: "✨" }
+                        },
+                        {
+                            type: 2,
+                            style: 4, // Danger
+                            label: "9 1 1",
+                            custom_id: "emergency_help",
+                            emoji: { name: "📞" },
+                            disabled: true
+                        }
+                    ]
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: "-# Enterprise Security • Zero Data Storage"
+                }
+            ]
+        };
     }
 
-    createMissionContainer(title, description, status = 'pending') {
-        const container = new ContainerBuilder();
-        const emoji = status === 'completed' ? '✅' : status === 'active' ? '🔄' : '⏳';
+    createLoadingContainer(step, currentStep, totalSteps) {
+        const percentage = Math.round((currentStep / totalSteps) * 100);
+        const filled = '█'.repeat(Math.round(percentage / 5));
+        const empty = '▒'.repeat(20 - Math.round(percentage / 5));
+        const timeElapsed = (currentStep * 2.5).toFixed(1);
         
-        container.addTextDisplay(
-            new TextDisplayBuilder().setContent(`# ${emoji} ${title}`)
-        );
-        
-        container.addSeparator(new SeparatorBuilder().setSpacing(1));
-        
-        container.addTextDisplay(
-            new TextDisplayBuilder().setContent(description)
-        );
-        
-        if (status === 'active') {
-            container.addSeparator(new SeparatorBuilder().setSpacing(2));
-            container.addTextDisplay(
-                new TextDisplayBuilder().setContent('*⏳ Menunggu aksi Anda...*')
-            );
-        }
-        
-        return container;
+        // Build task list
+        let taskList = '';
+        step.tasks.forEach((task, index) => {
+            const status = index < currentStep - 1 ? '✅' : (index === currentStep - 1 ? '🔄' : '⏳');
+            taskList += `> - **${task}: ${status}**\n`;
+        });
+
+        return {
+            type: 17,
+            components: [
+                {
+                    type: 10,
+                    content: `### ${step.emoji} PROSES VERIFIKASI - ${percentage}%`
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `**${step.name} sedang berjalan...**\n━━━━━━━━━━━━━━━━━━━━\n${filled}${empty}\n━━━━━━━━━━━━━━━━━━━━\n${taskList}`
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `-# ⏱️ ${timeElapsed} detik • ${step.name}`
+                }
+            ]
+        };
+    }
+
+    createExplorationContainer() {
+        return {
+            type: 17,
+            components: [
+                {
+                    type: 10,
+                    content: "## 🏠 KUNJUNGI AREA SERVER"
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `### Sebelum lanjut, silakan kunjungi channel penting:\n> 🏠 <id:home> - Lihat overview server\n> 📋 <#${this.config.rulesChannelId}> - Baca peraturan server \n> 🎨 <id:customize> - Setup roles dan channels\n\n**📌 Cara:** Klik tombol di bawah untuk mengunjungi masing-masing channel.`
+                },
+                { type: 14 },
+                {
+                    type: 1,
+                    components: [
+                        {
+                            type: 2,
+                            style: 5, // Link
+                            label: "🏠 Server Guide",
+                            url: `https://discord.com/channels/${this.config.serverId}/@home`
+                        },
+                        {
+                            type: 2,
+                            style: 5,
+                            label: "📋 Rules",
+                            url: `https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`
+                        },
+                        {
+                            type: 2,
+                            style: 5,
+                            label: "🎨 Self Role",
+                            url: `https://discord.com/channels/${this.config.serverId}/customize-community`
+                        }
+                    ]
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: "-# Akan otomatis lanjut dalam 20 detik"
+                }
+            ]
+        };
+    }
+
+    createMissionContainer() {
+        return {
+            type: 17,
+            components: [
+                {
+                    type: 10,
+                    content: "## 🔄 MISI PERKENALAN"
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `**Langkah selanjutnya:**\n\n1️⃣ Buka channel <#${this.config.generalChannelId}>\n2️⃣ Kirim pesan perkenalan singkat\n3️⃣ Bot akan otomatis mendeteksi dan mengirim **kode verifikasi via DM**\n\n**Contoh pesan:**\n\`\`\`Halo! Saya [nama], baru join nih. Salam kenal semua! 👋\`\`\`\n\n⏳ *Menunggu aksi Anda...*`
+                },
+                { type: 14 },
+                {
+                    type: 1,
+                    components: [
+                        {
+                            type: 2,
+                            style: 5,
+                            label: "💬 Ke Channel General",
+                            url: `https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`
+                        }
+                    ]
+                }
+            ]
+        };
+    }
+
+    createCodeInputContainer() {
+        return {
+            type: 17,
+            components: [
+                {
+                    type: 10,
+                    content: "## ✅ MISI CHAT SELESAI!"
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: "**Kode verifikasi telah dikirim ke DM Anda!**\n\nSilakan cek DM dari bot, lalu masukkan kode 6 digit tersebut dengan menekan tombol di bawah."
+                },
+                { type: 14 },
+                {
+                    type: 1,
+                    components: [
+                        {
+                            type: 2,
+                            style: 3,
+                            label: "🔐 Input Kode Verifikasi",
+                            custom_id: "input_verify_code",
+                            emoji: { name: "🔑" }
+                        },
+                        {
+                            type: 2,
+                            style: 2,
+                            label: "🔄 Kirim Ulang Kode",
+                            custom_id: "resend_code"
+                        }
+                    ]
+                }
+            ]
+        };
+    }
+
+    createSuccessContainer(username) {
+        return {
+            type: 17,
+            components: [
+                {
+                    type: 10,
+                    content: "## 🎉 VERIFIKASI BERHASIL!"
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `Selamat datang, **${username}**! 🚀\n\n✅ Role Member telah diberikan\n✅ Akses penuh ke server telah dibuka\n✅ Channel verifikasi akan tersembunyi\n\nSilakan ke <#${this.config.generalChannelId}> untuk mulai berinteraksi!`
+                }
+            ]
+        };
     }
 
     // ========== INITIALIZATION ==========
@@ -122,32 +266,11 @@ class VerifySystem {
     }
 
     async sendVerifyMessage(channel) {
-        // Component V2 Container for main message
-        const container = new ContainerBuilder()
-            .addTextDisplay(
-                new TextDisplayBuilder().setContent('# 🎯 VERIFIKASI MEMBER\nSelamat datang di **BananaSkiee Community**!')
-            )
-            .addSeparator(new SeparatorBuilder().setSpacing(1))
-            .addTextDisplay(
-                new TextDisplayBuilder().setContent(
-                    'Untuk mengakses seluruh channel dan fitur server, silakan verifikasi identitas Anda.\n\n' +
-                    '**Benefit Member:**\n• Akses 45+ channel eksklusif\n• Event & giveaway khusus member\n• Networking dengan creator\n• Resource library premium'
-                )
-            )
-            .addSeparator(new SeparatorBuilder().setSpacing(2));
-
-        const button = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('verify_account')
-                    .setLabel('🚀 Mulai Verifikasi')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('✨')
-            );
-
+        const container = this.createMainContainer();
+        
         await channel.send({
-            components: [container, button],
-            flags: MessageFlags.IsComponentsV2
+            flags: 32768, // IS_COMPONENTS_V2
+            components: [container]
         });
     }
 
@@ -163,9 +286,10 @@ class VerifySystem {
             }
 
             this.verificationQueue.set(interaction.user.id, true);
+            
+            // Defer dengan ephemeral
             await interaction.deferReply({ ephemeral: true });
 
-            // Save session with token
             this.createUserSession(interaction.user.id);
             this.updateUserSession(interaction.user.id, {
                 interactionToken: interaction.token,
@@ -180,21 +304,16 @@ class VerifySystem {
                 });
             }
 
-            // Loading Animation with Component V2
+            // Loading Animation
             const totalSteps = this.verificationSteps.length;
             for (let i = 0; i < totalSteps; i++) {
                 const step = this.verificationSteps[i];
                 const container = this.createLoadingContainer(step, i + 1, totalSteps);
                 
-                await interaction.editReply({
-                    components: [container],
-                    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral
-                });
-                
+                await this.editWithComponentV2(interaction, container);
                 await this.delay(step.duration);
             }
 
-            // Langsung ke Server Exploration (tanpa skip option)
             await this.showServerExploration(interaction);
             this.verificationQueue.delete(interaction.user.id);
 
@@ -210,6 +329,23 @@ class VerifySystem {
         }
     }
 
+    async editWithComponentV2(interaction, container) {
+        try {
+            // Gunakan webhook API untuk edit ephemeral message
+            const REST_API_URL = `/webhooks/${interaction.applicationId}/${interaction.token}/messages/@original`;
+            
+            await interaction.client.rest.patch(REST_API_URL, {
+                body: {
+                    flags: 32768, // IS_COMPONENTS_V2
+                    components: [container]
+                }
+            });
+        } catch (error) {
+            console.error('Edit Component V2 failed:', error);
+            throw error;
+        }
+    }
+
     async showServerExploration(interaction) {
         try {
             await interaction.deferUpdate();
@@ -217,52 +353,15 @@ class VerifySystem {
                 interactionToken: interaction.token
             });
 
-            const container = new ContainerBuilder()
-                .addTextDisplay(
-                    new TextDisplayBuilder().setContent('# 🏠 KUNJUNGI AREA SERVER')
-                )
-                .addSeparator(new SeparatorBuilder().setSpacing(1))
-                .addTextDisplay(
-                    new TextDisplayBuilder().setContent(
-                        'Sebelum melanjutkan, silakan kunjungi channel penting berikut:\n\n' +
-                        `• <id:home> - Panduan server\n` +
-                        `• <#${this.config.rulesChannelId}> - Peraturan server\n` +
-                        `• <id:customize> - Self roles`
-                    )
-                )
-                .addSeparator(new SeparatorBuilder().setSpacing(2))
-                .addTextDisplay(
-                    new TextDisplayBuilder().setContent('*⏳ Otomatis lanjut dalam 20 detik...*')
-                );
+            const container = this.createExplorationContainer();
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('📖 Rules')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.rulesChannelId}`),
-                    new ButtonBuilder()
-                        .setLabel('🏠 Guide')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/@home`),
-                    new ButtonBuilder()
-                        .setLabel('🎨 Roles')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/customize-community`)
-                );
+            await this.editWithComponentV2(interaction, container);
 
-            await interaction.editReply({
-                components: [container, buttons],
-                flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral
-            });
-
-            // Update session
             this.updateUserSession(interaction.user.id, {
                 step: 'server_exploration',
                 explorationStart: Date.now()
             });
 
-            // Auto advance to mission
             setTimeout(async () => {
                 const session = this.getUserSession(interaction.user.id);
                 if (session && session.step === 'server_exploration') {
@@ -280,31 +379,14 @@ class VerifySystem {
             const session = this.getUserSession(userId);
             if (!session) return;
 
-            const container = this.createMissionContainer(
-                'MISI PERKENALAN',
-                `**Langkah selanjutnya:**\n\n` +
-                `1. Buka channel <#${this.config.generalChannelId}>\n` +
-                `2. Kirim pesan perkenalan singkat\n` +
-                `3. Bot akan otomatis mendeteksi dan mengirim kode verifikasi via DM\n\n` +
-                `**Contoh:**\n\`\`\`Halo! Saya [nama], baru join nih. Salam kenal semua! 👋\`\`\``,
-                'active'
-            );
+            const container = this.createMissionContainer();
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setLabel('💬 Ke Channel General')
-                        .setStyle(ButtonStyle.Link)
-                        .setURL(`https://discord.com/channels/${this.config.serverId}/${this.config.generalChannelId}`)
-                );
-
-            await this.editOriginalEphemeralMessage(
+            await this.editOriginalWithComponentV2(
                 client,
                 userId,
                 session.interactionToken,
                 session.applicationId,
-                container,
-                buttons
+                container
             );
 
             this.updateUserSession(userId, {
@@ -340,50 +422,50 @@ class VerifySystem {
                 attempts: 0
             });
 
-            // Send DM with code
+            // Send DM dengan Component V2
             try {
+                const dmContainer = {
+                    type: 17,
+                    components: [
+                        {
+                            type: 10,
+                            content: "## 🔐 KODE VERIFIKASI ANDA"
+                        },
+                        { type: 14 },
+                        {
+                            type: 10,
+                            content: `Kode: **\`${verificationCode}\`**\n\nMasukkan kode ini di tombol **"Input Kode"** yang muncul di channel verifikasi.\nKode berlaku selama **10 menit**.\n\n⚠️ *Jangan berikan kode ini kepada siapapun!*`
+                        },
+                        { type: 14 },
+                        {
+                            type: 10,
+                            content: "-# BananaSkiee Verification"
+                        }
+                    ]
+                };
+
                 await message.author.send({
-                    content: `🔐 **KODE VERIFIKASI ANDA**\n\nKode: \`${verificationCode}\`\n\nMasukkan kode ini di tombol "Input Kode" yang muncul di channel verifikasi.\nKode berlaku selama 10 menit.\n\n*Jangan berikan kode ini kepada siapapun!*`
+                    flags: 32768,
+                    components: [dmContainer]
                 });
             } catch (dmError) {
                 console.error('DM failed:', dmError);
-                // Fallback: tell them to enable DM
                 await message.reply({
                     content: `⚠️ <@${userId}> DM Anda terkunci! Silakan buka DM sementara untuk menerima kode verifikasi.`,
-                    ephemeral: true
+                    allowedMentions: { users: [userId] }
                 }).catch(() => {});
                 return;
             }
 
-            // Update UI to show Input Code button (enabled)
-            const container = this.createMissionContainer(
-                'VERIFIKASI KODE',
-                `✅ **Misi chat selesai!**\n\n` +
-                `**Kode verifikasi telah dikirim ke DM Anda.**\n\n` +
-                `Silakan cek DM dari bot, lalu masukkan kode 6 digit tersebut dengan menekan tombol di bawah.`,
-                'active'
-            );
+            // Update UI
+            const container = this.createCodeInputContainer();
 
-            const buttons = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('input_verify_code')
-                        .setLabel('🔐 Input Kode Verifikasi')
-                        .setStyle(ButtonStyle.Success)
-                        .setEmoji('🔑'),
-                    new ButtonBuilder()
-                        .setCustomId('resend_code')
-                        .setLabel('🔄 Kirim Ulang Kode')
-                        .setStyle(ButtonStyle.Secondary)
-                );
-
-            await this.editOriginalEphemeralMessage(
+            await this.editOriginalWithComponentV2(
                 message.client,
                 userId,
                 session.interactionToken,
                 session.applicationId,
-                container,
-                buttons
+                container
             );
 
             this.updateUserSession(userId, {
@@ -392,7 +474,6 @@ class VerifySystem {
                 messageContent: message.content
             });
 
-            // Auto expire code after 10 minutes
             setTimeout(() => {
                 this.verificationCodes.delete(userId);
             }, 600000);
@@ -467,39 +548,18 @@ class VerifySystem {
                 });
             }
 
-            // Code correct - Grant role
+            // Success
             const success = await this.grantMemberAccess(interaction);
             
             if (success) {
-                // Log to forum
                 await this.logVerification(interaction, codeData);
-                
-                // Clear data
                 this.verificationCodes.delete(userId);
                 this.userSessions.delete(userId);
 
-                // Success message with Component V2
-                const container = new ContainerBuilder()
-                    .addTextDisplay(
-                        new TextDisplayBuilder().setContent('# 🎉 VERIFIKASI BERHASIL!')
-                    )
-                    .addSeparator(new SeparatorBuilder().setSpacing(1))
-                    .addTextDisplay(
-                        new TextDisplayBuilder().setContent(
-                            `Selamat datang, **${interaction.user.username}**! 🚀\n\n` +
-                            `✅ Role Member telah diberikan\n` +
-                            `✅ Akses penuh ke server telah dibuka\n` +
-                            `✅ Channel verifikasi akan tersembunyi\n\n` +
-                            `Silakan ke <#${this.config.generalChannelId}> untuk mulai berinteraksi!`
-                        )
-                    );
+                const container = this.createSuccessContainer(interaction.user.username);
 
-                await interaction.editReply({
-                    components: [container],
-                    flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral
-                });
-
-                // Hide verify channel permission (optional, using role-based is better)
+                // Edit dengan Component V2
+                await this.editWithComponentV2(interaction, container);
             }
 
         } catch (error) {
@@ -524,10 +584,25 @@ class VerifySystem {
                 });
             }
 
-            // Resend DM
             try {
+                const dmContainer = {
+                    type: 17,
+                    components: [
+                        {
+                            type: 10,
+                            content: "## 🔐 KODE VERIFIKASI ANDA (RESEND)"
+                        },
+                        { type: 14 },
+                        {
+                            type: 10,
+                            content: `Kode: **\`${codeData.code}\`**\n\nMasukkan kode ini di channel verifikasi.`
+                        }
+                    ]
+                };
+
                 await interaction.user.send({
-                    content: `🔐 **KODE VERIFIKASI ANDA (RESEND)**\n\nKode: \`${codeData.code}\`\n\nMasukkan kode ini di channel verifikasi.`
+                    flags: 32768,
+                    components: [dmContainer]
                 });
                 
                 await interaction.followUp({
@@ -548,6 +623,23 @@ class VerifySystem {
 
     // ========== UTILITIES ==========
     
+    async editOriginalWithComponentV2(client, userId, token, applicationId, container) {
+        try {
+            const REST_API_URL = `/webhooks/${applicationId}/${token}/messages/@original`;
+            
+            await client.rest.patch(REST_API_URL, {
+                body: {
+                    flags: 32768,
+                    components: [container]
+                }
+            });
+            return true;
+        } catch (error) {
+            console.error('Edit original failed:', error.message);
+            return false;
+        }
+    }
+
     async grantMemberAccess(interaction) {
         try {
             const member = interaction.member;
@@ -568,50 +660,42 @@ class VerifySystem {
             if (!logChannel || logChannel.type !== ChannelType.GuildForum) return;
 
             const session = this.getUserSession(interaction.user.id);
-            
-            const content = `
-🎉 **VERIFIKASI BERHASIL - COMPONENT V2**
+            const duration = session?.createdAt 
+                ? Math.round((Date.now() - session.createdAt) / 1000) 
+                : 0;
+            const minutes = Math.floor(duration / 60);
+            const seconds = duration % 60;
 
-👤 **User:** ${interaction.user.tag} (${interaction.user.id})
-⏱️ **Waktu:** ${new Date().toLocaleString('id-ID')}
-💬 **Pesan Perkenalan:** ${session?.messageContent || 'N/A'}
-🔐 **Kode Used:** ${codeData.code}
-🔄 **Percobaan:** ${codeData.attempts + 1}
-`;
+            const logContainer = {
+                type: 17,
+                components: [
+                    {
+                        type: 10,
+                        content: `## ✅ VERIFIKASI BERHASIL\n**${interaction.user.username}** telah menyelesaikan verifikasi`
+                    },
+                    { type: 14 },
+                    {
+                        type: 10,
+                        content: `**👤 User:** ${interaction.user.tag}\n**🆔 ID:** \`${interaction.user.id}\`\n**⏱️ Durasi:** ${minutes}m ${seconds}s\n**💬 Pesan:** ${session?.messageContent?.substring(0, 100) || 'N/A'}\n**🔐 Kode:** ||${codeData.code}||\n**🔄 Percobaan:** ${codeData.attempts + 1}x`
+                    },
+                    { type: 14 },
+                    {
+                        type: 10,
+                        content: `-# ${new Date().toLocaleString('id-ID')}`
+                    }
+                ]
+            };
 
             await logChannel.threads.create({
-                name: `✅ ${interaction.user.username} - Verified`,
-                message: { content }
+                name: `✅ ${interaction.user.username} - ${new Date().toLocaleDateString('id-ID')}`,
+                message: {
+                    flags: 32768,
+                    components: [logContainer]
+                }
             });
 
         } catch (error) {
             console.error('Log error:', error);
-        }
-    }
-
-    async editOriginalEphemeralMessage(client, userId, token, applicationId, containerOrEmbed, components) {
-        try {
-            const REST_API_URL = `/webhooks/${applicationId}/${token}/messages/@original`;
-            
-            const payload = {
-                components: containerOrEmbed instanceof ContainerBuilder 
-                    ? [containerOrEmbed.toJSON()] 
-                    : undefined,
-                embeds: containerOrEmbed instanceof EmbedBuilder 
-                    ? [containerOrEmbed.toJSON()] 
-                    : undefined,
-                content: undefined
-            };
-
-            if (components) {
-                payload.components = components.map(c => c.toJSON());
-            }
-
-            await client.rest.patch(REST_API_URL, { body: payload });
-            return true;
-        } catch (error) {
-            console.error('Edit failed:', error.message);
-            return false;
         }
     }
 
