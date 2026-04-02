@@ -623,34 +623,79 @@ class VerifySystem {
         }
     }
 
-    async logVerification(interaction, codeData) {
-        try {
-            const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
-            if (!logChannel || logChannel.type !== ChannelType.GuildForum) return;
+async logVerification(interaction, codeData) {
+    try {
+        const logChannel = await interaction.guild.channels.fetch(this.config.logChannelId);
+        if (!logChannel || logChannel.type !== ChannelType.GuildForum) return;
 
-            const session = this.getUserSession(interaction.user.id);
-            const duration = session?.createdAt 
-                ? Math.round((Date.now() - session.createdAt) / 1000) 
-                : 0;
+        const session = this.getUserSession(interaction.user.id);
+        const member = interaction.member;
+        const user = interaction.user;
+        
+        const duration = session?.createdAt 
+            ? Math.round((Date.now() - session.createdAt) / 1000) 
+            : 0;
+        const minutes = Math.floor(duration / 60);
+        const seconds = duration % 60;
+        
+        // Hitung account age
+        const accountAge = Math.floor((Date.now() - user.createdTimestamp) / 86400000);
+        
+        // Format timestamp
+        const verifiedAt = new Date().toLocaleString('id-ID', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
-            const logContainer = {
-                type: 17,
-                components: [
-                    { type: 10, content: `## ✅ ${interaction.user.username} VERIFIED` },
-                    { type: 14 },
-                    { type: 10, content: `**ID:** \`${interaction.user.id}\`\n**Durasi:** ${Math.floor(duration/60)}m ${duration%60}s\n**Kode:** ||${codeData.code}||` }
-                ]
-            };
+        // Component V2 Container yang lebih detail
+        const logContainer = {
+            type: 17,
+            components: [
+                {
+                    type: 10,
+                    content: `## ✅ ${user.username} BERHASIL VERIFIED`
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `**👤 Informasi User**\n> **Username:** ${user.tag}\n> **ID:** \\`${user.id}\\`\n> **Display Name:** ${user.globalName || user.username}\n> **Akun Dibuat:** <t:${Math.floor(user.createdTimestamp / 1000)}:R> (${accountAge} hari)`
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `**📊 Detail Verifikasi**\n> **Waktu Selesai:** ${verifiedAt}\n> **Total Durasi:** ${minutes}m ${seconds}s\n> **Kode Digunakan:** ||${codeData.code}||\n> **Percobaan:** ${codeData.attempts + 1}x\n> **Pesan Perkenalan:** "${session?.messageContent?.substring(0, 80) || 'N/A'}${session?.messageContent?.length > 80 ? '...' : ''}"`
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `**🛡️ Security Info**\n> **Status:** ✅ CLEAN\n> **Bot:** ${user.bot ? '❌ YES' : '✅ NO'}\n> **Boost:** ${member.premiumSince ? '✅ YES' : '❌ NO'}\n> **System:** Component V2 + MongoDB`
+                },
+                { type: 14 },
+                {
+                    type: 10,
+                    content: `-# Log ID: VRF-${user.id}-${Date.now().toString(36).toUpperCase()}`
+                }
+            ]
+        };
 
-            await logChannel.threads.create({
-                name: `✅ ${interaction.user.username}`,
-                message: { flags: 32768, components: [logContainer] }
-            });
+        await logChannel.threads.create({
+            name: `✅ ${user.username} • ${new Date().toLocaleDateString('id-ID')}`,
+            message: {
+                flags: 32768,
+                components: [logContainer]
+            },
+            appliedTags: [] // Bisa tambah tag jika ada
+        });
 
-        } catch (error) {
-            console.error('Log error:', error);
-        }
+        console.log(`📋 Log created: ${user.username} verified`);
+
+    } catch (error) {
+        console.error('Log error:', error);
     }
+}
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
