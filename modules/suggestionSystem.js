@@ -1,85 +1,71 @@
-// modules/suggestionSystem.js
-const { MessageFlags } = require('discord.js');
 const { MongoClient } = require('mongodb');
+const express = require('express');
 
-const SUGGESTION_CHANNEL_ID = '1430584708974252102';
-
-const MONGO_URI = 'mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX';
-// Database baru - lowercase & deskriptif
-const DB_NAME = 'suggestions_akira';
-const COLLECTION_NAME = 'votes';
-
-let client = null;
-let collection = null;
-let isConnecting = false;
-let connectionPromise = null;
+const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
+const dbClient = new MongoClient(uri);
+let db;
 
 async function connectDB() {
-    if (collection) return;
-    if (isConnecting) {
-        await connectionPromise;
-        return;
-    }
-    
-    isConnecting = true;
-    connectionPromise = (async () => {
-        try {
-            client = new MongoClient(MONGO_URI);
-            await client.connect();
-            const db = client.db(DB_NAME);
-            collection = db.collection(COLLECTION_NAME);
-            console.log(`✅ MongoDB connected: ${DB_NAME}.${COLLECTION_NAME}`);
-        } catch (error) {
-            console.error('❌ MongoDB error:', error);
-            throw error;
-        } finally {
-            isConnecting = false;
-        }
-    })();
-    
-    await connectionPromise;
-}
-
-async function getVotes(messageId) {
     try {
-        await connectDB();
-        const doc = await collection.findOne({ _id: messageId });
-        return doc ? doc.votes : {};
-    } catch (error) {
-        console.error('❌ Get votes error:', error);
-        return {};
-    }
+        await dbClient.connect();
+        db = dbClient.db('donasi_akira');
+        console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
+    } catch (e) { console.error("❌ MongoDB Error:", e); }
 }
+connectDB();
 
-async function saveVotes(messageId, votes) {
-    try {
-        await connectDB();
-        await collection.updateOne(
-            { _id: messageId },
-            { $set: { votes, updatedAt: new Date() } },
-            { upsert: true }
-        );
-    } catch (error) {
-        console.error('❌ Save votes error:', error);
-        throw error;
-    }
-}
+module.exports = (client, app) => {
+    app.use(express.json());
 
-module.exports = {
-    name: 'suggestionSystem',
-    
-    async handleSuggestionMessage(message) {
-        if (message.channel.id !== SUGGESTION_CHANNEL_ID) return;
-        if (message.author.bot) return;
-        
+    app.post('/webhook', async (req, res) => {
         try {
-            await message.delete().catch(() => {});
+            const data = req.body;
+            const LOG_CHANNEL_ID = "1487715289390121041";
+            const ROLE_DONATUR_ID = "1444248607745245204";
+            const FALLBACK_USER_ID = "1364631032363749628";
             
+            const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+            if (!channel) return res.status(200).send('Channel Not Found');
+
+            const discordInput = data.additional_fields?.[0]?.value;
+            let memberObject = null;
+            let displayName = "Anonim";
+            let avatarURL = "https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png";
+            let userId = FALLBACK_USER_ID;
+
+            if (discordInput) {
+                const cleanId = discordInput.toString().replace(/[<@!>]/g, '').trim();
+                memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
+                if (memberObject) {
+                    userId = memberObject.id;
+                    displayName = memberObject.user.username; 
+                    avatarURL = memberObject.user.displayAvatarURL({ extension: 'png', size: 512 });
+                    await memberObject.roles.add(ROLE_DONATUR_ID).catch(() => null);
+                }
+            }
+
+            const amountNum = parseFloat(data.amount) || 0;
+            const amountStr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amountNum);
             const timestamp = Math.floor(Date.now() / 1000);
-            const username = message.author.globalName || message.author.username;
-            
-            const suggestionPayload = {
-                flags: MessageFlags.IsComponentsV2,
+            const txId = data.transaction_id || `TX-${Date.now()}`;
+
+            // Hitung Total Donasi
+            let totalTeks = "";
+            if (memberObject) {
+                const userStats = await db.collection('user_stats').findOneAndUpdate(
+                    { userId: userId },
+                    { $inc: { totalAmount: amountNum, count: 1 } },
+                    { upsert: true, returnDocument: 'after' }
+                );
+                if (userStats.count > 1) {
+                    const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(userStats.totalAmount);
+                    totalTeks = `\n> **Total Anda:** \`${formattedTotal}\``;
+                }
+            }
+
+            // --- TEMPLATE SESUAI REQUEST TUAN ---
+            const mainMsg = {
+                flags: 32768,
                 components: [{
                     type: 17,
                     components: [
@@ -87,167 +73,95 @@ module.exports = {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# New Suggestion\n> **"${message.content}"**\n\n**__Informasi__**\n> **Pengusul:** ${username}\n> **User ID:** ${message.author.id}\n> **Tanggal:** <t:${timestamp}:F>`
+                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amountStr}\`${totalTeks}\n> **Donasi To:** 001\n> **Tanggal:** <t:${timestamp}:F>`
                             }],
-                            accessory: {
-                                type: 11,
-                                media: { url: message.author.displayAvatarURL({ dynamic: true, size: 128 }) }
-                            }
+                            accessory: { type: 11, media: { url: avatarURL } }
                         },
                         { type: 14 },
                         {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `**__Catatan__**\n\n> Silakan berdiskusi tentang saran ini di thread di bawah ini!`
+                                content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc"
                             }],
                             accessory: {
                                 type: 2,
                                 style: 5,
-                                label: "Profile",
-                                url: `https://discord.com/users/${message.author.id}`
+                                url: "https://sociabuzz.com/bananaaskiee/tribe",
+                                label: "Donasi"
                             }
                         },
                         { type: 14 },
                         {
                             type: 1,
                             components: [
-                                {
-                                    style: 3,
-                                    type: 2,
-                                    label: "Yes (0)",
-                                    emoji: { name: "👍" },
-                                    custom_id: `suggest_yes_${message.author.id}_${timestamp}`
-                                },
-                                {
-                                    style: 4,
-                                    type: 2,
-                                    label: "No (0)",
-                                    emoji: { name: "👎" },
-                                    custom_id: `suggest_no_${message.author.id}_${timestamp}`
-                                }
+                                { type: 2, style: 3, label: "(0)", emoji: { name: "❤️" }, custom_id: `like_${txId}` },
+                                { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" },
+                                { type: 2, style: 5, label: "Profil", url: `https://discord.com/users/${userId}` }
                             ]
                         }
                     ]
                 }]
             };
 
-            const sentMessage = await message.channel.send(suggestionPayload);
+            const sentMsg = await channel.send(mainMsg);
 
-            const thread = await sentMessage.startThread({
-                name: `Suggestion Discussion`,
-                autoArchiveDuration: 1440,
-                reason: 'Suggestion discussion thread'
+            // --- AUTO THREAD PUBLIC ---
+            const thread = await sentMsg.startThread({
+                name: `💝 Donasi - ${memberObject ? memberObject.displayName : 'Anonim'}`,
+                autoArchiveDuration: 1440
             });
 
             await thread.send({
-                flags: MessageFlags.IsComponentsV2,
+                flags: 32768,
                 components: [{
                     type: 17,
-                    components: [{ type: 10, content: "Anda dapat berdiskusi di sini tentang saran tersebut." }]
+                    components: [{ 
+                        type: 10, 
+                        content: `Ayo berikan ucapan terima kasih yang tulus untuk **${displayName}**!` 
+                    }]
                 }]
             });
 
-            await saveVotes(sentMessage.id, {});
-            console.log(`✅ Suggestion created: ${sentMessage.id}`);
-
-        } catch (error) {
-            console.error('❌ Error handling suggestion:', error);
+            res.status(200).send('OK');
+        } catch (err) {
+            console.error("🚨 Webhook Error:", err.message);
+            res.status(200).send('Handled');
         }
-    },
+    });
 
-    async handleSuggestionButtons(interaction) {
-        if (!interaction.isButton()) return false;
+    // --- LIKE HANDLER ---
+    client.on('interactionCreate', async (interaction) => {
+        if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
         
-        const { customId, message } = interaction;
-        if (!customId.startsWith('suggest_')) return false;
-        
+        // Langsung deferUpdate agar tidak bentrok
+        await interaction.deferUpdate().catch(() => null);
+
+        const txId = interaction.customId.replace('like_', '');
         try {
-            const parts = customId.split('_');
-            const action = parts[1];
-            const authorId = parts[2];
-            const timestamp = parts[3];
-            
-            if (action !== 'yes' && action !== 'no') return false;
-            
-            const votes = await getVotes(message.id);
-            const userId = interaction.user.id;
-            const currentVote = votes[userId];
+            const result = await db.collection('donations_likes').findOneAndUpdate(
+                { transactionId: txId },
+                { $inc: { count: 1 }, $addToSet: { users: interaction.user.id } },
+                { upsert: true, returnDocument: 'after' }
+            );
 
-            let yesCount = 0;
-            let noCount = 0;
+            const newCount = result.count || 1;
+            const updatedComponents = interaction.message.components.map(row => {
+                if (row.type === 17) {
+                    row.components = row.components.map(comp => {
+                        if (comp.type === 1) {
+                            comp.components = comp.components.map(btn => {
+                                if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
+                                return btn;
+                            });
+                        }
+                        return comp;
+                    });
+                }
+                return row;
+            });
 
-            for (const vote of Object.values(votes)) {
-                if (vote === 'yes') yesCount++;
-                else if (vote === 'no') noCount++;
-            }
-
-            // Toggle logic
-            if (currentVote === action) {
-                delete votes[userId];
-                action === 'yes' ? yesCount-- : noCount--;
-            } else if (!currentVote) {
-                votes[userId] = action;
-                action === 'yes' ? yesCount++ : noCount++;
-            } else {
-                votes[userId] = action;
-                if (action === 'yes') { yesCount++; noCount--; }
-                else { noCount++; yesCount--; }
-            }
-
-            await saveVotes(message.id, votes);
-
-            const container = message.components[0];
-            if (!container?.components) {
-                console.error('❌ Invalid components structure');
-                await interaction.deferUpdate().catch(() => {});
-                return true;
-            }
-
-            const newComponents = [{
-                type: 17,
-                components: [
-                    container.components[0], // Header
-                    container.components[1], // Separator
-                    container.components[2], // Catatan
-                    container.components[3], // Separator
-                    {
-                        type: 1,
-                        components: [
-                            {
-                                type: 2,
-                                style: 3,
-                                label: `Yes (${yesCount})`,
-                                emoji: { name: "👍" },
-                                custom_id: `suggest_yes_${authorId}_${timestamp}`
-                            },
-                            {
-                                type: 2,
-                                style: 4,
-                                label: `No (${noCount})`,
-                                emoji: { name: "👎" },
-                                custom_id: `suggest_no_${authorId}_${timestamp}`
-                            }
-                        ]
-                    }
-                ]
-            }];
-
-            await message.edit({ components: newComponents, flags: MessageFlags.IsComponentsV2 });
-            await interaction.deferUpdate().catch(() => {});
-            return true;
-
-        } catch (error) {
-            console.error('❌ Error handling button:', error);
-            await interaction.deferUpdate().catch(() => {});
-            return true;
-        }
-    },
-    
-    async disconnect() {
-        if (client) {
-            await client.close();
-            console.log('👋 MongoDB disconnected');
-        }
-    }
+            await interaction.editReply({ components: updatedComponents }).catch(() => null);
+        } catch (err) { console.log("Like Error:", err.message); }
+    });
 };
