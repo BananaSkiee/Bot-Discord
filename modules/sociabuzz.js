@@ -1,10 +1,11 @@
-// modules/sociabuzz.js
-const { MessageFlags, ChannelType, PermissionFlagsBits } = require('discord.js');
+const { MessageFlags, ChannelType } = require('discord.js');
 const { MongoClient } = require('mongodb');
 
 const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
-const DONASI_CHANNEL_ID = '1489600684088229972';
+const DB_NAME = 'donasi_akira'; // Sesuai permintaan dengan double 'i'
+const DONASI_CHANNEL_ID = '1487715289390121041';
 const DEFAULT_AVATAR = 'https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png';
+const DEFAULT_USER_ID = '1364631032363749628';
 
 let dbClient = null;
 let db = null;
@@ -14,12 +15,25 @@ async function connectDB() {
         if (!dbClient) {
             dbClient = new MongoClient(uri);
             await dbClient.connect();
-            db = dbClient.db('donasi_akira');
-            console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
+            db = dbClient.db(DB_NAME);
+            console.log(`🍃 MongoDB Connected: Database '${DB_NAME}' Ready!`);
         }
-    } catch (e) { 
-        console.error("❌ MongoDB Error:", e);
+    } catch (e) {
+        console.error("❌ MongoDB Connection Error:", e);
     }
+}
+
+function formatRupiah(angka) {
+    return new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    }).format(angka);
+}
+
+function formatTimestamp(isoString) {
+    const date = new Date(isoString);
+    return Math.floor(date.getTime() / 1000);
 }
 
 async function handleLike(interaction) {
@@ -29,7 +43,6 @@ async function handleLike(interaction) {
         const txId = interaction.customId.replace('like_', '');
         const userId = interaction.user.id;
         
-        // Cek apakah user sudah like
         const existing = await db.collection('donations_likes').findOne({ 
             transactionId: txId,
             users: userId 
@@ -39,14 +52,12 @@ async function handleLike(interaction) {
         let message = "";
         
         if (existing) {
-            // Unlike
             updateOperation = { 
                 $inc: { count: -1 }, 
                 $pull: { users: userId } 
             };
             message = "💔 Kamu membatalkan like";
         } else {
-            // Like baru
             updateOperation = { 
                 $inc: { count: 1 }, 
                 $addToSet: { users: userId } 
@@ -62,7 +73,7 @@ async function handleLike(interaction) {
 
         const newCount = result?.count || 0;
 
-        // Update tombol like di message
+        // Update label tombol like pada Components V2
         const container = interaction.message.components[0];
         if (!container || container.type !== 17) {
             console.error('❌ Bukan Components V2 message');
@@ -95,7 +106,6 @@ async function handleLike(interaction) {
             flags: MessageFlags.IsComponentsV2 
         });
         
-        // Reply ephemeral untuk konfirmasi
         if (!interaction.replied && !interaction.deferred) {
             await interaction.reply({ 
                 content: message, 
@@ -116,54 +126,37 @@ async function handleLike(interaction) {
     }
 }
 
-function formatRupiah(angka) {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    }).format(angka);
-}
-
-function formatTimestamp(isoString) {
-    const date = new Date(isoString);
-    return Math.floor(date.getTime() / 1000);
-}
-
-function initWebhook(client, app) {
+function initSociabuzz(client, app) {
     if (!app || typeof app.post !== 'function') {
         return console.error("❌ Express 'app' tidak valid.");
     }
 
     connectDB();
     
-    // Webhook endpoint untuk Sociabuzz
     app.post('/webhook', async (req, res) => {
         try {
             console.log('📩 Webhook received:', JSON.stringify(req.body, null, 2));
             
-            // Parse data dari Sociabuzz
             const {
                 id: transactionId,
                 amount,
                 name: donaturName,
                 message: pesanDonasi,
                 created_at,
-                email, // Bisa digunakan untuk mapping Discord
-                metadata // Data tambahan jika ada
+                metadata
             } = req.body;
 
             if (!amount) {
                 return res.status(400).json({ error: 'Amount required' });
             }
 
-            // Cek apakah sudah pernah diproses (anti duplikat)
+            // Anti duplikat
             const existing = await db.collection('donations').findOne({ transactionId });
             if (existing) {
                 console.log('⚠️ Donasi duplikat:', transactionId);
                 return res.status(200).json({ message: 'Already processed' });
             }
 
-            // Simpan ke database
             await db.collection('donations').insertOne({
                 transactionId,
                 amount: parseInt(amount),
@@ -173,7 +166,7 @@ function initWebhook(client, app) {
                 metadata: metadata || {}
             });
 
-            // Hitung total donasi dari user ini (jika ada email/identifier sama)
+            // Hitung total donasi user ini
             const totalDonasi = await db.collection('donations')
                 .aggregate([
                     { $match: { name: donaturName || 'Anonim' } },
@@ -181,16 +174,16 @@ function initWebhook(client, app) {
                 ]).toArray();
             
             const total = totalDonasi[0]?.total || parseInt(amount);
+            const isFirstDonation = total === parseInt(amount);
 
-            // Cari Discord user (jika metadata ada userId)
-            let discordUser = null;
+            // Resolve Discord user info
             let displayName = donaturName || 'Anonim';
             let avatarUrl = DEFAULT_AVATAR;
-            let profileUrl = 'https://discord.com/users/1364631032363749628'; // Default fallback
+            let profileUrl = `https://discord.com/users/${DEFAULT_USER_ID}`;
             
             if (metadata?.discordUserId) {
                 try {
-                    discordUser = await client.users.fetch(metadata.discordUserId);
+                    const discordUser = await client.users.fetch(metadata.discordUserId);
                     displayName = discordUser.globalName || discordUser.username;
                     avatarUrl = discordUser.displayAvatarURL({ dynamic: true, size: 256 });
                     profileUrl = `https://discord.com/users/${discordUser.id}`;
@@ -202,60 +195,67 @@ function initWebhook(client, app) {
             const timestamp = formatTimestamp(created_at || new Date());
             const formattedAmount = formatRupiah(amount);
             const formattedTotal = formatRupiah(total);
+            const shortId = transactionId.slice(-6).toUpperCase();
             
-            // Generate custom_id untuk tombol like
             const likeCustomId = `like_${transactionId}`;
             
-            // Template Components V2
+            // Bangun konten Informasi (hanya tampilkan Total jika bukan donasi pertama)
+            let informasiText = `> **Nama:** ${displayName}\n> **Nominal:** \`${formattedAmount}\``;
+            if (!isFirstDonation) {
+                informasiText += `\n> **Total Anda:** \`${formattedTotal}\``;
+            }
+            informasiText += `\n> **Donasi To:** ${shortId}\n> **Tanggal:** <t:${timestamp}:F>`;
+
+            // Payload Components V2
             const donationPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [
                     {
-                        type: 17, // Container
+                        type: 17,
                         components: [
                             {
-                                type: 9, // Section - Header
+                                type: 9,
                                 components: [
                                     {
-                                        type: 10, // Text Display
-                                        content: `# 💎 Donation Support\n> "${pesanDonasi || 'Terima kasih atas dukungannya!'}"\n\n**__Informasi Donasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${formattedAmount}\`\n> **Total Donasi:** \`${formattedTotal}\`\n> **Donasi ID:** \`${transactionId.slice(-6).toUpperCase() || '001'}\`\n> **Waktu:** <t:${timestamp}:F>`
+                                        type: 10,
+                                        content: `# Donation Support\n> "${pesanDonasi || 'Terima kasih atas dukungannya!'}"\n\n**__Informasi__**\n${informasiText}`
                                     }
                                 ],
                                 accessory: {
-                                    type: 11, // Thumbnail
+                                    type: 11,
                                     media: {
                                         url: avatarUrl
                                     }
                                 }
                             },
                             {
-                                type: 14 // Separator
+                                type: 14
                             },
                             {
-                                type: 9, // Section - Terima Kasih
+                                type: 9,
                                 components: [
                                     {
                                         type: 10,
-                                        content: `**__Terima Kasih Banyak__**\n\n> Donasi Anda sangat berarti dan membantu perkembangan komunitas ini!`
+                                        content: `**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc`
                                     }
                                 ],
                                 accessory: {
-                                    type: 2, // Button
-                                    style: 5, // Link
+                                    type: 2,
+                                    style: 5,
                                     label: "Donasi",
                                     url: "https://sociabuzz.com/bananaaskiee/donate",
                                     custom_id: `donate_btn_${transactionId}`
                                 }
                             },
                             {
-                                type: 14 // Separator
+                                type: 14
                             },
                             {
-                                type: 1, // ActionRow
+                                type: 1,
                                 components: [
                                     {
-                                        style: 3, // Success/Green
-                                        type: 2, // Button
+                                        style: 3,
+                                        type: 2,
                                         label: "(0)",
                                         emoji: {
                                             name: "❤️"
@@ -264,14 +264,14 @@ function initWebhook(client, app) {
                                     },
                                     {
                                         type: 2,
-                                        style: 5, // Link
+                                        style: 5,
                                         label: "Benefit",
                                         url: "https://discord.com/channels/1347233781391560837/1487703926483587102",
                                         custom_id: `benefit_${transactionId}`
                                     },
                                     {
                                         type: 2,
-                                        style: 5, // Link
+                                        style: 5,
                                         label: "Profil",
                                         url: profileUrl,
                                         custom_id: `profile_${transactionId}`
@@ -283,7 +283,6 @@ function initWebhook(client, app) {
                 ]
             };
 
-            // Kirim ke channel donasi
             const channel = await client.channels.fetch(DONASI_CHANNEL_ID);
             if (!channel) {
                 console.error('❌ Channel donasi tidak ditemukan:', DONASI_CHANNEL_ID);
@@ -292,15 +291,15 @@ function initWebhook(client, app) {
 
             const sentMessage = await channel.send(donationPayload);
 
-            // Buat thread publik
+            // Buat Public Thread
             const thread = await sentMessage.startThread({
                 name: `💝 Support dari ${displayName}`,
-                autoArchiveDuration: 1440, // 24 jam
-                type: ChannelType.PublicThread, // Thread publik (semua bisa chat)
+                autoArchiveDuration: 1440,
+                type: ChannelType.PublicThread,
                 reason: 'Diskusi donasi dari ' + displayName
             });
 
-            // Kirim pesan di thread dengan Components V2
+            // Kirim pesan di dalam thread
             const threadMessage = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [
@@ -318,7 +317,7 @@ function initWebhook(client, app) {
 
             await thread.send(threadMessage);
 
-            // Inisialisasi like counter di MongoDB
+            // Inisialisasi like counter
             await db.collection('donations_likes').insertOne({
                 transactionId,
                 count: 0,
@@ -345,4 +344,6 @@ function initWebhook(client, app) {
     console.log("✅ Sociabuzz Webhook registered at /webhook");
 }
 
-module.exports = { initWebhook, handleLike };
+// Export pattern: require('./modules/sociabuzz')(client, app) dan handleLike untuk interaction
+module.exports = initSociabuzz;
+module.exports.handleLike = handleLike;
