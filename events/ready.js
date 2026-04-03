@@ -7,6 +7,8 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 const { initAutoDelete } = require('../modules/autoDelete');
 const roleManager = require('../modules/roleManager');
 const autoThread = require('../modules/autoThread');
+const sociabuzz = require("../modules/sociabuzz");
+const app = require('../index.js');
 
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
@@ -19,7 +21,18 @@ module.exports = {
     
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
-    
+
+    try {
+       if (app) {
+        sociabuzz(client, app);
+        console.log("✅ SociaBuzz Webhook Integration Active");
+     } else {
+       console.warn("⚠️ App tidak ditemukan...");
+     }
+    } catch (err) {
+      console.error("❌ Gagal inisialisasi SociaBuzz Module:", err);
+    }
+       
     try {
         autoThread(client);
     } catch (err) {
