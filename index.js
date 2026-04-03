@@ -83,7 +83,7 @@ fs.readdirSync("./events").forEach((file) => {
   
   if (event.once) {
     if (event.name === "ready" || event.name === "clientReady") {
-      client.once("ready", (...args) => event.execute(...args, client));
+      client.once("ready", (...args) => event.execute(...args, client, app));
     } else {
       client.once(event.name, (...args) => event.execute(...args, client));
     }
