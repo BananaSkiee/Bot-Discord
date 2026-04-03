@@ -15,7 +15,7 @@ module.exports = (client, app) => {
             }).format(rawAmount);
 
             // 3. Ambil channel (Gunakan fetch jika cache kosong)
-            const LOG_CHANNEL_ID = "1352800131933802547"; 
+            const LOG_CHANNEL_ID = "1487715289390121041"; 
             let channel = client.channels.cache.get(LOG_CHANNEL_ID);
             
             if (!channel) {
