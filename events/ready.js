@@ -7,8 +7,6 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 const { initAutoDelete } = require('../modules/autoDelete');
 const roleManager = require('../modules/roleManager');
 const autoThread = require('../modules/autoThread');
-const sociabuzz = require("../modules/sociabuzz");
-const app = require('../index.js');
 
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
@@ -16,12 +14,14 @@ let verifyInviteSystem = null;
 module.exports = {
   name: "ready",
   once: true,
-  async execute(client) {
+  async execute(client, app) { 
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
     
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
 
+    const sociabuzz = require("../modules/sociabuzz");
+    
     try {
        if (app) {
         sociabuzz(client, app);
