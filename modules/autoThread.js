@@ -43,12 +43,12 @@ module.exports = function(client) {
                 return;
             }
 
-            // Jika Ada Media: Reaction ❤️ & Auto Thread (PUBLIC THREAD - SEMUA MEMBER BISA CHAT)
+            // Jika Ada Media: Reaction ❤️ & Auto Thread
             await m.react('❤️').catch(() => null);
             const thread = await m.startThread({ 
-                name: "💬 Komentar Publik", 
+                name: "Tulis Komentar Disini...", 
                 autoArchiveDuration: 1440,
-                type: 11 // ⭐ PUBLIC THREAD - Semua member bisa lihat & chat
+                type: 11
             }).catch(() => null);
 
             if (thread) {
@@ -56,7 +56,7 @@ module.exports = function(client) {
                     flags: 32768,
                     components: [{
                         type: 17, components: [{
-                            type: 10, content: "👋 **Thread publik aktif!** Semua member boleh berkomentar di sini. Jaga kesopanan ya! 😊"
+                            type: 10, content: "Anda dapat berkomentar di sini, komentar yang positif"
                         }]
                     }]
                 }).catch(() => null);
@@ -66,9 +66,9 @@ module.exports = function(client) {
         // 📢 2. DISCORD UPDATE THREAD - <#1488059638074314832> (Public Bisa Memicu)
         if (m.channel.id === CH.UPDATE) {
             const tUpdate = await m.startThread({ 
-                name: "💬 Diskusi Update",
+                name: "Discord Update Thread",
                 autoArchiveDuration: 1440,
-                type: 11 // ⭐ PUBLIC THREAD - Semua member bisa lihat & chat
+                type: 11
             }).catch(() => null);
 
             if (tUpdate) {
@@ -76,7 +76,7 @@ module.exports = function(client) {
                     flags: 32768,
                     components: [{
                         type: 17, components: [{
-                            type: 10, content: "👋 **Thread diskusi publik aktif!** Semua member bebas berdiskusi tentang update ini."
+                            type: 10, content: "Anda dapat berdiskusi di sini tentang update tersebut."
                         }]
                     }]
                 }).catch(() => null);
@@ -86,9 +86,9 @@ module.exports = function(client) {
         // 🎁 3. DISCORD QUEST THREAD - <#1443255215460585563> (Public Bisa Memicu)
         if (m.channel.id === CH.QUEST) {
             const tQuest = await m.startThread({ 
-                name: "💬 Diskusi Quest",
+                name: "Discord Quest Discussion Thread",
                 autoArchiveDuration: 1440,
-                type: 11 // ⭐ PUBLIC THREAD - Semua member bisa lihat & chat
+                type: 11
             }).catch(() => null);
 
             if (tQuest) {
@@ -96,7 +96,7 @@ module.exports = function(client) {
                     flags: 32768,
                     components: [{
                         type: 17, components: [{
-                            type: 10, content: "👋 **Thread diskusi publik aktif!** Silakan diskusi quest di sini, semua member boleh ikut."
+                            type: 10, content: "Anda dapat berdiskusi di sini tentang quest tersebut."
                         }]
                     }]
                 }).catch(() => null);
