@@ -2,42 +2,61 @@ module.exports = (client, app) => {
     app.post('/webhook', async (req, res) => {
         try {
             const data = req.body;
-            
-            // 1. Log data mentah untuk debugging di Koyeb
-            console.log("💰 [SociaBuzz] Data diterima:", JSON.stringify(data, null, 2));
+            console.log("💰 [SociaBuzz] Data masuk dari:", data.voter_name || "Anonim");
 
-            // 2. Pastikan nominal adalah angka (SociaBuzz kadang kirim string)
-            const rawAmount = parseFloat(data.amount) || 0;
-            const formattedAmount = new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
-            }).format(rawAmount);
+            // 1. Ambil ID Discord dari "Pertanyaan Tambahan"
+            // Kita ambil dari data.additional_fields[0] karena itu kolom pertama kamu
+            const discordInput = data.additional_fields && data.additional_fields[0] 
+                ? data.additional_fields[0].value 
+                : null;
 
-            // 3. Ambil channel (Gunakan fetch jika cache kosong)
             const LOG_CHANNEL_ID = "1487715289390121041"; 
-            let channel = client.channels.cache.get(LOG_CHANNEL_ID);
-            
-            if (!channel) {
-                try {
-                    channel = await client.channels.fetch(LOG_CHANNEL_ID);
-                } catch (e) {
-                    console.error("❌ [SociaBuzz] Gagal fetch channel:", e.message);
-                }
-            }
+            const ROLE_DONATUR_ID = "1444248607745245204"; // Role yang kamu minta
+            const channel = client.channels.cache.get(LOG_CHANNEL_ID);
 
             if (channel) {
-                const { EmbedBuilder } = require('discord.js');
-                
-                // Gunakan format standar dulu jika Type 17 (Component V2) rewel di channel tertentu
+                let memberMention = "Anonim";
+                let memberObject = null;
+
+                if (discordInput) {
+                    // Bersihkan input jika user copy-paste mention (menghilangkan <@!>)
+                    const cleanId = discordInput.replace(/[<@!>]/g, '').trim();
+                    
+                    try {
+                        // Cari member di server The Nexus
+                        memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
+                        
+                        if (memberObject) {
+                            memberMention = `<@${memberObject.id}>`;
+                            
+                            // 2. OTOMATIS KASIH ROLE (Berapapun nominalnya)
+                            await memberObject.roles.add(ROLE_DONATUR_ID)
+                                .then(() => console.log(`✅ Role berhasil diberikan ke ${memberObject.user.tag}`))
+                                .catch(err => console.error("❌ Gagal kasih role:", err.message));
+                        } else {
+                            memberMention = `**${discordInput}** (User tidak ditemukan/salah ID)`;
+                        }
+                    } catch (e) {
+                        memberMention = `**${discordInput}**`;
+                    }
+                }
+
+                // Format mata uang IDR
+                const formattedAmount = new Intl.NumberFormat('id-ID', {
+                    style: 'currency', 
+                    currency: 'IDR', 
+                    minimumFractionDigits: 0
+                }).format(parseFloat(data.amount) || 0);
+
+                // 3. Tampilkan Log dengan Component V2
                 const logContainer = {
                     type: 17,
                     components: [
-                        { type: 10, content: `## 💸 DUKUNGAN SOCIABUZZ MASUK!` },
+                        { type: 10, content: `## 💸 DUKUNGAN BARU MASUK!` },
                         { type: 14 },
                         { 
                             type: 10, 
-                            content: `### 👤 Informasi Donatur\n> **Nama:** ${data.supporter_name || 'Anonim'}\n> **Nominal:** \`${formattedAmount}\`\n> **Metode:** ${data.payment_method || 'E-Wallet'}` 
+                            content: `### 👤 Info Donatur\n> **Akun:** ${memberMention}\n> **Nominal:** \`${formattedAmount}\`\n> **Metode:** ${data.payment_method || 'E-Wallet'}` 
                         },
                         { type: 14 },
                         { 
@@ -45,29 +64,22 @@ module.exports = (client, app) => {
                             content: `### ✉️ Pesan\n\`\`\`\n${data.message || 'Tidak ada pesan.'}\n\`\`\`` 
                         },
                         { type: 14 },
-                        { type: 10, content: `-# ID: ${data.transaction_id || '-'} • BananaSkiee Systems` }
+                        { type: 10, content: `-# ID Transaksi: ${data.transaction_id || '-'} • BananaSkiee Systems` }
                     ]
                 };
 
                 await channel.send({
+                    content: memberObject ? `🎊 Terima kasih ${memberMention} atas dukungannya!` : "🎊 Seseorang baru saja berdonasi!",
                     flags: 32768,
                     components: [logContainer]
                 });
-                
-                console.log("✅ [SociaBuzz] Log berhasil dikirim ke Discord.");
-            } else {
-                console.error("❌ [SociaBuzz] Channel tidak ditemukan!");
             }
 
-            // WAJIB: Kirim respon 200 ke SociaBuzz agar tidak Error 500 lagi
             res.status(200).send('OK');
-
         } catch (err) {
-            console.error("🚨 [SociaBuzz] Crash Error:", err.stack);
-            // Tetap kirim 200 atau 500? Sebaiknya 500 agar kamu tahu ada yang salah
-            res.status(500).send('Internal Error');
+            console.error("🚨 [SociaBuzz Webhook] Error:", err);
+            res.status(500).send('Internal Server Error');
         }
     });
-
-    console.log("✅ SociaBuzz Module (Safe Mode) Loaded");
 };
+                            
