@@ -3,13 +3,12 @@ const express = require('express');
 
 const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
 const dbClient = new MongoClient(uri);
-let donationsColl;
+let db;
 
 async function connectDB() {
     try {
         await dbClient.connect();
-        const db = dbClient.db('donasi_akira');
-        donationsColl = db.collection('donations_likes');
+        db = dbClient.db('donasi_akira');
         console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
     } catch (e) { console.error("❌ MongoDB Error:", e); }
 }
@@ -31,21 +30,39 @@ module.exports = (client, app) => {
             let memberObject = null;
             let displayName = "Anonim";
             let avatarURL = "https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png";
+            let userId = null;
 
             if (discordInput) {
                 const cleanId = discordInput.toString().replace(/[<@!>]/g, '').trim();
                 memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
                 if (memberObject) {
-                    displayName = memberObject.user.username; 
+                    userId = memberObject.id;
+                    displayName = `${memberObject.user.username} - ${memberObject.displayName}`;
                     avatarURL = memberObject.user.displayAvatarURL({ extension: 'png', size: 512 });
                     await memberObject.roles.add(ROLE_DONATUR_ID).catch(() => null);
                 }
             }
 
-            const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.amount || 0);
+            // Hitung Total Donasi User ini di DB
+            const amountNum = parseFloat(data.amount) || 0;
+            let totalTeks = "";
+            if (userId) {
+                const userStats = await db.collection('user_stats').findOneAndUpdate(
+                    { userId: userId },
+                    { $inc: { totalAmount: amountNum, count: 1 } },
+                    { upsert: true, returnDocument: 'after' }
+                );
+                // Hanya kirim "Total Anda" jika ini bukan donasi pertama
+                if (userStats.count > 1) {
+                    const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(userStats.totalAmount);
+                    totalTeks = `\n> **Total Anda:** \`${formattedTotal}\``;
+                }
+            }
+
+            const amountStr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amountNum);
             const txId = data.transaction_id || `TX-${Date.now()}`;
 
-            // --- FIXED COMPONENT V2 STRUCTURE ---
+            // --- COMPONENT V2 TEMPLATE ---
             const mainMsg = {
                 flags: 32768,
                 components: [{
@@ -55,7 +72,7 @@ module.exports = (client, app) => {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amount}\`\n> **Donasi To:** 001\n> **Tanggal:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amountStr}\`${totalTeks}\n> **Donasi To:** 001\n> **Tanggal:** <t:${Math.floor(Date.now() / 1000)}:F>`
                             }],
                             accessory: { type: 11, media: { url: avatarURL } }
                         },
@@ -63,14 +80,15 @@ module.exports = (client, app) => {
                         {
                             type: 9,
                             components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
-                            accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/tribe", label: "Donate" }
+                            accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/donate", label: "Donasi" }
                         },
                         { type: 14 },
                         {
                             type: 1,
                             components: [
                                 { type: 2, style: 3, label: "(0)", emoji: { name: "❤️" }, custom_id: `like_${txId}` },
-                                { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" }
+                                { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" },
+                                { type: 2, style: 5, label: "Profil", url: userId ? `https://discord.com/users/${userId}` : "https://discord.com" }
                             ]
                         }
                     ]
@@ -79,9 +97,9 @@ module.exports = (client, app) => {
 
             const sentMsg = await channel.send(mainMsg);
 
-            // --- AUTO THREAD DENGAN PESAN COMPONENT V2 ---
+            // --- AUTO THREAD (PUBLIC) ---
             const thread = await sentMsg.startThread({
-                name: `💝 Support - ${displayName}`,
+                name: `💝 Donasi - ${memberObject ? memberObject.displayName : 'Anonim'}`,
                 autoArchiveDuration: 1440
             });
 
@@ -89,32 +107,27 @@ module.exports = (client, app) => {
                 flags: 32768,
                 components: [{
                     type: 17,
-                    components: [{ 
-                        type: 10, 
-                        content: `✨ Ayo berikan ucapan terima kasih yang tulus untuk **${displayName}**! 🚀` 
-                    }]
+                    components: [{ type: 10, content: "Ayo berikan ucapan terima kasih yang tulus untuk **${displayName}**!" }]
                 }]
             });
 
             res.status(200).send('OK');
         } catch (err) {
             console.error("🚨 Webhook Error:", err.message);
-            res.status(200).send('Error Handled');
+            res.status(200).send('Handled');
         }
     });
 
-    // --- FIXED LIKE HANDLER ---
+    // --- LIKE HANDLER (ANTI-CONFLICT) ---
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
         
-        // Gunakan deferUpdate agar tidak bentrok dengan interaction lain
-        if (!interaction.deferred && !interaction.replied) {
-            await interaction.deferUpdate().catch(() => null);
-        }
+        // Langsung defer agar tidak "Unknown Interaction"
+        await interaction.deferUpdate().catch(() => null);
 
         const txId = interaction.customId.replace('like_', '');
         try {
-            const result = await donationsColl.findOneAndUpdate(
+            const result = await db.collection('donations_likes').findOneAndUpdate(
                 { transactionId: txId },
                 { $inc: { count: 1 }, $addToSet: { users: interaction.user.id } },
                 { upsert: true, returnDocument: 'after' }
@@ -124,7 +137,7 @@ module.exports = (client, app) => {
             const updatedComponents = interaction.message.components.map(row => {
                 if (row.type === 17) {
                     row.components = row.components.map(comp => {
-                        if (comp.type === 1) { // Action Row didalam type 17
+                        if (comp.type === 1) {
                             comp.components = comp.components.map(btn => {
                                 if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
                                 return btn;
