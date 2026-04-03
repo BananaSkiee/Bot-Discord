@@ -15,6 +15,7 @@ const { handleInitialRoles, handleVerificationUpdate } = require("./modules/auto
 const { handleSuggestionMessage, handleSuggestionButtons } = require('./modules/suggestionSystem');
 const { handleFeedbackButtons, handleFeedbackModal } = require('./modules/feedbackSystem');
 const generator = require('./modules/generator.js');
+const sociabuzz = require('./modules/sociabuzz');
 
 const client = new Client({
   intents: [
@@ -44,6 +45,8 @@ module.exports = app;
 
 app.get("/", (_, res) => res.send("✅ Bot Akira aktif"));
 app.get("/health", (_, res) => res.status(200).json({ status: 'OK' }));
+
+sociabuzz.initWebhook(client, app);
 
 const server = app.listen(PORT, () => {
   console.log("🌐 Web server pusat hidup di port " + PORT);
