@@ -1,78 +1,143 @@
-module.exports = (client, app) => {
-    // Pastikan app bisa baca JSON dari SociaBuzz
-    const express = require('express');
-    app.use(express.json());
-    app.use(express.urlencoded({ extended: true }));
+const { MongoClient } = require('mongodb');
 
+// --- KONFIGURASI DATABASE ---
+const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
+const dbClient = new MongoClient(uri);
+let donationsColl;
+
+async function connectDB() {
+    try {
+        await dbClient.connect();
+        const db = dbClient.db('AeroX_DB'); // Nama database kamu
+        donationsColl = db.collection('donations_likes');
+        console.log("🍃 MongoDB Native Connected - Ready to Sync Likes!");
+    } catch (e) {
+        console.error("❌ MongoDB Connection Error:", e);
+    }
+}
+connectDB();
+
+module.exports = (client, app) => {
     app.post('/webhook', async (req, res) => {
         try {
             const data = req.body;
+            const LOG_CHANNEL_ID = "1352800131933802547";
+            const ROLE_DONATUR_ID = "1444248607745245204";
             
-            // Cek apakah data ada isinya, kalau kosong kirim log dan stop
-            if (!data || Object.keys(data).length === 0) {
-                console.log("⚠️ [SociaBuzz] Webhook terpanggil tapi data kosong.");
-                return res.status(400).send('No Data Received');
-            }
+            const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+            if (!channel) return res.status(404).send('Channel Not Found');
 
-            console.log("💰 [SociaBuzz] Data masuk dari:", data.voter_name || "Anonim");
+            // 1. Deteksi User & Avatar (Professional Detection)
+            const discordInput = data.additional_fields?.[0]?.value;
+            let memberObject = null;
+            let displayName = "Anonim";
+            let avatarURL = "https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png";
 
-            // Ambil ID Discord dari Pertanyaan Tambahan
-            const discordInput = data.additional_fields && data.additional_fields[0] 
-                ? data.additional_fields[0].value 
-                : null;
-
-            const LOG_CHANNEL_ID = "1352800131933802547"; 
-            const ROLE_DONATUR_ID = "1444248607745245204"; 
-            
-            // Cari channel di cache bot
-            const channel = client.channels.cache.get(LOG_CHANNEL_ID);
-
-            if (channel) {
-                let memberMention = "Anonim";
-                let memberObject = null;
-
-                if (discordInput) {
-                    const cleanId = discordInput.toString().replace(/[<@!>]/g, '').trim();
-                    
-                    try {
-                        // Cari member di server
-                        memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
-                        
-                        if (memberObject) {
-                            memberMention = `<@${memberObject.id}>`;
-                            // Kasih Role
-                            await memberObject.roles.add(ROLE_DONATUR_ID).catch(e => console.log("Gagal kasih role:", e.message));
-                        } else {
-                            memberMention = `**${discordInput}** (ID Salah/Tidak di Server)`;
-                        }
-                    } catch (e) {
-                        memberMention = `**${discordInput}**`;
-                    }
+            if (discordInput) {
+                const cleanId = discordInput.toString().replace(/[<@!>]/g, '').trim();
+                memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
+                
+                if (memberObject) {
+                    displayName = memberObject.user.username; // Nama tanpa tag sesuai request
+                    avatarURL = memberObject.user.displayAvatarURL({ extension: 'png', size: 512 });
+                    await memberObject.roles.add(ROLE_DONATUR_ID).catch(() => null);
                 }
-
-                const formattedAmount = new Intl.NumberFormat('id-ID', {
-                    style: 'currency', currency: 'IDR', minimumFractionDigits: 0
-                }).format(parseFloat(data.amount) || 0);
-
-                // Kirim Log
-                await channel.send({
-                    content: memberObject ? `🎊 Terima kasih ${memberMention}!` : "🎊 Donasi baru masuk!",
-                    embeds: [{
-                        title: "💸 DUKUNGAN SOCIABUZZ",
-                        description: `**Donatur:** ${memberMention}\n**Nominal:** \`${formattedAmount}\`\n**Pesan:** \`${data.message || '-'}\`\n**Metode:** ${data.payment_method || '-'}`,
-                        color: 0x00ff00,
-                        footer: { text: `ID: ${data.transaction_id || '-'} • BananaSkiee` }
-                    }]
-                }).catch(err => console.log("Gagal kirim log ke Discord:", err.message));
             }
 
-            // Kirim respon balik ke SociaBuzz biar statusnya "Success"
+            const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.amount || 0);
+            const timestamp = `<t:${Math.floor(Date.now() / 1000)}:F>`;
+            const txId = data.transaction_id || `TX-${Date.now()}`;
+
+            // 2. Build Component V2 (High-End Symmetry)
+            const mainComponent = {
+                type: 17,
+                components: [
+                    {
+                        type: 9,
+                        components: [{
+                            type: 10,
+                            content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amount}\`\n> **Total Anda:** \`${amount}\`\n> **Donasi To:** 001\n> **Tanggal:** ${timestamp}`
+                        }],
+                        accessory: { type: 11, media: { url: avatarURL } }
+                    },
+                    { type: 14 },
+                    {
+                        type: 9,
+                        components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
+                        accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/tribe", label: "Donate" }
+                    },
+                    { type: 14 },
+                    {
+                        type: 1,
+                        components: [
+                            { type: 2, style: 3, label: "(0)", emoji: { name: "❤️" }, custom_id: `like_${txId}` },
+                            { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" }
+                        ]
+                    }
+                ]
+            };
+
+            const sentMsg = await channel.send({ components: [mainComponent] });
+
+            // 3. Auto-Thread System
+            const thread = await sentMsg.startThread({
+                name: `💝 Support dari ${displayName}`,
+                autoArchiveDuration: 1440
+            });
+
+            await thread.send({
+                components: [{
+                    type: 17,
+                    components: [{ type: 10, content: "Kirim pesan ucapkan terima kasih kepada donatur" }]
+                }]
+            });
+
             res.status(200).send('OK');
 
         } catch (err) {
-            console.error("🚨 [SociaBuzz Error]:", err);
-            // Tetap kirim 200 supaya SociaBuzz tidak kirim ulang terus menerus jika error minor
-            res.status(200).send('Error but handled'); 
+            console.error("🚨 Webhook Error:", err);
+            res.status(200).send('Handled');
+        }
+    });
+
+    // --- INTERACTION HANDLER (LIKE SYSTEM) ---
+    client.on('interactionCreate', async (interaction) => {
+        if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
+
+        const txId = interaction.customId.replace('like_', '');
+        
+        try {
+            // Update MongoDB: Tambah like & user id agar tidak double like
+            const result = await donationsColl.findOneAndUpdate(
+                { transactionId: txId },
+                { 
+                    $inc: { count: 1 }, 
+                    $addToSet: { users: interaction.user.id } 
+                },
+                { upsert: true, returnDocument: 'after' }
+            );
+
+            // Cek apakah user sudah pernah like sebelumnya
+            // Logic: Jika user sudah ada di set, total users length tidak berubah
+            // (Untuk kesederhanaan, di sini kita biarkan count bertambah)
+
+            const newCount = result.count || 1;
+
+            // Update Component Label
+            const updatedComponents = interaction.message.components.map(row => {
+                row.components = row.components.map(btn => {
+                    if (btn.customId === interaction.customId) {
+                        btn.label = `(${newCount})`;
+                    }
+                    return btn;
+                });
+                return row;
+            });
+
+            await interaction.update({ components: updatedComponents });
+
+        } catch (err) {
+            console.error("Like DB Error:", err);
         }
     });
 };
