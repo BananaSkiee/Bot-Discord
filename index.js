@@ -221,12 +221,11 @@ client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
 client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
     try {
     // 1. Cek apakah ini tombol Like Donasi
-    if (interaction.isButton() && interaction.customId.startsWith('like_')) {
-      const sociabuzz = require('./modules/sociabuzz');
-      // Kita asumsikan Tuan mengekspor fungsi handleLike di sociabuzz.js
-      await sociabuzz.handleLike(interaction); 
-      return;
-    }
+if (interaction.isButton() && interaction.customId.startsWith('like_')) {
+    const sociabuzz = require('./modules/sociabuzz');
+    await sociabuzz.handleLike(interaction);
+    return;
+}
 
     // 2. Cek Suggestion
     const isSuggestion = await handleSuggestionButtons(interaction);
