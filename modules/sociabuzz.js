@@ -1,5 +1,6 @@
 // modules/sociabuzz.js
-const { MongoClient, MessageFlags } = require('discord.js');
+const { MessageFlags } = require('discord.js');
+const { MongoClient } = require('mongodb');
 
 const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
 const dbClient = new MongoClient(uri);
