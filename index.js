@@ -216,18 +216,34 @@ client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
 }));
 
 client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
-  try {
+    try {
+    // 1. Cek apakah ini tombol Like Donasi
+    if (interaction.isButton() && interaction.customId.startsWith('like_')) {
+      const sociabuzz = require('./modules/sociabuzz');
+      // Kita asumsikan Tuan mengekspor fungsi handleLike di sociabuzz.js
+      await sociabuzz.handleLike(interaction); 
+      return;
+    }
+
+    // 2. Cek Suggestion
     const isSuggestion = await handleSuggestionButtons(interaction);
     if (isSuggestion) return;
+
+    // 3. Cek Feedback
     const isFeedback = await handleFeedbackButtons(interaction);
     if (isFeedback) return;
+
     const isFeedbackModal = await handleFeedbackModal(interaction);
     if (isFeedbackModal) return;
+
   } catch (err) {
     console.error('❌ Interaction error:', err);
+    // Anti-crash jika interaksi gagal
+    if (!interaction.replied && !interaction.deferred) {
+       await interaction.reply({ content: 'Terjadi kesalahan sistem.', flags: 64 }).catch(() => null);
+    }
   }
 }));
-
 process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
 });
