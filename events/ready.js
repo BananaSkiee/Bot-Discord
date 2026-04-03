@@ -8,7 +8,6 @@ const { initAutoDelete } = require('../modules/autoDelete');
 const roleManager = require('../modules/roleManager');
 const autoThread = require('../modules/autoThread');
 const sociabuzz = require("../modules/sociabuzz");
-const app = require("../index");
 
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
@@ -24,8 +23,12 @@ module.exports = {
 
    // Tambahkan inisialisasi SociaBuzz di sini
     try {
-      sociabuzz(client, app);
-      console.log("✅ SociaBuzz Webhook Integration Active");
+      if (app) {
+        sociabuzz(client, app);
+        console.log("✅ SociaBuzz Webhook Integration Active");
+      } else {
+        console.warn("⚠️ App tidak ditemukan, Webhook SociaBuzz mungkin tidak jalan.");
+      }
     } catch (err) {
       console.error("❌ Gagal inisialisasi SociaBuzz Module:", err);
     }
