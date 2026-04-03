@@ -22,6 +22,7 @@ module.exports = (client, app) => {
             const data = req.body;
             const LOG_CHANNEL_ID = "1487715289390121041";
             const ROLE_DONATUR_ID = "1444248607745245204";
+            const FALLBACK_USER_ID = "1364631032363749628";
             
             const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
             if (!channel) return res.status(200).send('Channel Not Found');
@@ -30,39 +31,39 @@ module.exports = (client, app) => {
             let memberObject = null;
             let displayName = "Anonim";
             let avatarURL = "https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png";
-            let userId = null;
+            let userId = FALLBACK_USER_ID;
 
             if (discordInput) {
                 const cleanId = discordInput.toString().replace(/[<@!>]/g, '').trim();
                 memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
                 if (memberObject) {
                     userId = memberObject.id;
-                    displayName = `${memberObject.user.username} - ${memberObject.displayName}`;
+                    displayName = memberObject.user.username; 
                     avatarURL = memberObject.user.displayAvatarURL({ extension: 'png', size: 512 });
                     await memberObject.roles.add(ROLE_DONATUR_ID).catch(() => null);
                 }
             }
 
-            // Hitung Total Donasi User ini di DB
             const amountNum = parseFloat(data.amount) || 0;
+            const amountStr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amountNum);
+            const timestamp = Math.floor(Date.now() / 1000);
+            const txId = data.transaction_id || `TX-${Date.now()}`;
+
+            // Hitung Total Donasi
             let totalTeks = "";
-            if (userId) {
+            if (memberObject) {
                 const userStats = await db.collection('user_stats').findOneAndUpdate(
                     { userId: userId },
                     { $inc: { totalAmount: amountNum, count: 1 } },
                     { upsert: true, returnDocument: 'after' }
                 );
-                // Hanya kirim "Total Anda" jika ini bukan donasi pertama
                 if (userStats.count > 1) {
                     const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(userStats.totalAmount);
                     totalTeks = `\n> **Total Anda:** \`${formattedTotal}\``;
                 }
             }
 
-            const amountStr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amountNum);
-            const txId = data.transaction_id || `TX-${Date.now()}`;
-
-            // --- COMPONENT V2 TEMPLATE ---
+            // --- TEMPLATE SESUAI REQUEST TUAN ---
             const mainMsg = {
                 flags: 32768,
                 components: [{
@@ -72,15 +73,23 @@ module.exports = (client, app) => {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amountStr}\`${totalTeks}\n> **Donasi To:** 001\n> **Tanggal:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amountStr}\`${totalTeks}\n> **Donasi To:** 001\n> **Tanggal:** <t:${timestamp}:F>`
                             }],
                             accessory: { type: 11, media: { url: avatarURL } }
                         },
                         { type: 14 },
                         {
                             type: 9,
-                            components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
-                            accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/donate", label: "Donasi" }
+                            components: [{
+                                type: 10,
+                                content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc"
+                            }],
+                            accessory: {
+                                type: 2,
+                                style: 5,
+                                url: "https://sociabuzz.com/bananaaskiee/tribe",
+                                label: "Donasi"
+                            }
                         },
                         { type: 14 },
                         {
@@ -88,7 +97,7 @@ module.exports = (client, app) => {
                             components: [
                                 { type: 2, style: 3, label: "(0)", emoji: { name: "❤️" }, custom_id: `like_${txId}` },
                                 { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" },
-                                { type: 2, style: 5, label: "Profil", url: userId ? `https://discord.com/users/${userId}` : "https://discord.com" }
+                                { type: 2, style: 5, label: "Profil", url: `https://discord.com/users/${userId}` }
                             ]
                         }
                     ]
@@ -97,7 +106,7 @@ module.exports = (client, app) => {
 
             const sentMsg = await channel.send(mainMsg);
 
-            // --- AUTO THREAD (PUBLIC) ---
+            // --- AUTO THREAD PUBLIC ---
             const thread = await sentMsg.startThread({
                 name: `💝 Donasi - ${memberObject ? memberObject.displayName : 'Anonim'}`,
                 autoArchiveDuration: 1440
@@ -107,7 +116,10 @@ module.exports = (client, app) => {
                 flags: 32768,
                 components: [{
                     type: 17,
-                    components: [{ type: 10, content: "Ayo berikan ucapan terima kasih yang tulus untuk **${displayName}**!" }]
+                    components: [{ 
+                        type: 10, 
+                        content: `Ayo berikan ucapan terima kasih yang tulus untuk **${displayName}**!` 
+                    }]
                 }]
             });
 
@@ -118,11 +130,11 @@ module.exports = (client, app) => {
         }
     });
 
-    // --- LIKE HANDLER (ANTI-CONFLICT) ---
+    // --- LIKE HANDLER ---
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
         
-        // Langsung defer agar tidak "Unknown Interaction"
+        // Langsung deferUpdate agar tidak bentrok
         await interaction.deferUpdate().catch(() => null);
 
         const txId = interaction.customId.replace('like_', '');
