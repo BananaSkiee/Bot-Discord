@@ -38,6 +38,8 @@ const firstMessageCache = new Collection();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json()); 
+
 module.exports = app;
 
 app.get("/", (_, res) => res.send("✅ Bot Akira aktif"));
