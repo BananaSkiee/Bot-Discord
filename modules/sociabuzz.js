@@ -1,4 +1,5 @@
 const { MongoClient } = require('mongodb');
+const express = require('express');
 
 // --- KONFIGURASI DATABASE ---
 const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
@@ -8,9 +9,9 @@ let donationsColl;
 async function connectDB() {
     try {
         await dbClient.connect();
-        const db = dbClient.db('AeroX_DB'); // Nama database kamu
+        const db = dbClient.db('donasi_akira'); // NAMA DATABASE SESUAI PERMINTAAN
         donationsColl = db.collection('donations_likes');
-        console.log("🍃 MongoDB Native Connected - Ready to Sync Likes!");
+        console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
     } catch (e) {
         console.error("❌ MongoDB Connection Error:", e);
     }
@@ -18,16 +19,21 @@ async function connectDB() {
 connectDB();
 
 module.exports = (client, app) => {
+    // Middleware wajib untuk membaca data dari SociaBuzz
+    app.use(express.json());
+
     app.post('/webhook', async (req, res) => {
         try {
             const data = req.body;
-            const LOG_CHANNEL_ID = "1352800131933802547";
+            if (!data || Object.keys(data).length === 0) return res.status(400).send('No Data');
+
+            const LOG_CHANNEL_ID = "1487715289390121041"; // ID CHANNEL SESUAI PERMINTAAN
             const ROLE_DONATUR_ID = "1444248607745245204";
             
             const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
             if (!channel) return res.status(404).send('Channel Not Found');
 
-            // 1. Deteksi User & Avatar (Professional Detection)
+            // 1. Identifikasi Donatur & Avatar
             const discordInput = data.additional_fields?.[0]?.value;
             let memberObject = null;
             let displayName = "Anonim";
@@ -38,9 +44,10 @@ module.exports = (client, app) => {
                 memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
                 
                 if (memberObject) {
-                    displayName = memberObject.user.username; // Nama tanpa tag sesuai request
+                    displayName = memberObject.user.username; 
                     avatarURL = memberObject.user.displayAvatarURL({ extension: 'png', size: 512 });
-                    await memberObject.roles.add(ROLE_DONATUR_ID).catch(() => null);
+                    // Otomatis kasih Role
+                    await memberObject.roles.add(ROLE_DONATUR_ID).catch(e => console.log("Gagal add role:", e.message));
                 }
             }
 
@@ -48,7 +55,7 @@ module.exports = (client, app) => {
             const timestamp = `<t:${Math.floor(Date.now() / 1000)}:F>`;
             const txId = data.transaction_id || `TX-${Date.now()}`;
 
-            // 2. Build Component V2 (High-End Symmetry)
+            // 2. Format Component V2 (High-End Professional)
             const mainComponent = {
                 type: 17,
                 components: [
@@ -60,13 +67,13 @@ module.exports = (client, app) => {
                         }],
                         accessory: { type: 11, media: { url: avatarURL } }
                     },
-                    { type: 14 },
+                    { type: 14 }, // Divider
                     {
                         type: 9,
                         components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
                         accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/tribe", label: "Donate" }
                     },
-                    { type: 14 },
+                    { type: 14 }, // Divider
                     {
                         type: 1,
                         components: [
@@ -77,7 +84,11 @@ module.exports = (client, app) => {
                 ]
             };
 
-            const sentMsg = await channel.send({ components: [mainComponent] });
+            // Kirim Pesan Utama
+            const sentMsg = await channel.send({ 
+                components: [mainComponent],
+                flags: 32768 
+            });
 
             // 3. Auto-Thread System
             const thread = await sentMsg.startThread({
@@ -95,47 +106,33 @@ module.exports = (client, app) => {
             res.status(200).send('OK');
 
         } catch (err) {
-            console.error("🚨 Webhook Error:", err);
+            console.error("🚨 Webhook Error:", err.message);
             res.status(200).send('Handled');
         }
     });
 
-    // --- INTERACTION HANDLER (LIKE SYSTEM) ---
+    // --- HANDLER TOMBOL LIKE (SYNC KE MONGODB) ---
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
-
         const txId = interaction.customId.replace('like_', '');
         
         try {
-            // Update MongoDB: Tambah like & user id agar tidak double like
             const result = await donationsColl.findOneAndUpdate(
                 { transactionId: txId },
-                { 
-                    $inc: { count: 1 }, 
-                    $addToSet: { users: interaction.user.id } 
-                },
+                { $inc: { count: 1 }, $addToSet: { users: interaction.user.id } },
                 { upsert: true, returnDocument: 'after' }
             );
 
-            // Cek apakah user sudah pernah like sebelumnya
-            // Logic: Jika user sudah ada di set, total users length tidak berubah
-            // (Untuk kesederhanaan, di sini kita biarkan count bertambah)
-
             const newCount = result.count || 1;
-
-            // Update Component Label
             const updatedComponents = interaction.message.components.map(row => {
                 row.components = row.components.map(btn => {
-                    if (btn.customId === interaction.customId) {
-                        btn.label = `(${newCount})`;
-                    }
+                    if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
                     return btn;
                 });
                 return row;
             });
 
             await interaction.update({ components: updatedComponents });
-
         } catch (err) {
             console.error("Like DB Error:", err);
         }
