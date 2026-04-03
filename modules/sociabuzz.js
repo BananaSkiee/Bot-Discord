@@ -1,7 +1,6 @@
 const { MongoClient } = require('mongodb');
 const express = require('express');
 
-// --- KONFIGURASI DATABASE ---
 const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
 const dbClient = new MongoClient(uri);
 let donationsColl;
@@ -9,31 +8,25 @@ let donationsColl;
 async function connectDB() {
     try {
         await dbClient.connect();
-        const db = dbClient.db('donasi_akira'); // NAMA DATABASE SESUAI PERMINTAAN
+        const db = dbClient.db('donasi_akira');
         donationsColl = db.collection('donations_likes');
         console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
-    } catch (e) {
-        console.error("❌ MongoDB Connection Error:", e);
-    }
+    } catch (e) { console.error("❌ MongoDB Error:", e); }
 }
 connectDB();
 
 module.exports = (client, app) => {
-    // Middleware wajib untuk membaca data dari SociaBuzz
     app.use(express.json());
 
     app.post('/webhook', async (req, res) => {
         try {
             const data = req.body;
-            if (!data || Object.keys(data).length === 0) return res.status(400).send('No Data');
-
-            const LOG_CHANNEL_ID = "1487715289390121041"; // ID CHANNEL SESUAI PERMINTAAN
+            const LOG_CHANNEL_ID = "1487715289390121041";
             const ROLE_DONATUR_ID = "1444248607745245204";
             
             const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-            if (!channel) return res.status(404).send('Channel Not Found');
+            if (!channel) return res.status(200).send('Channel Not Found');
 
-            // 1. Identifikasi Donatur & Avatar
             const discordInput = data.additional_fields?.[0]?.value;
             let memberObject = null;
             let displayName = "Anonim";
@@ -42,80 +35,84 @@ module.exports = (client, app) => {
             if (discordInput) {
                 const cleanId = discordInput.toString().replace(/[<@!>]/g, '').trim();
                 memberObject = await channel.guild.members.fetch(cleanId).catch(() => null);
-                
                 if (memberObject) {
                     displayName = memberObject.user.username; 
                     avatarURL = memberObject.user.displayAvatarURL({ extension: 'png', size: 512 });
-                    // Otomatis kasih Role
-                    await memberObject.roles.add(ROLE_DONATUR_ID).catch(e => console.log("Gagal add role:", e.message));
+                    await memberObject.roles.add(ROLE_DONATUR_ID).catch(() => null);
                 }
             }
 
             const amount = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(data.amount || 0);
-            const timestamp = `<t:${Math.floor(Date.now() / 1000)}:F>`;
             const txId = data.transaction_id || `TX-${Date.now()}`;
 
-            // 2. Format Component V2 (High-End Professional)
-            const mainComponent = {
-                type: 17,
-                components: [
-                    {
-                        type: 9,
-                        components: [{
-                            type: 10,
-                            content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amount}\`\n> **Total Anda:** \`${amount}\`\n> **Donasi To:** 001\n> **Tanggal:** ${timestamp}`
-                        }],
-                        accessory: { type: 11, media: { url: avatarURL } }
-                    },
-                    { type: 14 }, // Divider
-                    {
-                        type: 9,
-                        components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
-                        accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/tribe", label: "Donate" }
-                    },
-                    { type: 14 }, // Divider
-                    {
-                        type: 1,
-                        components: [
-                            { type: 2, style: 3, label: "(0)", emoji: { name: "❤️" }, custom_id: `like_${txId}` },
-                            { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" }
-                        ]
-                    }
-                ]
+            // --- FIXED COMPONENT V2 STRUCTURE ---
+            const mainMsg = {
+                flags: 32768,
+                components: [{
+                    type: 17,
+                    components: [
+                        {
+                            type: 9,
+                            components: [{
+                                type: 10,
+                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amount}\`\n> **Donasi To:** 001\n> **Tanggal:** <t:${Math.floor(Date.now() / 1000)}:F>`
+                            }],
+                            accessory: { type: 11, media: { url: avatarURL } }
+                        },
+                        { type: 14 },
+                        {
+                            type: 9,
+                            components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
+                            accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/tribe", label: "Donate" }
+                        },
+                        { type: 14 },
+                        {
+                            type: 1,
+                            components: [
+                                { type: 2, style: 3, label: "(0)", emoji: { name: "❤️" }, custom_id: `like_${txId}` },
+                                { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" }
+                            ]
+                        }
+                    ]
+                }]
             };
 
-            // Kirim Pesan Utama
-            const sentMsg = await channel.send({ 
-                components: [mainComponent],
-                flags: 32768 
-            });
+            const sentMsg = await channel.send(mainMsg);
 
-            // 3. Auto-Thread System
+            // --- AUTO THREAD DENGAN PESAN COMPONENT V2 ---
             const thread = await sentMsg.startThread({
-                name: `💝 Support dari ${displayName}`,
+                name: `💝 Support - ${displayName}`,
                 autoArchiveDuration: 1440
             });
 
             await thread.send({
+                flags: 32768,
                 components: [{
                     type: 17,
-                    components: [{ type: 10, content: "Kirim pesan ucapkan terima kasih kepada donatur" }]
+                    components: [{ 
+                        type: 10, 
+                        content: `✨ Ayo berikan ucapan terima kasih yang tulus untuk **${displayName}**! 🚀` 
+                    }]
                 }]
             });
 
             res.status(200).send('OK');
-
         } catch (err) {
             console.error("🚨 Webhook Error:", err.message);
-            res.status(200).send('Handled');
+            res.status(200).send('Error Handled');
         }
     });
 
-    // --- HANDLER TOMBOL LIKE (SYNC KE MONGODB) ---
+    // --- FIXED LIKE HANDLER ---
     client.on('interactionCreate', async (interaction) => {
         if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
-        const txId = interaction.customId.replace('like_', '');
         
+        // Gunakan deferUpdate agar tidak bentrok dengan interaction lain
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferUpdate().catch(() => null);
+        }
+
+        const txId = interaction.customId.replace('like_', '');
         try {
             const result = await donationsColl.findOneAndUpdate(
                 { transactionId: txId },
@@ -125,16 +122,21 @@ module.exports = (client, app) => {
 
             const newCount = result.count || 1;
             const updatedComponents = interaction.message.components.map(row => {
-                row.components = row.components.map(btn => {
-                    if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
-                    return btn;
-                });
+                if (row.type === 17) {
+                    row.components = row.components.map(comp => {
+                        if (comp.type === 1) { // Action Row didalam type 17
+                            comp.components = comp.components.map(btn => {
+                                if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
+                                return btn;
+                            });
+                        }
+                        return comp;
+                    });
+                }
                 return row;
             });
 
-            await interaction.update({ components: updatedComponents });
-        } catch (err) {
-            console.error("Like DB Error:", err);
-        }
+            await interaction.editReply({ components: updatedComponents }).catch(() => null);
+        } catch (err) { console.log("Like Error:", err.message); }
     });
 };
