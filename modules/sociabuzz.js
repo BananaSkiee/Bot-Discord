@@ -294,7 +294,7 @@ function initWebhook(client, app) {
 
             // Buat thread publik
             const thread = await sentMessage.startThread({
-                name: `💬 Terima Kasih ${displayName}`,
+                name: `💝 Support dari ${displayName}`,
                 autoArchiveDuration: 1440, // 24 jam
                 type: ChannelType.PublicThread, // Thread publik (semua bisa chat)
                 reason: 'Diskusi donasi dari ' + displayName
