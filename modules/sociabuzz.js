@@ -1,8 +1,9 @@
+// modules/sociabuzz.js
 const { MessageFlags, ChannelType } = require('discord.js');
 const { MongoClient } = require('mongodb');
 
 const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
-const DB_NAME = 'donasi_akira'; // Sesuai permintaan dengan double 'i'
+const DB_NAME = 'donasi_akira'; // Sesuai permintaan: donasii_akira (double i)
 const DONASI_CHANNEL_ID = '1487715289390121041';
 const DEFAULT_AVATAR = 'https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png';
 const DEFAULT_USER_ID = '1364631032363749628';
@@ -18,8 +19,10 @@ async function connectDB() {
             db = dbClient.db(DB_NAME);
             console.log(`🍃 MongoDB Connected: Database '${DB_NAME}' Ready!`);
         }
+        return db;
     } catch (e) {
         console.error("❌ MongoDB Connection Error:", e);
+        throw e;
     }
 }
 
@@ -43,7 +46,8 @@ async function handleLike(interaction) {
         const txId = interaction.customId.replace('like_', '');
         const userId = interaction.user.id;
         
-        const existing = await db.collection('donations_likes').findOne({ 
+        const collection = db.collection('donations_likes');
+        const existing = await collection.findOne({ 
             transactionId: txId,
             users: userId 
         });
@@ -65,7 +69,7 @@ async function handleLike(interaction) {
             message = "❤️ Kamu menyukai donasi ini";
         }
         
-        const result = await db.collection('donations_likes').findOneAndUpdate(
+        const result = await collection.findOneAndUpdate(
             { transactionId: txId },
             updateOperation,
             { upsert: true, returnDocument: 'after' }
@@ -131,8 +135,7 @@ function initSociabuzz(client, app) {
         return console.error("❌ Express 'app' tidak valid.");
     }
 
-    connectDB();
-    
+    // Register webhook route
     app.post('/webhook', async (req, res) => {
         try {
             console.log('📩 Webhook received:', JSON.stringify(req.body, null, 2));
@@ -149,6 +152,8 @@ function initSociabuzz(client, app) {
             if (!amount) {
                 return res.status(400).json({ error: 'Amount required' });
             }
+
+            await connectDB();
 
             // Anti duplikat
             const existing = await db.collection('donations').findOne({ transactionId });
@@ -199,14 +204,14 @@ function initSociabuzz(client, app) {
             
             const likeCustomId = `like_${transactionId}`;
             
-            // Bangun konten Informasi (hanya tampilkan Total jika bukan donasi pertama)
+            // Bangun konten Informasi
             let informasiText = `> **Nama:** ${displayName}\n> **Nominal:** \`${formattedAmount}\``;
             if (!isFirstDonation) {
                 informasiText += `\n> **Total Anda:** \`${formattedTotal}\``;
             }
             informasiText += `\n> **Donasi To:** ${shortId}\n> **Tanggal:** <t:${timestamp}:F>`;
 
-            // Payload Components V2
+            // Payload Components V2 sesuai template
             const donationPayload = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [
@@ -299,7 +304,7 @@ function initSociabuzz(client, app) {
                 reason: 'Diskusi donasi dari ' + displayName
             });
 
-            // Kirim pesan di dalam thread
+            // Kirim pesan di dalam thread (Components V2)
             const threadMessage = {
                 flags: MessageFlags.IsComponentsV2,
                 components: [
@@ -337,13 +342,13 @@ function initSociabuzz(client, app) {
 
         } catch (error) {
             console.error('❌ Webhook Error:', error);
-            res.status(500).json({ error: 'Internal server error' });
+            res.status(500).json({ error: 'Internal server error', details: error.message });
         }
     });
 
     console.log("✅ Sociabuzz Webhook registered at /webhook");
 }
 
-// Export pattern: require('./modules/sociabuzz')(client, app) dan handleLike untuk interaction
+// Export pattern
 module.exports = initSociabuzz;
 module.exports.handleLike = handleLike;
