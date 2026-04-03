@@ -7,16 +7,53 @@ let db;
 
 async function connectDB() {
     try {
-        await dbClient.connect();
-        db = dbClient.db('donasi_akira');
-        console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
-    } catch (e) { console.error("❌ MongoDB Error:", e); }
+        if (!db) {
+            await dbClient.connect();
+            db = dbClient.db('donasi_akira');
+            console.log("🍃 MongoDB Connected: Database 'donasi_akira' Ready!");
+        }
+    } catch (e) { console.error("❌ MongoDB Error di Sociabuzz:", e); }
 }
-connectDB();
 
-module.exports = (client, app) => {
-    app.use(express.json());
+// Fungsi ini akan dipanggil dari index.js
+async function handleLike(interaction) {
+    try {
+        await connectDB(); // Pastikan DB siap
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferUpdate().catch(() => null);
+        }
 
+        const txId = interaction.customId.replace('like_', '');
+        const result = await db.collection('donations_likes').findOneAndUpdate(
+            { transactionId: txId },
+            { $inc: { count: 1 }, $addToSet: { users: interaction.user.id } },
+            { upsert: true, returnDocument: 'after' }
+        );
+
+        const newCount = result.count || 1;
+        const updatedComponents = interaction.message.components.map(row => {
+            if (row.type === 17) {
+                row.components = row.components.map(comp => {
+                    if (comp.type === 1) {
+                        comp.components = comp.components.map(btn => {
+                            if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
+                            return btn;
+                        });
+                    }
+                    return comp;
+                });
+            }
+            return row;
+        });
+
+        await interaction.editReply({ components: updatedComponents }).catch(() => null);
+    } catch (err) { console.log("Like Error:", err.message); }
+}
+
+// Fungsi inisialisasi Webhook
+function initWebhook(client, app) {
+    connectDB();
+    
     app.post('/webhook', async (req, res) => {
         try {
             const data = req.body;
@@ -46,10 +83,8 @@ module.exports = (client, app) => {
 
             const amountNum = parseFloat(data.amount) || 0;
             const amountStr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amountNum);
-            const timestamp = Math.floor(Date.now() / 1000);
             const txId = data.transaction_id || `TX-${Date.now()}`;
 
-            // Hitung Total Donasi
             let totalTeks = "";
             if (memberObject) {
                 const userStats = await db.collection('user_stats').findOneAndUpdate(
@@ -63,7 +98,6 @@ module.exports = (client, app) => {
                 }
             }
 
-            // --- TEMPLATE SESUAI REQUEST TUAN ---
             const mainMsg = {
                 flags: 32768,
                 components: [{
@@ -73,23 +107,15 @@ module.exports = (client, app) => {
                             type: 9,
                             components: [{
                                 type: 10,
-                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amountStr}\`${totalTeks}\n> **Donasi To:** 001\n> **Tanggal:** <t:${timestamp}:F>`
+                                content: `# Donation Support\n> "${data.message || 'Semoga bermanfaat!'}"\n\n**__Informasi__**\n> **Nama:** ${displayName}\n> **Nominal:** \`${amountStr}\`${totalTeks}\n> **Donasi To:** 001\n> **Tanggal:** <t:${Math.floor(Date.now() / 1000)}:F>`
                             }],
                             accessory: { type: 11, media: { url: avatarURL } }
                         },
                         { type: 14 },
                         {
                             type: 9,
-                            components: [{
-                                type: 10,
-                                content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc"
-                            }],
-                            accessory: {
-                                type: 2,
-                                style: 5,
-                                url: "https://sociabuzz.com/bananaaskiee/tribe",
-                                label: "Donasi"
-                            }
+                            components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
+                            accessory: { type: 2, style: 5, url: "https://sociabuzz.com/bananaaskiee/tribe", label: "Donasi" }
                         },
                         { type: 14 },
                         {
@@ -106,7 +132,7 @@ module.exports = (client, app) => {
 
             const sentMsg = await channel.send(mainMsg);
 
-            // --- AUTO THREAD PUBLIC ---
+            // Create Public Thread (Semua orang bisa chat)
             const thread = await sentMsg.startThread({
                 name: `💝 Donasi - ${memberObject ? memberObject.displayName : 'Anonim'}`,
                 autoArchiveDuration: 1440
@@ -129,39 +155,9 @@ module.exports = (client, app) => {
             res.status(200).send('Handled');
         }
     });
+}
 
-    // --- LIKE HANDLER ---
-    client.on('interactionCreate', async (interaction) => {
-        if (!interaction.isButton() || !interaction.customId.startsWith('like_')) return;
-        
-        // Langsung deferUpdate agar tidak bentrok
-        await interaction.deferUpdate().catch(() => null);
-
-        const txId = interaction.customId.replace('like_', '');
-        try {
-            const result = await db.collection('donations_likes').findOneAndUpdate(
-                { transactionId: txId },
-                { $inc: { count: 1 }, $addToSet: { users: interaction.user.id } },
-                { upsert: true, returnDocument: 'after' }
-            );
-
-            const newCount = result.count || 1;
-            const updatedComponents = interaction.message.components.map(row => {
-                if (row.type === 17) {
-                    row.components = row.components.map(comp => {
-                        if (comp.type === 1) {
-                            comp.components = comp.components.map(btn => {
-                                if (btn.customId === interaction.customId) btn.label = `(${newCount})`;
-                                return btn;
-                            });
-                        }
-                        return comp;
-                    });
-                }
-                return row;
-            });
-
-            await interaction.editReply({ components: updatedComponents }).catch(() => null);
-        } catch (err) { console.log("Like Error:", err.message); }
-    });
-};
+// Ekspor dua fungsi
+module.exports = initWebhook;
+module.exports.handleLike = handleLike;
+            
