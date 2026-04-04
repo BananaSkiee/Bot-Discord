@@ -1,5 +1,4 @@
 const { MongoClient } = require('mongodb');
-const { Routes } = require('discord-api-types/v10');
 
 module.exports = (client, app) => {
     const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
@@ -29,7 +28,7 @@ module.exports = (client, app) => {
                 const GUILD_ID = "1347233781391560837";
                 const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                 
-                // --- DETEKSI USER DISCORD ---
+                // Cari Member berdasarkan username/displayname
                 let member = guild.members.cache.find(m => 
                     m.user.username.toLowerCase() === supporterName.toLowerCase() || 
                     m.displayName.toLowerCase() === supporterName.toLowerCase()
@@ -108,29 +107,29 @@ module.exports = (client, app) => {
         })();
     });
 
-    // --- LIKES SYSTEM (FAST PATCH MODE) ---
+    // --- LIKES SYSTEM (NATIVE MODE) ---
     client.on('interactionCreate', async (i) => {
         if (!i.isButton() || i.customId !== 'like_donasi_btn') return;
 
         try {
-            // Segera kirim respon kosong (PENTING!)
+            // Langsung acknowledge interaksinya biar ga "Interaction Failed"
             await i.deferUpdate().catch(() => {});
 
             const likesCol = db.collection("likes");
             const hasLiked = await likesCol.findOne({ msg: i.message.id, user: i.user.id });
-            if (hasLiked) return; // Silent if already liked
+            if (hasLiked) return; 
 
             await likesCol.insertOne({ msg: i.message.id, user: i.user.id });
             const totalLikes = await likesCol.countDocuments({ msg: i.message.id });
 
-            // Gunakan REST API langsung untuk bypass limitasi interaction
-            const newComponents = JSON.parse(JSON.stringify(i.message.components));
-            // Akses tombol: Section (0) -> Row (4) -> Button (0)
+            // Ambil komponen lama
+            const newComponents = i.message.components.map(row => row.toJSON());
+            
+            // Update label tombol Like (Indeks 0 -> Row 4 -> Button 0)
             newComponents[0].components[4].components[0].label = `${totalLikes}`;
 
-            await client.rest.patch(Routes.channelMessage(i.channelId, i.message.id), {
-                body: { components: newComponents }
-            });
+            // Update pesan aslinya secara langsung
+            await i.message.edit({ components: newComponents }).catch(() => {});
 
         } catch (err) { 
             console.error("❌ Like Error:", err.message);
