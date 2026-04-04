@@ -25,6 +25,25 @@ module.exports = (client, app) => {
                 const rawAmount = parseFloat(data.amount) || 0;
                 const supporterName = data.supporter_name || 'Anonim';
                 const messageDonasi = data.message || 'Terima kasih atas dukungannya!';
+                
+                // Ambil Discord ID dari custom field SociaBuzz (jika ada) atau cari via username
+                const discordIdFromField = data.custom_fields ? data.custom_fields.discord_id : null;
+
+                const GUILD_ID = "1347233781391560837";
+                const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
+                
+                // Cari Member
+                let member = null;
+                if (discordIdFromField) {
+                    member = await guild.members.fetch(discordIdFromField).catch(() => null);
+                }
+                if (!member) {
+                    member = guild.members.cache.find(m => 
+                        m.user.username.toLowerCase() === supporterName.toLowerCase() || 
+                        m.displayName.toLowerCase() === supporterName.toLowerCase()
+                    );
+                }
+
                 const donationDate = `<t:${Math.floor(Date.now() / 1000)}:F>`;
                 const currencyFormatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
 
@@ -32,7 +51,6 @@ module.exports = (client, app) => {
                 if (db) {
                     const userCol = db.collection("users");
                     const existing = await userCol.findOne({ name: supporterName.toLowerCase() });
-                    
                     if (existing) {
                         const newTotal = existing.totalAmount + rawAmount;
                         totalStr = `\n> **Total Anda:** \`${currencyFormatter.format(newTotal)}\``;
@@ -42,22 +60,13 @@ module.exports = (client, app) => {
                     }
                 }
 
-                const GUILD_ID = "1347233781391560837";
                 const CHANNEL_ID = "1487715289390121041";
-                const ROLE_ID = "1444248607745245204";
-                
-                const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                 const channel = await client.channels.fetch(CHANNEL_ID);
 
                 if (channel) {
-                    const member = guild.members.cache.find(m => 
-                        m.user.username.toLowerCase() === supporterName.toLowerCase() || 
-                        m.displayName.toLowerCase() === supporterName.toLowerCase()
-                    );
-
                     const userAvatar = member ? member.user.displayAvatarURL({ extension: 'png' }) : "https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png";
                     const profileUrl = member ? `https://discord.com/users/${member.id}` : `https://discord.com/users/1364631032363749628`;
-                    const displayIdentity = member ? member.displayName : supporterName;
+                    const displayIdentity = member ? member.user.username : supporterName;
 
                     const payload = {
                         flags: 32768,
@@ -92,12 +101,7 @@ module.exports = (client, app) => {
                     };
 
                     const sentMsg = await channel.send(payload);
-
-                    const thread = await sentMsg.startThread({
-                        name: `💝 Support dari ${displayIdentity}`,
-                        autoArchiveDuration: 1440,
-                        type: 11 
-                    });
+                    const thread = await sentMsg.startThread({ name: `💝 Support dari ${displayIdentity}`, type: 11 });
 
                     await thread.send({
                         flags: 32768,
@@ -110,25 +114,23 @@ module.exports = (client, app) => {
                         }]
                     });
 
-                    if (member) await member.roles.add(ROLE_ID).catch(() => {});
+                    if (member) await member.roles.add("1444248607745245204").catch(() => {});
                 }
             } catch (err) { console.error("🚨 Background Error:", err); }
         })();
     });
 
-    // --- LIKES SYSTEM (SILENT MODE) ---
     client.on('interactionCreate', async (i) => {
         if (!i.isButton() || i.customId !== 'like_donasi_btn') return;
 
         try {
+            // Langsung defer biar ga kena 'Unknown Interaction'
+            await i.deferUpdate().catch(() => {});
+
             const likesCol = db.collection("likes");
             const hasLiked = await likesCol.findOne({ msg: i.message.id, user: i.user.id });
 
-            // Kalau sudah like, langsung kasih feedback 'defer' tanpa respon (diem ajh)
-            if (hasLiked) {
-                // Gunakan deferUpdate agar Discord tau interaksi diproses, tapi ga ada perubahan/pesan.
-                return await i.deferUpdate().catch(() => {}); 
-            }
+            if (hasLiked) return; // Silent, diem aja.
 
             await likesCol.insertOne({ msg: i.message.id, user: i.user.id });
             const totalLikes = await likesCol.countDocuments({ msg: i.message.id });
@@ -136,9 +138,7 @@ module.exports = (client, app) => {
             const newComponents = i.message.components;
             newComponents[0].components[4].components[0].label = `${totalLikes}`;
 
-            if (!i.replied && !i.deferred) {
-                await i.update({ components: newComponents });
-            }
+            await i.editReply({ components: newComponents }).catch(() => {});
         } catch (err) { console.error("❌ Like Error:", err); }
     });
 };
