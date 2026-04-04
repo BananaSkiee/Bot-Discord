@@ -9,13 +9,12 @@ module.exports = (client, app) => {
         try {
             await dbClient.connect();
             db = dbClient.db("donasi_akira");
-            console.log("📂 [SociaBuzz] MongoDB Connected!");
+            console.log("📂 [SociaBuzz] MongoDB Connected & Ready!");
         } catch (e) { console.error("❌ MongoDB Error:", e.message); }
     }
     connectDB();
 
     app.post('/webhook', async (req, res) => {
-        // Respon cepat ke SociaBuzz
         res.status(200).send('OK');
 
         (async () => {
@@ -25,18 +24,35 @@ module.exports = (client, app) => {
 
                 const rawAmount = parseFloat(data.amount) || 0;
                 const supporterName = data.supporter_name || 'Anonim';
+                const supporterEmail = data.supporter_email || 'Tidak ada email';
                 const messageDonasi = data.message || 'Terima kasih atas dukungannya!';
                 
+                // Logic Privacy dari SociaBuzz (biasanya field 'is_private' atau 'is_hidden')
+                const isPrivate = data.is_private || data.is_hidden || false;
+                const emailHidden = data.hide_email || false;
+
+                const MY_ID = "1346964077309595658"; // ID Discord Lo
                 const GUILD_ID = "1347233781391560837";
                 const CHANNEL_ID = "1487715289390121041";
                 const ROLE_ID = "1444248607745245204";
 
                 const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                 const channel = await client.channels.fetch(CHANNEL_ID);
+                const owner = await client.users.fetch(MY_ID);
 
-                if (!channel) return;
+                // --- 1. NOMOR URUT DONASI (001, 002...) ---
+                let donationNumber = "001";
+                if (db) {
+                    const counterCol = db.collection("counters");
+                    const counter = await counterCol.findOneAndUpdate(
+                        { id: "donation_count" },
+                        { $inc: { seq: 1 } },
+                        { upsert: true, returnDocument: 'after' }
+                    );
+                    donationNumber = counter.seq.toString().padStart(3, '0');
+                }
 
-                // Cari member untuk avatar & role
+                // --- 2. DETEKSI USER DISCORD ---
                 const member = guild.members.cache.find(m => 
                     m.user.username.toLowerCase() === supporterName.toLowerCase() || 
                     m.displayName.toLowerCase() === supporterName.toLowerCase()
@@ -45,7 +61,7 @@ module.exports = (client, app) => {
                 const donationDate = `<t:${Math.floor(Date.now() / 1000)}:F>`;
                 const currencyFormatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
 
-                // Logic Database: "Total Anda" hanya muncul jika sudah pernah donasi
+                // --- 3. LOGIC TOTAL ANDA ---
                 let totalStr = "";
                 if (db) {
                     const userCol = db.collection("users");
@@ -61,63 +77,80 @@ module.exports = (client, app) => {
 
                 const userAvatar = member ? member.user.displayAvatarURL({ extension: 'png' }) : "https://i.ibb.co.com/49pJCf1/Tak-berjudul17-20260403173554.png";
                 const profileUrl = member ? `https://discord.com/users/${member.id}` : `https://discord.com/users/1364631032363749628`;
-                const displayIdentity = member ? member.user.username : supporterName;
+                const displayIdentity = member ? `<@${member.id}>` : `\`${supporterName}\``;
 
-                // Kirim Pesan Utama (Type 17)
-                const sentMsg = await channel.send({
-                    flags: 32768,
-                    components: [{
-                        type: 17,
-                        components: [
-                            {
-                                type: 9,
-                                components: [{
-                                    type: 10,
-                                    content: `# Donation Support\n> "${messageDonasi}"\n\n**__Informasi__**\n> **Nama:** ${displayIdentity}\n> **Nominal:** \`${currencyFormatter.format(rawAmount)}\`${totalStr}\n> **Donasi To:** 001\n> **Tanggal:** ${donationDate}`
-                                }],
-                                accessory: { type: 11, media: { url: userAvatar } }
-                            },
-                            { type: 14 },
-                            {
-                                type: 9,
-                                components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
-                                accessory: { type: 2, style: 5, label: "Donasi", url: "https://sociabuzz.com/bananaaskiee/donate" }
-                            },
-                            { type: 14 },
-                            {
-                                type: 1,
-                                components: [
-                                    { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" },
-                                    { type: 2, style: 5, label: "Profil", url: profileUrl }
-                                ]
-                            }
-                        ]
-                    }]
-                });
+                // --- 4. KIRIM KE DM OWNER (Info Lengkap) ---
+                if (owner) {
+                    let dmContent = `🔔 **Donasi Baru Masuk!** (#${donationNumber})\n`;
+                    dmContent += `> **Dari:** ${supporterName}\n`;
+                    dmContent += `> **Nominal:** ${currencyFormatter.format(rawAmount)}\n`;
+                    if (!emailHidden) dmContent += `> **Email:** \`${supporterEmail}\`\n`;
+                    dmContent += `> **Pesan:** ${messageDonasi}`;
+                    
+                    await owner.send(dmContent).catch(() => console.log("Gagal kirim DM ke Owner"));
+                }
 
-                // Auto Thread
-                const thread = await sentMsg.startThread({
-                    name: `💝 Support dari ${displayIdentity}`,
-                    autoArchiveDuration: 1440,
-                    type: 11 
-                });
+                // --- 5. KIRIM KE CHANNEL SERVER ---
+                if (channel) {
+                    // Cek jika pesan harus disensor
+                    const displayMessage = isPrivate ? "*[ Pesan ini disembunyikan oleh donatur ]*" : messageDonasi;
 
-                // Pesan Template V2 di dalam Thread
-                await thread.send({
-                    flags: 32768,
-                    components: [{
-                        type: 17,
+                    const payload = {
+                        flags: 32768,
                         components: [{
-                            type: 10,
-                            content: `Ayo berikan ucapan terima kasih yang tulus untuk **${displayIdentity}**!`
+                            type: 17,
+                            components: [
+                                {
+                                    type: 9,
+                                    components: [{
+                                        type: 10,
+                                        content: `# Donation Support\n> "${displayMessage}"\n\n**__Informasi__**\n> **Nama:** ${displayIdentity}\n> **Nominal:** \`${currencyFormatter.format(rawAmount)}\`${totalStr}\n> **Donasi To:** ${donationNumber}\n> **Tanggal:** ${donationDate}`
+                                    }],
+                                    accessory: { type: 11, media: { url: userAvatar } }
+                                },
+                                { type: 14 },
+                                {
+                                    type: 9,
+                                    components: [{ type: 10, content: "**__Terimakasih Banyak__**\n\n> Donasi Anda membantu saya mempercepat beli pc" }],
+                                    accessory: { type: 2, style: 5, label: "Donasi", url: "https://sociabuzz.com/bananaaskiee/donate" }
+                                },
+                                { type: 14 },
+                                {
+                                    type: 1,
+                                    components: [
+                                        { type: 2, style: 5, label: "Benefit", url: "https://discord.com/channels/1347233781391560837/1487703926483587102" },
+                                        { type: 2, style: 5, label: "Profil", url: profileUrl }
+                                    ]
+                                }
+                            ]
                         }]
-                    }]
-                });
+                    };
 
-                // Kasih Role Donatur
-                if (member) await member.roles.add(ROLE_ID).catch(() => {});
+                    const sentMsg = await channel.send(payload);
 
-            } catch (err) { console.error("🚨 Donation Error:", err.message); }
+                    // --- 6. AUTO THREAD ---
+                    const threadName = `💝 Support dari ${member ? member.user.username : supporterName}`;
+                    const thread = await sentMsg.startThread({
+                        name: threadName.substring(0, 31), // Limit nama thread
+                        autoArchiveDuration: 1440
+                    });
+
+                    await thread.send({
+                        flags: 32768,
+                        components: [{
+                            type: 17,
+                            components: [{
+                                type: 10,
+                                content: `Ayo berikan ucapan terima kasih yang tulus untuk **${member ? member.user.username : supporterName}**!`
+                            }]
+                        }]
+                    });
+
+                    // Tambah Role jika member ketemu
+                    if (member) await member.roles.add(ROLE_ID).catch(() => {});
+                }
+
+            } catch (err) { console.error("🚨 Webhook Error:", err); }
         })();
     });
 };
