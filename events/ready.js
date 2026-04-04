@@ -1,3 +1,4 @@
+//events/ready.js
 const { ChannelType } = require("discord.js");
 const autoGreeting = require("../modules/autoGreeting");
 const slashCommandSetup = require("../modules/slashCommandSetup");
@@ -7,6 +8,8 @@ const { setInitialBotRoles } = require("../modules/autoBotRole");
 const { initAutoDelete } = require('../modules/autoDelete');
 const roleManager = require('../modules/roleManager');
 const autoThread = require('../modules/autoThread');
+const sociabuzz = require("../modules/sociabuzz");
+const app = require("../index");
 
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
@@ -14,25 +17,20 @@ let verifyInviteSystem = null;
 module.exports = {
   name: "ready",
   once: true,
-  async execute(client, app) { 
+  async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
     
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
 
-    const sociabuzz = require("../modules/sociabuzz");
-    
+   // Tambahkan inisialisasi SociaBuzz di sini
     try {
-       if (app) {
-        sociabuzz(client, app);
-        console.log("✅ SociaBuzz Webhook Integration Active");
-     } else {
-       console.warn("⚠️ App tidak ditemukan...");
-     }
+      sociabuzz(client, app);
+      console.log("✅ SociaBuzz Webhook Integration Active");
     } catch (err) {
       console.error("❌ Gagal inisialisasi SociaBuzz Module:", err);
     }
-       
+    
     try {
         autoThread(client);
     } catch (err) {
@@ -102,4 +100,4 @@ module.exports = {
       console.error("❌ Auto Bot Role (Initial) error:", err);
     }
   },
-};
+}
