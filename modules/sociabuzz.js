@@ -1,4 +1,5 @@
 const { MongoClient } = require('mongodb');
+const { Routes } = require('discord-api-types/v10');
 
 module.exports = (client, app) => {
     const uri = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
@@ -16,7 +17,6 @@ module.exports = (client, app) => {
 
     app.post('/webhook', async (req, res) => {
         res.status(200).send('OK');
-
         (async () => {
             try {
                 const data = req.body;
@@ -26,23 +26,14 @@ module.exports = (client, app) => {
                 const supporterName = data.supporter_name || 'Anonim';
                 const messageDonasi = data.message || 'Terima kasih atas dukungannya!';
                 
-                // Ambil Discord ID dari custom field SociaBuzz (jika ada) atau cari via username
-                const discordIdFromField = data.custom_fields ? data.custom_fields.discord_id : null;
-
                 const GUILD_ID = "1347233781391560837";
                 const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
                 
-                // Cari Member
-                let member = null;
-                if (discordIdFromField) {
-                    member = await guild.members.fetch(discordIdFromField).catch(() => null);
-                }
-                if (!member) {
-                    member = guild.members.cache.find(m => 
-                        m.user.username.toLowerCase() === supporterName.toLowerCase() || 
-                        m.displayName.toLowerCase() === supporterName.toLowerCase()
-                    );
-                }
+                // --- DETEKSI USER DISCORD ---
+                let member = guild.members.cache.find(m => 
+                    m.user.username.toLowerCase() === supporterName.toLowerCase() || 
+                    m.displayName.toLowerCase() === supporterName.toLowerCase()
+                );
 
                 const donationDate = `<t:${Math.floor(Date.now() / 1000)}:F>`;
                 const currencyFormatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
@@ -107,10 +98,7 @@ module.exports = (client, app) => {
                         flags: 32768,
                         components: [{
                             type: 17,
-                            components: [{
-                                type: 10,
-                                content: `Ayo berikan ucapan terima kasih yang tulus untuk **${displayIdentity}**!`
-                            }]
+                            components: [{ type: 10, content: `Ayo berikan ucapan terima kasih yang tulus untuk **${displayIdentity}**!` }]
                         }]
                     });
 
@@ -120,25 +108,32 @@ module.exports = (client, app) => {
         })();
     });
 
+    // --- LIKES SYSTEM (FAST PATCH MODE) ---
     client.on('interactionCreate', async (i) => {
         if (!i.isButton() || i.customId !== 'like_donasi_btn') return;
 
         try {
-            // Langsung defer biar ga kena 'Unknown Interaction'
+            // Segera kirim respon kosong (PENTING!)
             await i.deferUpdate().catch(() => {});
 
             const likesCol = db.collection("likes");
             const hasLiked = await likesCol.findOne({ msg: i.message.id, user: i.user.id });
-
-            if (hasLiked) return; // Silent, diem aja.
+            if (hasLiked) return; // Silent if already liked
 
             await likesCol.insertOne({ msg: i.message.id, user: i.user.id });
             const totalLikes = await likesCol.countDocuments({ msg: i.message.id });
 
-            const newComponents = i.message.components;
+            // Gunakan REST API langsung untuk bypass limitasi interaction
+            const newComponents = JSON.parse(JSON.stringify(i.message.components));
+            // Akses tombol: Section (0) -> Row (4) -> Button (0)
             newComponents[0].components[4].components[0].label = `${totalLikes}`;
 
-            await i.editReply({ components: newComponents }).catch(() => {});
-        } catch (err) { console.error("❌ Like Error:", err); }
+            await client.rest.patch(Routes.channelMessage(i.channelId, i.message.id), {
+                body: { components: newComponents }
+            });
+
+        } catch (err) { 
+            console.error("❌ Like Error:", err.message);
+        }
     });
 };
