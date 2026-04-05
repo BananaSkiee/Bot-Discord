@@ -27,11 +27,10 @@ module.exports = (client, app) => {
                 const supporterEmail = data.supporter_email || 'Tidak ada email';
                 const messageDonasi = data.message || 'Terima kasih atas dukungannya!';
                 
-                // Logic Privacy dari SociaBuzz (biasanya field 'is_private' atau 'is_hidden')
                 const isPrivate = data.is_private || data.is_hidden || false;
                 const emailHidden = data.hide_email || false;
 
-                const MY_ID = "1346964077309595658"; // ID Discord Lo
+                const MY_ID = "1346964077309595658"; 
                 const GUILD_ID = "1347233781391560837";
                 const CHANNEL_ID = "1487715289390121041";
                 const ROLE_ID = "1444248607745245204";
@@ -40,7 +39,7 @@ module.exports = (client, app) => {
                 const channel = await client.channels.fetch(CHANNEL_ID);
                 const owner = await client.users.fetch(MY_ID);
 
-                // --- 1. NOMOR URUT DONASI (001, 002...) ---
+                // --- 1. NOMOR URUT DONASI ---
                 let donationNumber = "001";
                 if (db) {
                     const counterCol = db.collection("counters");
@@ -52,7 +51,7 @@ module.exports = (client, app) => {
                     donationNumber = counter.seq.toString().padStart(3, '0');
                 }
 
-                // --- 2. DETEKSI USER DISCORD ---
+                // --- 2. DETEKSI USER ---
                 const member = guild.members.cache.find(m => 
                     m.user.username.toLowerCase() === supporterName.toLowerCase() || 
                     m.displayName.toLowerCase() === supporterName.toLowerCase()
@@ -61,7 +60,7 @@ module.exports = (client, app) => {
                 const donationDate = `<t:${Math.floor(Date.now() / 1000)}:F>`;
                 const currencyFormatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
 
-                // --- 3. LOGIC TOTAL ANDA ---
+                // --- 3. LOGIC TOTAL ---
                 let totalStr = "";
                 if (db) {
                     const userCol = db.collection("users");
@@ -79,20 +78,18 @@ module.exports = (client, app) => {
                 const profileUrl = member ? `https://discord.com/users/${member.id}` : `https://discord.com/users/1364631032363749628`;
                 const displayIdentity = member ? `<@${member.id}>` : `\`${supporterName}\``;
 
-                // --- 4. KIRIM KE DM OWNER (Info Lengkap) ---
+                // --- 4. DM OWNER ---
                 if (owner) {
                     let dmContent = `🔔 **Donasi Baru Masuk!** (#${donationNumber})\n`;
                     dmContent += `> **Dari:** ${supporterName}\n`;
                     dmContent += `> **Nominal:** ${currencyFormatter.format(rawAmount)}\n`;
                     if (!emailHidden) dmContent += `> **Email:** \`${supporterEmail}\`\n`;
                     dmContent += `> **Pesan:** ${messageDonasi}`;
-                    
-                    await owner.send(dmContent).catch(() => console.log("Gagal kirim DM ke Owner"));
+                    await owner.send(dmContent).catch(() => {});
                 }
 
-                // --- 5. KIRIM KE CHANNEL SERVER ---
+                // --- 5. CHANNEL SERVER & AUTO REACTION ---
                 if (channel) {
-                    // Cek jika pesan harus disensor
                     const displayMessage = isPrivate ? "*[ Pesan ini disembunyikan oleh donatur ]*" : messageDonasi;
 
                     const payload = {
@@ -128,10 +125,14 @@ module.exports = (client, app) => {
 
                     const sentMsg = await channel.send(payload);
 
+                    // --- AUTO REACTION ❤️ ---
+                    // Ini otomatis nambahin react ❤️ ke pesan yang baru dikirim (Bot ID: 1364631032363749628)
+                    await sentMsg.react('❤️').catch(() => {});
+
                     // --- 6. AUTO THREAD ---
                     const threadName = `💝 Support dari ${member ? member.user.username : supporterName}`;
                     const thread = await sentMsg.startThread({
-                        name: threadName.substring(0, 31), // Limit nama thread
+                        name: threadName.substring(0, 31),
                         autoArchiveDuration: 1440
                     });
 
@@ -146,7 +147,6 @@ module.exports = (client, app) => {
                         }]
                     });
 
-                    // Tambah Role jika member ketemu
                     if (member) await member.roles.add(ROLE_ID).catch(() => {});
                 }
 
