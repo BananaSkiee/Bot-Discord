@@ -6,15 +6,15 @@
  */
 
 const IDS = {
-    V1: "1352286235233620108",
-    NV2: "1444248606579097640",
-    TRIGGER_ROLE: "1444248605761470595", 
-    V2_ROLE: "1444248590305202247",      // Role yang baru didapat
-    OLD_V2_LOG: "1444248605245313156"    // Role yang wajib dihapus saat dapet V2_ROLE
+    V1: "1352286235233620108",           // Role Awal
+    NV2: "1444248606579097640",          // Role Bonus V1
+    TRIGGER_ROLE: "1444248605761470595", // Role Pemicu
+    OLD_V2_LOG: "1444248605245313156",   // Role yang didapat dari Trigger
+    V2_ROLE: "1444248590305202247"       // Role Final (Hapus Log)
 };
 
 module.exports = (client) => {
-    console.log("💎 [RoleManager] Real-time Monitoring Active | Zero-Lag Mode");
+    console.log("💎 [RoleManager] Logic Updated | Zero-Lag Mode Active");
 
     client.on('guildMemberUpdate', async (oldMember, newMember) => {
         if (newMember.user.bot) return;
@@ -26,37 +26,35 @@ module.exports = (client) => {
         const hadTrigger = oldMember.roles.cache.has(IDS.TRIGGER_ROLE);
         const hasTrigger = newMember.roles.cache.has(IDS.TRIGGER_ROLE);
 
-        const hadV2 = oldMember.roles.cache.has(IDS.V2_ROLE);
-        const hasV2 = newMember.roles.cache.has(IDS.V2_ROLE);
+        const hadV2Final = oldMember.roles.cache.has(IDS.V2_ROLE);
+        const hasV2Final = newMember.roles.cache.has(IDS.V2_ROLE);
 
-        // 1. Jika member BARU dapet V1 -> Kasih NV2
+        // 1. Dapet V1 (108) -> Kasih NV2 (640)
         if (!hadV1 && hasV1) {
-            if (!newMember.roles.cache.has(IDS.NV2)) {
-                await newMember.roles.add(IDS.NV2).catch(e => console.error(`[Error] V1-Add: ${e.message}`));
-                console.log(`✨ [Tier-Up] ${newMember.user.tag} received NV2`);
-            }
+            await newMember.roles.add(IDS.NV2).catch(e => console.error(`[Error] V1-Add: ${e.message}`));
+            console.log(`✨ [V1] ${newMember.user.tag} received NV2`);
         }
 
-        // 2. Jika member BARU dapet TRIGGER_ROLE -> Hapus NV2 & Tambah V2_ROLE
+        // 2. Dapet Trigger (595) -> Hapus NV2 (640) & Kasih OLD_V2_LOG (3156)
         if (!hadTrigger && hasTrigger) {
             try {
                 await Promise.all([
                     newMember.roles.remove(IDS.NV2).catch(() => null),
-                    newMember.roles.add(IDS.V2_ROLE)
+                    newMember.roles.add(IDS.OLD_V2_LOG)
                 ]);
-                console.log(`🚀 [Transition] ${newMember.user.tag}: NV2 Removed & V2_ROLE Added`);
+                console.log(`🚀 [Trigger] ${newMember.user.tag}: Received Log ${IDS.OLD_V2_LOG} & Removed NV2`);
             } catch (e) {
-                console.error(`[Error] Transition Logic: ${e.message}`);
+                console.error(`[Error] Trigger Transition: ${e.message}`);
             }
         }
 
-        // 3. LOGIKA BARU: Jika dapet V2_ROLE -> Wajib hapus OLD_V2_LOG (1444248605245313156)
-        if (!hadV2 && hasV2) {
+        // 3. Dapet V2_ROLE (247) -> Hapus OLD_V2_LOG (3156)
+        if (!hadV2Final && hasV2Final) {
             if (newMember.roles.cache.has(IDS.OLD_V2_LOG)) {
                 await newMember.roles.remove(IDS.OLD_V2_LOG).catch(e => 
-                    console.error(`[Error] Gagal hapus role lama: ${e.message}`)
+                    console.error(`[Error] Cleanup Failed: ${e.message}`)
                 );
-                console.log(`🗑️ [Cleanup] ${newMember.user.tag}: Removed old role ${IDS.OLD_V2_LOG} because they got V2_ROLE`);
+                console.log(`🗑️ [Cleanup] ${newMember.user.tag}: Removed Log because V2 Final attained`);
             }
         }
     });
