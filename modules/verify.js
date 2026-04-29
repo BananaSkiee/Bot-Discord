@@ -14,10 +14,10 @@ class VerifySystem {
         VerifySystem.instance = this;
 
         this.config = {
-            verifyChannelId: '1352823970054803509',
-            logChannelId: '1428789734993432676',
+            verifyChannelId: '1498934734363824128',
+            logChannelId: '1499061460951892118',
             memberRoleId: '1352286235233620108',
-            generalChannelId: '1352404526870560788',
+            generalChannelId: '1498934398597468251',
             serverId: '1347233781391560837',
             rulesChannelId: '1352326247186694164',
             mongoUri: 'mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX'
