@@ -10,6 +10,8 @@ const roleManager = require('../modules/roleManager');
 const autoThread = require('../modules/autoThread');
 const sociabuzz = require("../modules/sociabuzz");
 const welcomeHandler = require("../modules/welcomeHandler"); // Tambahkan ini
+const banManager = require("../modules/banManager"); // Tambahkan ini
+
 const app = require("../index");
 
 const verifySystem = new VerifySystem();
@@ -24,6 +26,13 @@ module.exports = {
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
 
+  try {
+      banManager(client);
+    } catch (err) {
+      console.error("❌ Gagal inisialisasi BanManager:", err);
+  }
+    
+    
     // --- Module Welcome (Components V2) ---
     try {
       welcomeHandler(client);
