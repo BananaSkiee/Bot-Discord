@@ -32,7 +32,7 @@ module.exports = (client, app) => {
 
                 const MY_ID = "1346964077309595658"; 
                 const GUILD_ID = "1347233781391560837";
-                const CHANNEL_ID = "1487715289390121041";
+                const CHANNEL_ID = "1502234553341972610";
                 const ROLE_ID = "1444248607745245204";
 
                 const guild = client.guilds.cache.get(GUILD_ID) || await client.guilds.fetch(GUILD_ID);
