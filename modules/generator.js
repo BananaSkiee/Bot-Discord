@@ -1,6 +1,6 @@
 const { Events, PermissionFlagsBits } = require('discord.js');
 
-const ALLOWED_CHANNEL_ID = '1488537737488371772';
+const ALLOWED_CHANNEL_ID = '1502223858995036211';
 const ALLOWED_USER_ID = '1346964077309595658';
 
 // Mapping karakter ke small caps Unicode
