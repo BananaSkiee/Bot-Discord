@@ -8,9 +8,9 @@ module.exports = function(client) {
     client.on("messageCreate", async (m) => {
         if (!m.guild) return;
 
-        const CH_MEDIA = "1477430329517277407";
-        const CH_UPDATE = "1488059638074314832";
-        const CH_QUEST = "1443255215460585563";
+        const CH_MEDIA = "1498935486880677968";
+        const CH_UPDATE = "1502215449482625024";
+        const CH_QUEST = "1498935218910924800";
         const BOT_QUEST_ID = "1379246675171999826";
 
         // 🖼️ 1. GALLERY PROTECTION (ID: 1477430329517277407)
