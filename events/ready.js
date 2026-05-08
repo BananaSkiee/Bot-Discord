@@ -160,5 +160,6 @@ module.exports = {
     } else {
       console.warn("⚠️ MEME_CHANNEL_ID tidak dikonfigurasi di .env.");
     }
+   }
   }, // Penutup fungsi execute
 }; // Penutup module.exports
