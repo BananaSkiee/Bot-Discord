@@ -9,10 +9,10 @@ const autoThread = require('../modules/autoThread');
 const sociabuzz = require("../modules/sociabuzz");
 const welcomeHandler = require("../modules/welcomeHandler");
 const banManager = require("../modules/banManager");
-const { sendInitialCard } = require('../modules/introCard');
+//const { sendInitialCard } = require('../modules/introCard');
 const beritaModule = require("../modules/autoNews");
 const autoSendMeme = require("../modules/autoMeme");
-const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
+//const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
 const app = require("../index");
 
 const verifySystem = new VerifySystem();
