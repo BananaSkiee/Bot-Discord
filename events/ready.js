@@ -54,7 +54,7 @@ module.exports = {
       await sendFeedbackPrompt(client);
     } catch (err) {
       console.error("❌ Feedback prompt error:", err);
-    } */
+    }
     
     // --- Module Welcome (Components V2) ---
     try {
