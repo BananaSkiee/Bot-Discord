@@ -30,6 +30,13 @@ module.exports = {
     const ROLE_NON_VERIFY = "1444248589051367435";
     const ROLE_MEMBER = "1352286235233620108";
 
+    // 📰 Auto berita
+    try {
+      beritaModule(client);
+    } catch (err) {
+      console.error("❌ Auto berita error:", err);
+    }
+    
   try {
       banManager(client);
     } catch (err) {
@@ -135,3 +142,17 @@ module.exports = {
     }
   },
 }
+
+    // 🤣 Auto meme tiap 3 jam
+    const memeChannelId = process.env.MEME_CHANNEL_ID;
+    if (memeChannelId) {
+      const memeChannel = client.channels.cache.get(memeChannelId);
+      if (memeChannel) {
+        setInterval(() => autoSendMeme(memeChannel), 10_800_000);
+        console.log("✅ Fitur auto meme aktif.");
+      } else {
+        console.error("❌ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
+      }
+    } else {
+      console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
+    }
