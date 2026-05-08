@@ -11,6 +11,10 @@ const autoThread = require('../modules/autoThread');
 const sociabuzz = require("../modules/sociabuzz");
 const welcomeHandler = require("../modules/welcomeHandler"); // Tambahkan ini
 const banManager = require("../modules/banManager"); // Tambahkan ini
+const { sendInitialCard } = require('../modules/introCard');
+const beritaModule = require("../modules/autoNews");
+const autoSendMeme = require("../modules/autoMeme");
+const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
 
 const app = require("../index");
 
@@ -32,6 +36,18 @@ module.exports = {
       console.error("❌ Gagal inisialisasi BanManager:", err);
   }
     
+        try {
+        // Hapus/Comment baris di bawah ini setelah pesan masuk ke Discord!
+        await sendInitialCard(client, '1498935928994140253'); 
+    } catch (err) {
+        console.error("❌ Intro Card gagal dipicu:", err.message);
+    }
+    
+    try {
+      await sendFeedbackPrompt(client);
+    } catch (err) {
+      console.error("❌ Feedback prompt error:", err);
+    } */
     
     // --- Module Welcome (Components V2) ---
     try {
