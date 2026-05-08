@@ -143,16 +143,22 @@ module.exports = {
   },
 }
 
+
+    // --- PINDAHKAN KE SINI (Di dalam execute) ---
     // 🤣 Auto meme tiap 3 jam
     const memeChannelId = process.env.MEME_CHANNEL_ID;
     if (memeChannelId) {
       const memeChannel = client.channels.cache.get(memeChannelId);
       if (memeChannel) {
+        // Kirim meme pertama kali saat startup, lalu set interval
+        autoSendMeme(memeChannel); 
         setInterval(() => autoSendMeme(memeChannel), 10_800_000);
         console.log("✅ Fitur auto meme aktif.");
       } else {
-        console.error("❌ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
+        console.warn("⚠️ Channel meme tidak ditemukan. Fitur auto meme dinonaktifkan.");
       }
     } else {
-      console.error("❌ MEME_CHANNEL_ID tidak dikonfigurasi. Fitur auto meme dinonaktifkan.");
+      console.warn("⚠️ MEME_CHANNEL_ID tidak dikonfigurasi di .env.");
     }
+  }, // Penutup fungsi execute
+}; // Penutup module.exports
