@@ -7,7 +7,7 @@ const {
     MessageFlags 
 } = require('discord.js');
 
-const FEEDBACK_CHANNEL_ID = '1352326384940220488';
+const FEEDBACK_CHANNEL_ID = '1498935397453922305';
 
 // Emoji reaksi berdasarkan rating
 const RATING_REACTIONS = {
