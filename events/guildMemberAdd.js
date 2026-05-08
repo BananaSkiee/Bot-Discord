@@ -28,11 +28,11 @@ module.exports = {
         }
         
         // --- PENGATURAN ID DARI JSON BARU ---
-        const welcomeChannelId = '1352404526870560788';
-        const rulesChannelId   = '1363352240638918689';
-        const rolesChannelId   = '1352823970054803509';
-        const introChannelId   = '1430930313382461460';
-        const bannerUrl        = "https://cdn.discordapp.com/attachments/1443915399124226140/1446058830998933596/Teks_paragraf_Anda_20251024_194308_0000.png?ex=69d2c8fb&is=69d1777b&hm=2c6874e0c6c4689c956a136f1f89d82812775471be18a1c9563a2a1bc219926f&";
+        const welcomeChannelId = '1498934398597468251';
+        const rulesChannelId   = '1352326247186694164';
+        const rolesChannelId   = '1498934734363824128';
+        const introChannelId   = '1498935928994140253';
+        const bannerUrl        = "https://cdn.discordapp.com/attachments/1414256332592254986/1446430523638546525/welcome_gif_from_my_discord_server_1.jpg?ex=69fefbe6&is=69fdaa66&hm=d6a30f0f796e89487f411d2f7f95dc7d6457591b7b314dce5869eed6a1450c12&";
 
         const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
         if (!welcomeChannel) return;
