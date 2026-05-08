@@ -1,6 +1,10 @@
 const allowedChannelIds = [
-  "1352339757660635197", // Ganti dengan ID channel yang diizinkan
-  "1352331574376665178"
+  "1502256109526978691", // Ganti dengan ID channel yang diizinkan
+  "1498935218910924800",
+  "1502215449482625024",
+  "1502224249820155904",
+  "1498935771992690708",
+  "1498935442446352484"
 ];
 
 // Daftar emoji yang akan direact (sebanyak apapun)
