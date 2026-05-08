@@ -2,7 +2,7 @@
 const { MessageFlags } = require('discord.js');
 const { MongoClient } = require('mongodb');
 
-const SUGGESTION_CHANNEL_ID = '1430584708974252102';
+const SUGGESTION_CHANNEL_ID = '1502216979199688734';
 
 const MONGO_URI = 'mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX';
 // Database baru - lowercase & deskriptif
