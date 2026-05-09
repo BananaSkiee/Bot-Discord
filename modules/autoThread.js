@@ -11,7 +11,7 @@ module.exports = function(client) {
         const CH_MEDIA = "1498935486880677968";
         const CH_UPDATE = "1502215449482625024";
         const CH_QUEST = "1498935218910924800";
-        const BOT_QUEST_ID = "1379246675171999826";
+        const BOT_QUEST_ID = "1364585069812912148";
 
         // 🖼️ 1. GALLERY PROTECTION (ID: 1477430329517277407)
         if (m.channel.id === CH_MEDIA && !m.author.bot) {
