@@ -357,11 +357,11 @@ const T = {
       const num = (page - 1) * 10 + i + 1;
       const mention = p.userId ? `<@${p.userId}>` : '@none';
       const link = p.link ? `[${p.serverName || 'Nama server'}](${p.link})` : '`none`';
-      content += `**${num}.** ${mention}\n-# <:00:1360567203325542431>Server Link: ${link}\n`;
+      content += "**" + num + ".** " + mention + "\n-# <:00:1360567203325542431>Server Link: " + link + "\n";
     });
     for (let i = partners.length; i < 10; i++) {
       const num = (page - 1) * 10 + i + 1;
-      content += `**${num}.** @none\n-# <:00:1360567203325542431>Server Link: \\`none\\`\n`;
+      content += "**" + num + ".** @none\n-# <:00:1360567203325542431>Server Link: `none`\n";
     }
     const now = Math.floor(Date.now() / 1000);
     return {
