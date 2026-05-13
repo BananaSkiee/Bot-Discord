@@ -226,7 +226,8 @@ client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
 
 client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
   try {
-    const isPartnership = await partnership.handleInteraction(interaction);
+    // ✅ FIX: Ganti handleInteraction jadi handlePartnershipInteraction
+    const isPartnership = await partnership.handlePartnershipInteraction(interaction);
     if (isPartnership) return;
 
     const isSuggestion = await handleSuggestionButtons(interaction);
