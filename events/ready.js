@@ -17,7 +17,7 @@ const app = require("../index");
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
 let partnershipSystem = null;
-
+j
 module.exports = {
   name: "ready",
   once: true,
@@ -37,15 +37,17 @@ module.exports = {
     try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
     try { banManager(client); } catch (err) { console.error("❌ Gagal inisialisasi BanManager:", err); }
 
-    try { 
+    // Commented out introCard
+    /* try { 
       const { sendInitialCard } = require('../modules/introCard');
       await sendInitialCard(client, '1498935928994140253'); 
-    } catch (err) { console.error("❌ Intro Card gagal dipicu:", err.message); }
+    } catch (err) { console.error("❌ Intro Card gagal dipicu:", err.message); } */
 
-    try { 
+    // Commented out feedbackSystem
+    /* try { 
       const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
       await sendFeedbackPrompt(client); 
-    } catch (err) { console.error("❌ Feedback prompt error:", err); }
+    } catch (err) { console.error("❌ Feedback prompt error:", err); } */
 
     try {
       welcomeHandler(client);
@@ -101,7 +103,18 @@ module.exports = {
 
     try { await setInitialBotRoles(client); } catch (err) { console.error("❌ Auto Bot Role error:", err); }
 
-/*    const memeChannelId = process.env.MEME_CHANNEL_ID;
+    // Send Partnership Dashboard to channel 1498934645096448010
+    try {
+      const dashboardChannel = client.channels.cache.get("1498934645096448010");
+      if (dashboardChannel && client.partnershipSystem) {
+        await client.partnershipSystem.sendDashboard(dashboardChannel);
+        console.log("✅ Partnership Dashboard sent to channel 1498934645096448010");
+      }
+    } catch (err) {
+      console.error("❌ Gagal mengirim Partnership Dashboard:", err.message);
+    }
+
+    /* const memeChannelId = process.env.MEME_CHANNEL_ID;
     if (memeChannelId) {
       const memeChannel = client.channels.cache.get(memeChannelId);
       if (memeChannel) {
@@ -113,6 +126,6 @@ module.exports = {
       }
     } else {
       console.warn("⚠️ MEME_CHANNEL_ID tidak dikonfigurasi di .env.");
-    }*/
+    } */
   },
 };
