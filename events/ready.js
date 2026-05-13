@@ -18,7 +18,7 @@ const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
 
 module.exports = {
-  name: "clientReady",
+  name: "ready",
   once: true,
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
