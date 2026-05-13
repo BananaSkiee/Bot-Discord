@@ -1,6 +1,6 @@
 // modules/partnership.js
 // Guild Partnership System - EmpireBS
-// Component V2 + MongoDB | Strict single-acknowledge
+// Component V2 + MongoDB | Fixed: strict single-acknowledge, no double-defer
 
 const { MongoClient } = require("mongodb");
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require("discord.js");
@@ -474,7 +474,7 @@ async function handleInteraction(interaction) {
   if (!id || !id.startsWith("partner_")) return false;
 
   try {
-    // 1. Button yang WAJIB showModal (tanpa defer)
+    // 1) Tombol yang langsung showModal (TANPA defer)
     if (interaction.isButton()) {
       if (id === "partner_form_open" || id === "partner_form_events" || id === "partner_form_repost") {
         const typeMap = { partner_form_open: "open", partner_form_events: "events", partner_form_repost: "repost" };
@@ -497,36 +497,79 @@ async function handleInteraction(interaction) {
         const logId   = parts[parts.length - 1];
         const db2     = await getDB();
         const pending = await db2.collection("pending").findOne({ logId });
-        if (pending) editCtx.set(interaction.user.id, pending);
+        editCtx.set(interaction.user.id, pending || { logId, desc: "" });
         return interaction.showModal(buildEditModal(pending?.desc || ""));
       }
     }
 
-    // 2. Toggle Yes/No atau List pagination → deferUpdate (mengedit pesan yang sama)
+    // 2) Tombol yang hanya update pesan (Yes/No, List pagination, Search, Info) -> deferUpdate
     if (interaction.isButton()) {
-      const toggleIds = [
-        "partner_events_yes", "partner_events_no",
-        "partner_repost_yes", "partner_repost_no",
-        "partner_open_yes",   "partner_open_no",
-        "partner_dm_yes",     "partner_dm_no",
-      ];
-      if (toggleIds.includes(id) || id.startsWith("partner_list_") || id === "partner_search" || id.startsWith("partner_info_")) {
+      const isToggle = id.endsWith("_yes") || id.endsWith("_no");
+      const isList   = id.startsWith("partner_list_");
+      const isSearchOrInfo = id === "partner_search" || id.startsWith("partner_info_");
+      if (isToggle || isList || isSearchOrInfo) {
         await interaction.deferUpdate();
-        return handleButtonAfterDefer(interaction);
+        // Toggle
+        if (id === "partner_events_yes") { embedState.set(`events_${interaction.user.id}`, true); return interaction.editReply(msgPostingEvents(true)); }
+        if (id === "partner_events_no")  { embedState.set(`events_${interaction.user.id}`, false); return interaction.editReply(msgPostingEvents(false)); }
+        if (id === "partner_repost_yes") { embedState.set(`repost_${interaction.user.id}`, true); return interaction.editReply(msgRepostingPartner(true)); }
+        if (id === "partner_repost_no")  { embedState.set(`repost_${interaction.user.id}`, false); return interaction.editReply(msgRepostingPartner(false)); }
+        if (id === "partner_open_yes")   { embedState.set(`open_${interaction.user.id}`, true); return interaction.editReply(msgGuildForm(true)); }
+        if (id === "partner_open_no")    { embedState.set(`open_${interaction.user.id}`, false); return interaction.editReply(msgGuildForm(false)); }
+        if (id === "partner_dm_yes")     { return interaction.editReply(msgDMNotifikasi(true)); }
+        if (id === "partner_dm_no")      { return interaction.editReply(msgDMNotifikasi(false)); }
+        // List
+        if (isList) return handleListPagination(interaction);
+        // Search / Info
+        if (isSearchOrInfo) return interaction.editReply({});
       }
     }
 
-    // 3. Select menu & button lainnya → deferReply flags:64
-    await interaction.deferReply({ flags: 64 });
+    // 3) Select menu -> deferReply (ephemeral)
     if (interaction.isStringSelectMenu()) {
-      return handleSelectMenu(interaction);
+      await interaction.deferReply({ flags: 64 });
+      const val = interaction.values[0];
+      const hasPartnerRole = interaction.member.roles.cache.has(ROLE.PARTNER);
+      if (val === "open_partnership") {
+        if (hasPartnerRole) return interaction.editReply(msgAlreadyPartner());
+        return interaction.editReply(msgOpenPartnership());
+      }
+      if (val === "posting_events") {
+        if (!hasPartnerRole) return interaction.editReply(msgNeedPartner());
+        embedState.set(`events_${interaction.user.id}`, true);
+        return interaction.editReply(msgPostingEvents(true));
+      }
+      if (val === "reposting_partner") {
+        if (!hasPartnerRole) return interaction.editReply(msgNeedPartner());
+        embedState.set(`repost_${interaction.user.id}`, true);
+        return interaction.editReply(msgRepostingPartner(true));
+      }
+      if (val === "list_partnership") {
+        const db2       = await getDB();
+        const partners  = await db2.collection("partners").find({}).toArray();
+        const totalPages = Math.max(1, Math.ceil(partners.length / ITEMS_PER_PAGE));
+        return interaction.editReply(msgListPartnership(partners, 0, totalPages, partners.length, Date.now()));
+      }
+      return interaction.editReply({ content: "❌ Pilihan tidak dikenali." });
     }
+
+    // 4) Tombol benefit, ketentuan, accept -> deferReply (ephemeral)
     if (interaction.isButton()) {
-      return handleButtonAfterDefer(interaction);
+      await interaction.deferReply({ flags: 64 });
+      if (id === "partner_ketentuan") return interaction.editReply(msgKetentuan());
+      if (id === "partner_benefit")   return interaction.editReply(msgBenefit());
+      if (id.startsWith("partner_accept_")) return handleAccept(interaction);
+      return interaction.editReply({ content: "❌ Tombol tidak dikenali." });
     }
+
+    // 5) Modal submit -> deferReply (ephemeral)
     if (interaction.isModalSubmit()) {
-      return handleModalSubmit(interaction);
+      await interaction.deferReply({ flags: 64 });
+      if (id.startsWith("partner_modal_")) return handleFormSubmit(interaction);
+      if (id === "partner_reject_modal") return handleRejectModal(interaction);
+      if (id === "partner_edit_modal")   return handleEditModal(interaction);
     }
+
     return false;
   } catch (err) {
     console.error("❌ Partnership interaction error:", err);
@@ -545,94 +588,7 @@ async function handleInteraction(interaction) {
   }
 }
 
-// ─── AFTER DEFER ──────────────────────────────────────────────────────────────
-async function handleButtonAfterDefer(interaction) {
-  const id = interaction.customId;
-
-  // Toggle Embed / DM
-  if (id === "partner_events_yes") {
-    embedState.set(`events_${interaction.user.id}`, true);
-    return interaction.editReply(msgPostingEvents(true));
-  }
-  if (id === "partner_events_no") {
-    embedState.set(`events_${interaction.user.id}`, false);
-    return interaction.editReply(msgPostingEvents(false));
-  }
-  if (id === "partner_repost_yes") {
-    embedState.set(`repost_${interaction.user.id}`, true);
-    return interaction.editReply(msgRepostingPartner(true));
-  }
-  if (id === "partner_repost_no") {
-    embedState.set(`repost_${interaction.user.id}`, false);
-    return interaction.editReply(msgRepostingPartner(false));
-  }
-  if (id === "partner_open_yes") {
-    embedState.set(`open_${interaction.user.id}`, true);
-    return interaction.editReply(msgGuildForm(true));
-  }
-  if (id === "partner_open_no") {
-    embedState.set(`open_${interaction.user.id}`, false);
-    return interaction.editReply(msgGuildForm(false));
-  }
-  if (id === "partner_dm_yes") {
-    return interaction.editReply(msgDMNotifikasi(true));
-  }
-  if (id === "partner_dm_no") {
-    return interaction.editReply(msgDMNotifikasi(false));
-  }
-
-  // List Pagination
-  if (id.startsWith("partner_list_")) {
-    return handleListPagination(interaction);
-  }
-
-  // Disabled / Info / Search → ack
-  if (id === "partner_search" || id.startsWith("partner_info_")) {
-    return interaction.editReply({});
-  }
-
-  // Static Info
-  if (id === "partner_ketentuan") {
-    return interaction.editReply(msgKetentuan());
-  }
-  if (id === "partner_benefit") {
-    return interaction.editReply(msgBenefit());
-  }
-
-  // Accept
-  if (id.startsWith("partner_accept_")) {
-    return handleAccept(interaction);
-  }
-
-  return interaction.editReply({ content: "❌ Perintah tidak dikenali." });
-}
-
-async function handleSelectMenu(interaction) {
-  const val          = interaction.values[0];
-  const hasPartnerRole = interaction.member.roles.cache.has(ROLE.PARTNER);
-
-  if (val === "open_partnership") {
-    if (hasPartnerRole) return interaction.editReply(msgAlreadyPartner());
-    return interaction.editReply(msgOpenPartnership());
-  }
-  if (val === "posting_events") {
-    if (!hasPartnerRole) return interaction.editReply(msgNeedPartner());
-    embedState.set(`events_${interaction.user.id}`, true);
-    return interaction.editReply(msgPostingEvents(true));
-  }
-  if (val === "reposting_partner") {
-    if (!hasPartnerRole) return interaction.editReply(msgNeedPartner());
-    embedState.set(`repost_${interaction.user.id}`, true);
-    return interaction.editReply(msgRepostingPartner(true));
-  }
-  if (val === "list_partnership") {
-    const db2       = await getDB();
-    const partners  = await db2.collection("partners").find({}).toArray();
-    const totalPages = Math.max(1, Math.ceil(partners.length / ITEMS_PER_PAGE));
-    return interaction.editReply(msgListPartnership(partners, 0, totalPages, partners.length, Date.now()));
-  }
-}
-
+// ─── LIST PAGINATION ──────────────────────────────────────────────────────────
 async function handleListPagination(interaction) {
   const parts       = interaction.customId.split("_");
   const action      = parts[2]; // first | prev | page | next | last
@@ -664,20 +620,7 @@ async function handleListPagination(interaction) {
   return interaction.editReply(msgListPartnership(partners, newPage, totalPages, partners.length, Date.now()));
 }
 
-// ─── MODAL SUBMITS ────────────────────────────────────────────────────────────
-async function handleModalSubmit(interaction) {
-  const id = interaction.customId;
-  if (id.startsWith("partner_modal_")) {
-    return handleFormSubmit(interaction);
-  }
-  if (id === "partner_reject_modal") {
-    return handleRejectModal(interaction);
-  }
-  if (id === "partner_edit_modal") {
-    return handleEditModal(interaction);
-  }
-}
-
+// ─── FORM SUBMIT ──────────────────────────────────────────────────────────────
 async function handleFormSubmit(interaction) {
   const parts    = interaction.customId.split("_"); // partner_modal_{type}_{embed}
   const type     = parts[2];
@@ -727,6 +670,7 @@ async function handleFormSubmit(interaction) {
   return interaction.editReply({ content: "✅ Formulir kamu sudah terkirim! Tunggu review dari admin." });
 }
 
+// ─── ACCEPT ───────────────────────────────────────────────────────────────────
 async function handleAccept(interaction) {
   const parts  = interaction.customId.split("_"); // partner_accept_{type}_{userId}_{logId}
   const type   = parts[2];
@@ -816,6 +760,7 @@ async function handleAccept(interaction) {
   return interaction.editReply({ content: `✅ Berhasil di-accept! Postingan sudah terkirim ke <#${targetChannelId}>.` });
 }
 
+// ─── REJECT MODAL ─────────────────────────────────────────────────────────────
 async function handleRejectModal(interaction) {
   const reason  = interaction.fields.getTextInputValue("reject_reason");
   const pending = rejectCtx.get(interaction.user.id);
@@ -845,6 +790,7 @@ async function handleRejectModal(interaction) {
   return interaction.editReply({ content: "✅ Pengajuan berhasil ditolak dan notifikasi sudah dikirim ke user." });
 }
 
+// ─── EDIT MODAL ───────────────────────────────────────────────────────────────
 async function handleEditModal(interaction) {
   const newDesc = interaction.fields.getTextInputValue("edit_desc");
   const ctx     = editCtx.get(interaction.user.id);
