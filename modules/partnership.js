@@ -136,7 +136,7 @@ async function handleOpenPartnership(interaction, member) {
         SEP,
         text("-# © Guild Partnership - EmpireBS"),
       ]),
-      flags: 64
+      ephemeral: true
     });
   }
 
@@ -157,7 +157,7 @@ async function handleOpenPartnership(interaction, member) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -172,7 +172,7 @@ async function handleKetentuan(interaction) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -185,13 +185,14 @@ async function handleBenefit(interaction) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
 
 // ─── POSTING EVENTS ──────────────────────────────────────────────────────────
-const eventsEmbedState = new Map();
+// state per user: { embedMode: bool }
+const eventsEmbedState = new Map(); // userId -> boolean (true = embed)
 
 async function handlePostingEvents(interaction, member) {
   if (!hasPartnerRole(member)) {
@@ -203,10 +204,11 @@ async function handlePostingEvents(interaction, member) {
         SEP,
         text("-# © Guild Partnership - EmpireBS"),
       ]),
-      flags: 64
+      ephemeral: true
     });
   }
 
+  // default: embed (yes disabled, no active)
   eventsEmbedState.set(interaction.user.id, true);
 
   await interaction.followUp({
@@ -226,7 +228,7 @@ async function handlePostingEvents(interaction, member) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -302,6 +304,7 @@ async function handleEventsModalSubmit(interaction, isEmbed) {
     eventsLink = interaction.fields.getTextInputValue("f_events") || "";
   }
 
+  // Save pending to DB
   const database = await getDb();
   const logId = `EVT-${Date.now()}-${user.id}`;
   await database.collection("pending_events").insertOne({
@@ -310,11 +313,12 @@ async function handleEventsModalSubmit(interaction, isEmbed) {
     isEmbed, startedAt, type: "posting_events"
   });
 
+  // Show DM notification choice
   await interaction.reply({
     ...cv2([
       text("## 🔈 Notifikasi DM"),
       SEP,
-      text("> Saat pilih tombol **Iya Pake** bot <@1364585069812912148> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#1502206484489175101>\n\nNote: Saat ini tombol **Tidak Pake**"),
+      text("> Saat pilih tombol **Iya Pake** bot <@1364585069812912148> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#1502206484489175101>\n\nNote: Saat ini tombol **Tidak Pake**, (nnti sesuaikan ya, kalo pencet tombol yes nnti berubah jadi, \"Saat ini tombol **Iya Pake**\")"),
       SEP,
       {
         type: 1,
@@ -326,9 +330,10 @@ async function handleEventsModalSubmit(interaction, isEmbed) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
 
+  // Send to admin log channel
   await sendAdminReview(interaction.guild, logId, user, member, { nama, desc, link, banners, color, isEmbed, type: "posting_events" });
   return true;
 }
@@ -346,10 +351,11 @@ async function handleRepostingPartner(interaction, member) {
         SEP,
         text("-# © Guild Partnership - EmpireBS"),
       ]),
-      flags: 64
+      ephemeral: true
     });
   }
 
+  // Check cooldown 1 week
   const database = await getDb();
   const lastRepost = await database.collection("repost_cooldown").findOne({ userId: interaction.user.id });
   if (lastRepost) {
@@ -366,7 +372,7 @@ async function handleRepostingPartner(interaction, member) {
           SEP,
           text("-# © Guild Partnership - EmpireBS"),
         ]),
-        flags: 64
+        ephemeral: true
       });
     }
   }
@@ -390,7 +396,7 @@ async function handleRepostingPartner(interaction, member) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -480,7 +486,7 @@ async function handleRepostModalSubmit(interaction, isEmbed) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
 
   await sendAdminReview(interaction.guild, logId, user, member, { nama, desc, link, banners, color, isEmbed, type: "reposting_partner" });
@@ -488,12 +494,15 @@ async function handleRepostModalSubmit(interaction, isEmbed) {
 }
 
 // ─── PARTNER TICKET (!partner command) ───────────────────────────────────────
-const partnerUsageCache = new Map();
+const partnerUsageCache = new Map(); // channelId -> count
 
 async function handlePartnerCommand(message) {
   if (!message.guild) return;
   if (message.content.toLowerCase() !== "!partner") return;
-  if (message.channel.parentId !== CHANNEL.TICKET_CAT) return;
+  if (!message.guild.channels.cache.get(message.channel.parentId === CHANNEL.TICKET_CAT ? message.channel.id : null)) {
+    // Validate: channel must be in TICKET_CAT category
+    if (message.channel.parentId !== CHANNEL.TICKET_CAT) return;
+  }
   if (!hasStaffRole(message.member)) {
     await message.reply({
       ...cv2([
@@ -525,6 +534,7 @@ async function handlePartnerCommand(message) {
 
   partnerUsageCache.set(channelId, count + 1);
 
+  // Send partnership form in the ticket channel
   await message.channel.send({
     ...cv2([
       text("## ✉️ Pengajuan Partnership"),
@@ -545,6 +555,7 @@ async function handlePartnerCommand(message) {
   });
 }
 
+// state per channel for ticket form
 const ticketEmbedState = new Map();
 
 async function handleTicketYesNo(interaction) {
@@ -633,14 +644,14 @@ async function handleTicketPartnerModalSubmit(interaction, isEmbed) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
 
   await sendAdminReview(interaction.guild, logId, user, member, { nama, desc, link, banners, color, isEmbed, type: "pengajuan_partnership", channelId: interaction.channel.id });
   return true;
 }
 
-// ─── ADMIN REVIEW ────────────────────────────────────────────────────────────
+// ─── ADMIN REVIEW (send to log channel) ──────────────────────────────────────
 async function sendAdminReview(guild, logId, user, member, data) {
   const logChannel = guild.channels.cache.get(CHANNEL.LOG_ADMIN);
   if (!logChannel) return;
@@ -671,6 +682,10 @@ async function sendAdminReview(guild, logId, user, member, data) {
 
   const accentColor = data.color || null;
 
+  // Preview container
+  const previewMsg = guild.channels.cache.get(CHANNEL.LOG_ADMIN);
+
+  // Admin action container
   const adminMsg = cv2([
     text(`## ${typeLabel}`),
     SEP,
@@ -693,6 +708,7 @@ async function sendAdminReview(guild, logId, user, member, data) {
 
   await logChannel.send(adminMsg);
 
+  // Also send the actual preview
   if (data.isEmbed) {
     const previewPayload = cv2(previewComponents, accentColor);
     await logChannel.send(previewPayload);
@@ -703,18 +719,20 @@ async function sendAdminReview(guild, logId, user, member, data) {
 async function handleAdminAccept(interaction, logId) {
   const database = await getDb();
   
+  // Find pending record from all collections
   let record = await database.collection("pending_partnership").findOne({ logId });
   let coll = "pending_partnership";
   if (!record) { record = await database.collection("pending_events").findOne({ logId }); coll = "pending_events"; }
   if (!record) { record = await database.collection("pending_repost").findOne({ logId }); coll = "pending_repost"; }
   if (!record) {
-    return interaction.reply({ content: "❌ Data tidak ditemukan!", flags: 64 });
+    return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
   }
 
   const acceptedAt = Date.now();
   const duration   = formatDuration(acceptedAt - record.startedAt);
   const admin      = interaction.user;
 
+  // ─ Post to correct channel ─
   let targetChannelId;
   if (record.type === "posting_events")   targetChannelId = CHANNEL.EVENTS_POST;
   else                                     targetChannelId = CHANNEL.PARTNER_POST;
@@ -743,6 +761,7 @@ async function handleAdminAccept(interaction, logId) {
       postPayload = { content: record.desc };
     }
 
+    // Re-Posting: delete previous post
     if (record.type === "reposting_partner") {
       const prev = await database.collection("posted_messages").findOne({ userId: record.userId, type: "reposting_partner" });
       if (prev) {
@@ -756,6 +775,7 @@ async function handleAdminAccept(interaction, logId) {
 
     postedMsg = await targetChannel.send(postPayload);
 
+    // Save posted message reference
     await database.collection("posted_messages").updateOne(
       { userId: record.userId, type: record.type },
       { $set: { messageId: postedMsg.id, channelId: targetChannelId, postedAt: Date.now() } },
@@ -763,11 +783,13 @@ async function handleAdminAccept(interaction, logId) {
     );
   }
 
+  // ─ Get / create forum post ─
   const forumChannel = interaction.guild.channels.cache.get(CHANNEL.PARTNER_FORUM);
   let forumThread = null;
   let serverName = record.nama;
 
   if (forumChannel) {
+    // Find existing thread by server name pattern "1) (serverName)" or create new
     const threads = await forumChannel.threads.fetchActive();
     forumThread = threads.threads.find(t => t.name.toLowerCase().includes(serverName.toLowerCase()));
 
@@ -780,12 +802,14 @@ async function handleAdminAccept(interaction, logId) {
     const forumTemplate = buildForumLog(record, admin, duration, acceptedAt, postedMsg, forumLogType);
 
     if (!forumThread && record.type === "pengajuan_partnership") {
+      // Create new forum post
       forumThread = await forumChannel.threads.create({
         name: `1) ${serverName}`,
         message: forumTemplate,
       });
     } else if (forumThread) {
       if (record.type === "reposting_partner") {
+        // Delete old partnership post in thread
         const msgs = await forumThread.messages.fetch({ limit: 50 });
         for (const [, m] of msgs) {
           if (m.author.id === interaction.client.user.id && !m.id.endsWith("0")) {
@@ -798,6 +822,7 @@ async function handleAdminAccept(interaction, logId) {
     }
   }
 
+  // ─ Give partner role ─
   const guild = interaction.guild;
   const targetMember = await guild.members.fetch(record.userId).catch(() => null);
   let hasRole = false;
@@ -806,6 +831,7 @@ async function handleAdminAccept(interaction, logId) {
     hasRole = targetMember.roles.cache.has(ROLE.PARTNER);
   }
 
+  // ─ Set re-post cooldown ─
   if (record.type === "reposting_partner") {
     await database.collection("repost_cooldown").updateOne(
       { userId: record.userId },
@@ -814,6 +840,7 @@ async function handleAdminAccept(interaction, logId) {
     );
   }
 
+  // ─ Send DM to user ─
   const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
   if (dmUser) {
     const acceptTs = Math.floor(acceptedAt / 1000);
@@ -840,8 +867,10 @@ async function handleAdminAccept(interaction, logId) {
     }).catch(() => {});
   }
 
+  // ─ Remove from pending ─
   await database.collection(coll).deleteOne({ logId });
 
+  // ─ Update admin message ─
   await interaction.update({
     ...cv2([
       text(`## ✅ ${record.type === "posting_events" ? "Posting Events" : record.type === "reposting_partner" ? "Re-Posting Partnership" : "Pengajuan Partnership"} — Diterima`),
@@ -912,8 +941,9 @@ async function handleRejectModalSubmit(interaction, logId) {
   if (!record) { record = await database.collection("pending_events").findOne({ logId }); coll = "pending_events"; }
   if (!record) { record = await database.collection("pending_repost").findOne({ logId }); coll = "pending_repost"; }
 
-  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", flags: 64 });
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
 
+  // DM user
   const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
   if (dmUser) {
     await dmUser.send({
@@ -947,7 +977,7 @@ async function handleAdminEdit(interaction, logId) {
   let record = await database.collection("pending_partnership").findOne({ logId });
   if (!record) { record = await database.collection("pending_events").findOne({ logId }); }
   if (!record) { record = await database.collection("pending_repost").findOne({ logId }); }
-  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", flags: 64 });
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
 
   await interaction.showModal({
     title: "Edit Pesan",
@@ -986,7 +1016,7 @@ async function handleEditModalSubmit(interaction, logId) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -1002,7 +1032,7 @@ async function handleStopPartnership(interaction, member) {
         SEP,
         text("-# © Guild Partnership - EmpireBS"),
       ]),
-      flags: 64
+      ephemeral: true
     });
   }
 
@@ -1020,7 +1050,7 @@ async function handleStopPartnership(interaction, member) {
       },
       SEP,
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -1033,7 +1063,7 @@ async function handleStopForm(interaction) {
       { type: 1, components: [{ type: 4, custom_id: "f_nama",   label: "Nama Server",   style: 1, placeholder: "Nama server kamu", required: true }] },
       { type: 1, components: [{ type: 4, custom_id: "f_link",   label: "Link Server",   style: 1, placeholder: "https://discord.gg/...", required: true }] },
       { type: 1, components: [{ type: 4, custom_id: "f_reason", label: "Alasan Berhenti Partnership", style: 2,
-        placeholder: "Pilih alasan: Tidak aktif/Fokus sendiri/Beda visi/Lainnya", // ✅ dipotong max 100
+        placeholder: "Pilih alasan:\n• Sudah tidak aktif\n• Ingin fokus komunitas sendiri\n• Perbedaan visi\n• Lainnya (jelaskan)",
         required: true }] },
     ]
   });
@@ -1054,6 +1084,7 @@ async function handleStopModalSubmit(interaction) {
     nama, link, reason, requestedAt: Date.now()
   });
 
+  // Send to admin log
   const logChannel = interaction.guild.channels.cache.get(CHANNEL.LOG_ADMIN);
   if (logChannel) {
     await logChannel.send({
@@ -1085,12 +1116,121 @@ async function handleStopModalSubmit(interaction) {
       SEP,
       text("-# © Guild Partnership - EmpireBS"),
     ]),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
 
-// ... (stop accept/reject functions tetap sama, hanya tambahkan flags:64 jika perlu)
+async function handleStopAccept(interaction, logId) {
+  await interaction.showModal({
+    title: "Pesan Penutup Partnership",
+    custom_id: `stop_accept_modal_${logId}`,
+    components: [
+      { type: 1, components: [{ type: 4, custom_id: "f_msg", label: "Pesan untuk partner",
+        style: 2, placeholder: "Tulis pesan penutup untuk partner (ucapan terima kasih, dll.)",
+        required: true }] }
+    ]
+  });
+  return true;
+}
+
+async function handleStopAcceptModal(interaction, logId) {
+  const database = await getDb();
+  const record   = await database.collection("stop_requests").findOne({ logId });
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+
+  const msg    = interaction.fields.getTextInputValue("f_msg");
+  const admin  = interaction.user;
+
+  // DM user
+  const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
+  if (dmUser) {
+    await dmUser.send({
+      ...cv2([
+        text("## 👋 Terima Kasih Sudah Berpartnership"),
+        SEP,
+        text(msg),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    }).catch(() => {});
+  }
+
+  // Remove partner role
+  const guildMember = await interaction.guild.members.fetch(record.userId).catch(() => null);
+  if (guildMember) await guildMember.roles.remove(ROLE.PARTNER).catch(() => {});
+
+  await database.collection("stop_requests").deleteOne({ logId });
+
+  await interaction.update({
+    ...cv2([
+      text("## ✅ Partnership Dihentikan"),
+      SEP,
+      text(`Role Partner dicabut dari <@${record.userId}>. DM penutup sudah terkirim.`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+async function handleStopReject(interaction, logId) {
+  const database = await getDb();
+  const record   = await database.collection("stop_requests").findOne({ logId });
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+
+  // Create private channel in STOP_CAT
+  const guild = interaction.guild;
+  const stopChannel = await guild.channels.create({
+    name: `stop-${record.userName.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+    parent: CHANNEL.STOP_CAT,
+    permissionOverwrites: [
+      { id: guild.id,       deny: ["ViewChannel"] },
+      { id: record.userId,  allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
+      { id: interaction.client.user.id, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory", "ManageChannels"] },
+    ]
+  });
+
+  // DM user
+  const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
+  if (dmUser) {
+    await dmUser.send({
+      ...cv2([
+        text("## 💬 Diskusi Berhenti Partnership"),
+        SEP,
+        text(`Permintaan kamu untuk berhenti partnership belum dapat diproses langsung. Mohon kunjungi kanal <#${stopChannel.id}> untuk mendiskusikan lebih lanjut alasan kamu ingin berhenti partnership.`),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    }).catch(() => {});
+  }
+
+  // Send context to the new channel
+  await stopChannel.send({
+    ...cv2([
+      text(`## 🛑 Diskusi Pemberhentian Partnership — <@${record.userId}>`),
+      SEP,
+      text(`**Alasan yang diajukan:**\n> ${record.reason}`),
+      SEP,
+      text("Silakan jelaskan kembali alasan kamu dengan lebih detail. Admin akan menanggapi sesegera mungkin."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+
+  await database.collection("stop_requests").deleteOne({ logId });
+
+  await interaction.update({
+    ...cv2([
+      text("## ↩️ Permintaan Ditolak — Channel Dibuat"),
+      SEP,
+      text(`Channel diskusi dibuat di <#${stopChannel.id}>. DM notifikasi sudah dikirim.`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
 
 // ─── LIST PARTNERSHIP ─────────────────────────────────────────────────────────
 const LIST_PER_PAGE = 10;
@@ -1104,7 +1244,7 @@ async function handleListPartnership(interaction, member) {
 
   await interaction.followUp({
     ...buildListEmbed(partners, page, totalPages, total),
-    flags: 64
+    ephemeral: true
   });
   return true;
 }
@@ -1153,9 +1293,6 @@ function buildListEmbed(partners, page, totalPages, total) {
 }
 
 async function handleListPage(interaction, action, page, totalPages) {
-  // defer dulu agar aman
-  await interaction.deferUpdate();
-
   const database = await getDb();
   const partners = await database.collection("partners").find({}).toArray();
   const total    = partners.length;
@@ -1167,7 +1304,7 @@ async function handleListPage(interaction, action, page, totalPages) {
   else if (action === "first") newPage = page <= 0       ? maxPage : Math.max(0, page - 5);
   else if (action === "last")  newPage = page >= maxPage ? 0       : Math.min(maxPage, page + 5);
 
-  await interaction.editReply(buildListEmbed(partners, newPage, totalPages, total));
+  await interaction.update(buildListEmbed(partners, newPage, totalPages, total));
   return true;
 }
 
@@ -1184,7 +1321,55 @@ async function handleListSearch(interaction) {
   return true;
 }
 
-// ... (handleListSearchModal tetap sama, tambahkan flags:64)
+async function handleListSearchModal(interaction) {
+  const nama   = interaction.fields.getTextInputValue("f_nama")   || "";
+  const link   = interaction.fields.getTextInputValue("f_link")   || "";
+  const partBy = interaction.fields.getTextInputValue("f_partby") || "";
+
+  if (!nama && !link && !partBy) {
+    return interaction.reply({ content: "❌ Minimal isi 1 field pencarian!", ephemeral: true });
+  }
+
+  const database = await getDb();
+  const query = {};
+  if (nama)   query.nama    = { $regex: nama,   $options: "i" };
+  if (link)   query.link    = { $regex: link,   $options: "i" };
+  if (partBy) query.acceptedBy = { $regex: partBy, $options: "i" };
+
+  const results = await database.collection("partners").find(query).toArray();
+
+  if (!results.length) {
+    return interaction.reply({
+      ...cv2([
+        text("## 🔍 Hasil Pencarian"),
+        SEP,
+        text("Tidak ada partner yang ditemukan dengan kriteria tersebut."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ]),
+      ephemeral: true
+    });
+  }
+
+  let listText = "";
+  results.slice(0, 15).forEach((p, i) => {
+    listText += `**${i + 1}.** <@${p.userId}>\n-# <:00:1360567203325542431>Server Link: [${p.nama}](${p.link})\n`;
+  });
+
+  await interaction.reply({
+    ...cv2([
+      text("## 🔍 Hasil Pencarian"),
+      SEP,
+      text(listText.trimEnd()),
+      SEP,
+      text(`-# Ditemukan: ${results.length} partner`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
 
 // ─── DM NOTIF YES/NO ─────────────────────────────────────────────────────────
 async function handleNotifYesNo(interaction, logId, isYes) {
@@ -1240,7 +1425,7 @@ async function handlePartnershipInteraction(interaction) {
 
       if (id.startsWith("list_page_")) {
         const parts  = id.split("_");
-        const action = parts[2];
+        const action = parts[2]; // next/prev/first/last
         const page   = parseInt(parts[3]);
         const total  = parseInt(parts[4]);
         return handleListPage(interaction, action, page, total);
@@ -1266,11 +1451,9 @@ async function handlePartnershipInteraction(interaction) {
   } catch (err) {
     console.error("❌ Partnership interaction error:", err);
     try {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: "❌ Terjadi kesalahan. Coba lagi.", flags: 64 });
-      } else {
-        await interaction.followUp({ content: "❌ Terjadi kesalahan. Coba lagi.", flags: 64 });
-      }
+      const errMsg = { content: "❌ Terjadi kesalahan. Coba lagi.", ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(errMsg);
+      else await interaction.reply(errMsg);
     } catch (_) {}
   }
   return false;
@@ -1281,6 +1464,7 @@ async function initPartnership(client) {
   console.log("✅ Partnership Module Initializing...");
   client.partnershipReady = true;
 
+  // Send/update dashboard
   try {
     const guild = client.guilds.cache.get("1347233781391560837");
     if (!guild) return;
