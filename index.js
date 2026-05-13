@@ -1,6 +1,6 @@
 // index.js
 require("dotenv").config();
-require("./modules/globalLogger"); 
+require("./modules/globalLogger");
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
@@ -15,30 +15,31 @@ const { handleInitialRoles, handleVerificationUpdate } = require("./modules/auto
 const { handleSuggestionMessage, handleSuggestionButtons } = require('./modules/suggestionSystem');
 const { handleFeedbackButtons, handleFeedbackModal } = require('./modules/feedbackSystem');
 const generator = require('./modules/generator.js');
+const partnership = require('./modules/partnership');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences, 
+    GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildInvites, 
+    GatewayIntentBits.GuildInvites,
   ],
 });
 
-require('./modules/rateLimiter')(client);     
+require('./modules/rateLimiter')(client);
 
 client.commands = new Collection();
 
 const inviteCache = new Collection();
-const firstMessageCache = new Collection(); 
+const firstMessageCache = new Collection();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json()); 
+app.use(express.json());
 
 module.exports = app;
 
@@ -52,7 +53,7 @@ const server = app.listen(PORT, () => {
 function startSelfPing() {
   const SELF_PING_URL = `https://${process.env.KOYEB_APP_NAME || 'parallel-helaine-bananaskiee-701c062c'}.koyeb.app/health`;
   const PING_INTERVAL = 5 * 60 * 1000;
-  
+
   setInterval(async () => {
     try {
       await fetch(SELF_PING_URL);
@@ -77,7 +78,7 @@ function guard(eventName, handler) {
 
 fs.readdirSync("./events").forEach((file) => {
   const event = require(`./events/${file}`);
-  
+
   if (event.once) {
     if (event.name === "ready" || event.name === "clientReady") {
       client.once("ready", (...args) => event.execute(...args, client));
@@ -93,11 +94,19 @@ client.on("messageCreate", guard("messageCreate", async (message) => {
   if (message.author.bot || !message.guild) return;
 
   await generator.execute(message);
-  
+
   try {
     await handleSuggestionMessage(message);
   } catch (err) {
     console.error('❌ Suggestion error:', err);
+  }
+
+  // ✅ PARTNERSHIP COMMAND
+  try {
+    const handled = await partnership.handlePartnerCommand(message);
+    if (handled) return;
+  } catch (err) {
+    console.error("❌ Partnership cmd error:", err);
   }
 
   // ✅ VERIFY INVITE COMMAND
@@ -140,9 +149,9 @@ client.on("messageCreate", guard("messageCreate", async (message) => {
     }
     return;
   }
-  
+
   const webCmds = ["helpweb", "registerweb", "createweb", "listweb", "gettoken", "nukeweb", "sendweb", "broadweb", "clearweb"];
-  
+
   if (message.content.startsWith("!")) {
     const cmd = message.content.slice(1).split(" ")[0].toLowerCase();
     if (webCmds.includes(cmd)) {}
@@ -191,7 +200,7 @@ client.on('inviteDelete', guard("inviteDelete", invite => {
 client.on("guildMemberAdd", guard("guildMemberAdd", async (member) => {
   autoGreeting(client, member);
   await handleInitialRoles(member);
-  
+
   let inviteUsed = null;
   try {
     const currentInvites = await member.guild.invites.fetch();
@@ -217,10 +226,15 @@ client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
 
 client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
   try {
+    const isPartnership = await partnership.handleInteraction(interaction);
+    if (isPartnership) return;
+
     const isSuggestion = await handleSuggestionButtons(interaction);
     if (isSuggestion) return;
+
     const isFeedback = await handleFeedbackButtons(interaction);
     if (isFeedback) return;
+
     const isFeedbackModal = await handleFeedbackModal(interaction);
     if (isFeedbackModal) return;
   } catch (err) {
@@ -252,7 +266,7 @@ process.on('SIGTERM', async () => {
     if (logChannel) {
       await logChannel.send({
         embeds: [{
-          color: 0xe74c3c, 
+          color: 0xe74c3c,
           description: "🛑 **Status:** Offline / Sedang Restart.",
           timestamp: new Date()
         }]
