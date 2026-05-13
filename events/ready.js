@@ -1,3 +1,4 @@
+// events/ready.js
 const autoGreeting = require("../modules/autoGreeting");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const VerifySystem = require("../modules/verify");
@@ -9,10 +10,10 @@ const autoThread = require('../modules/autoThread');
 const sociabuzz = require("../modules/sociabuzz");
 const welcomeHandler = require("../modules/welcomeHandler");
 const banManager = require("../modules/banManager");
-//const { sendInitialCard } = require('../modules/introCard');
+// const { sendInitialCard } = require('../modules/introCard');
 const beritaModule = require("../modules/autoNews");
-const autoSendMeme = require("../modules/autoMeme");
-//const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
+// const autoSendMeme = require("../modules/autoMeme");
+// const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
 const partnership = require('../modules/partnership');
 const app = require("../index");
 
@@ -27,9 +28,10 @@ module.exports = {
 
     try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
     try { banManager(client); } catch (err) { console.error("❌ Gagal inisialisasi BanManager:", err); }
-    try { await sendInitialCard(client, '1498935928994140253'); } catch (err) { console.error("❌ Intro Card gagal dipicu:", err.message); }
-    try { await sendFeedbackPrompt(client); } catch (err) { console.error("❌ Feedback prompt error:", err); }
+    // try { await sendInitialCard(client, '1498935928994140253'); } catch (err) { console.error("❌ Intro Card gagal dipicu:", err.message); }
+    // try { await sendFeedbackPrompt(client); } catch (err) { console.error("❌ Feedback prompt error:", err); }
     try { partnership.init(client); } catch (err) { console.error("❌ Partnership Module error:", err); }
+
     try {
       welcomeHandler(client);
       console.log("✅ Welcome Module Active");
@@ -84,6 +86,8 @@ module.exports = {
 
     try { await setInitialBotRoles(client); } catch (err) { console.error("❌ Auto Bot Role error:", err); }
 
+    /*
+    // ── AUTO MEME (dinonaktifkan) ──────────────────────────────────────────────
     const memeChannelId = process.env.MEME_CHANNEL_ID;
     if (memeChannelId) {
       const memeChannel = client.channels.cache.get(memeChannelId);
@@ -97,5 +101,7 @@ module.exports = {
     } else {
       console.warn("⚠️ MEME_CHANNEL_ID tidak dikonfigurasi di .env.");
     }
+    // ─────────────────────────────────────────────────────────────────────────
+    */
   },
 };
