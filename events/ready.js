@@ -17,7 +17,7 @@ const app = require("../index");
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
 let partnershipSystem = null;
-j
+
 module.exports = {
   name: "ready",
   once: true,
