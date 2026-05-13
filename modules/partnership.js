@@ -427,6 +427,114 @@ class PartnershipSystem {
     }
   }
 
+
+  async sendDashboard(channel) {
+    const dashboardComponents = [
+      {
+        type: 10,
+        content: "## <:1_:1486297322848653425> Partnership Requirement<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>"
+      },
+      {
+        type: 14
+      },
+      {
+        type: 10,
+        content: "> - Member dan Staff server aktif\n> - Tidak mengandung konten NSFW.\n> - Tiada minimal jumlah member server.\n> - Gunakan channels partner bukan forum.\n> - Tidak menerima server khusus berjualan.\n> - Bebas dari konflik dengan komunitas lain."
+      },
+      {
+        type: 14
+      },
+      {
+        type: 1,
+        components: [
+          {
+            type: 3,
+            options: [
+              {
+                label: "Open Partnership",
+                value: "2X4OAiLrez",
+                emoji: {
+                  name: "🔍"
+                }
+              },
+              {
+                label: "Posting Events",
+                value: "5rSW3aoXFw",
+                emoji: {
+                  name: "📥"
+                }
+              },
+              {
+                label: "Re-Posting Partner",
+                value: "Vrv9pE1vwp",
+                emoji: {
+                  name: "🔃"
+                }
+              },
+              {
+                label: "List Partnership",
+                value: "IoA1YxsT8u",
+                emoji: {
+                  name: "📜"
+                }
+              },
+              {
+                label: "Berhenti Partnership",
+                value: "ASH11sgG4x",
+                emoji: {
+                  name: "🛑"
+                }
+              }
+            ],
+            flows: {},
+            custom_id: "p_301362246674550785",
+            min_values: 1,
+            max_values: 1
+          }
+        ]
+      },
+      {
+        type: 14
+      },
+      {
+        type: 10,
+        content: "-# © Guild Partnership - EmpireBS"
+      }
+    ];
+
+    const dashboardMessage = {
+      flags: 32768,
+      components: [
+        {
+          type: 17,
+          components: dashboardComponents
+        }
+      ]
+    };
+
+    // Check if there's already a dashboard message in the channel
+    try {
+      const messages = await channel.messages.fetch({ limit: 10 });
+      const existingDashboard = messages.find(msg => 
+        msg.components && msg.components[0] && 
+        msg.components[0].components && 
+        msg.components[0].components.some(c => c.type === 1 && c.components[0]?.custom_id === "p_301362246674550785")
+      );
+
+      if (existingDashboard) {
+        await existingDashboard.edit(dashboardMessage);
+        console.log("✅ Partnership Dashboard updated");
+      } else {
+        await channel.send(dashboardMessage);
+        console.log("✅ Partnership Dashboard sent");
+      }
+    } catch (err) {
+      console.error("❌ Error sending dashboard:", err.message);
+      // Fallback: just send without checking
+      await channel.send(dashboardMessage);
+    }
+  }
+
   hasPartnerRole(member) {
     return member.roles.cache.has(CONFIG.PARTNER_ROLE_ID);
   }
