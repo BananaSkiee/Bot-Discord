@@ -101,7 +101,7 @@ module.exports = {
 
     try { await setInitialBotRoles(client); } catch (err) { console.error("❌ Auto Bot Role error:", err); }
 
- /*   const memeChannelId = process.env.MEME_CHANNEL_ID;
+/*    const memeChannelId = process.env.MEME_CHANNEL_ID;
     if (memeChannelId) {
       const memeChannel = client.channels.cache.get(memeChannelId);
       if (memeChannel) {
