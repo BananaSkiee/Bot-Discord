@@ -1109,7 +1109,7 @@ class PartnershipSystem {
         ]),
         separatorComponent(),
         textComponent("-# © Guild Partnership - EmpireBS")
-      ];
+      );
 
       await adminChannel.send(buildV2MessageWithAccent(components, accentColor));
     } else {
