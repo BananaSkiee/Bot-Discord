@@ -318,7 +318,7 @@ const T = {
         components: [
           { type: 10, content: '## 🔈 Notifikasi DM' },
           { type: 14 },
-          { type: 10, content: `> Saat pilih tombol **Iya Pake** bot <@${CFG.BOT_ID}> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#${CFG.CH_EVENT_PARTNER}>\n\nNote: ${note}` },
+          { type: 10, content: '> Saat pilih tombol **Iya Pake** bot <@' + CFG.BOT_ID + '> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#' + CFG.CH_EVENT_PARTNER + '>\n\nNote: ' + note },
           { type: 14 },
           { type: 1, components: [
             { type: 2, style: 3, label: 'Iya Pake', custom_id: 'p_dm_yes', disabled: yesDisabled, flow: { actions: [] } },
@@ -339,13 +339,13 @@ const T = {
         components: [
           { type: 9, components: [{ type: 10, content: '## <:1_:1486297322848653425> Notifikasi DM' }], accessory: {
             type: 2, style: 5, label: 'Messages',
-            url: `https://discord.com/channels/${CFG.GUILD_ID}/${CFG.CH_EVENT_PARTNER}/${messageId}`,
+            url: 'https://discord.com/channels/' + CFG.GUILD_ID + '/' + CFG.CH_EVENT_PARTNER + '/' + messageId,
             custom_id: 'p_dm_link'
           }},
           { type: 14 },
-          { type: 10, content: `Postingan Events kamu sudah kekirim di <#${CFG.CH_EVENT_PARTNER}>\nDi Accept oleh: <@${accepterId}>` },
+          { type: 10, content: 'Postingan Events kamu sudah kekirim di <#' + CFG.CH_EVENT_PARTNER + '>\nDi Accept oleh: <@' + accepterId + '>' },
           { type: 14 },
-          { type: 10, content: `-# © Guild Partnership - EmpireBS • ${duration}` }
+          { type: 10, content: '-# © Guild Partnership - EmpireBS • ' + duration }
         ]
       }]
     };
@@ -355,13 +355,13 @@ const T = {
     let content = '';
     partners.forEach((p, i) => {
       const num = (page - 1) * 10 + i + 1;
-      const mention = p.userId ? `<@${p.userId}>` : '@none';
-      const link = p.link ? `[${p.serverName || 'Nama server'}](${p.link})` : '`none`';
-      content += "**" + num + ".** " + mention + "\n-# <:00:1360567203325542431>Server Link: " + link + "\n";
+      const mention = p.userId ? '<@' + p.userId + '>' : '@none';
+      const link = p.link ? '[' + (p.serverName || 'Nama server') + '](' + p.link + ')' : '`none`';
+      content += '**' + num + '.** ' + mention + '\n-# <:00:1360567203325542431>Server Link: ' + link + '\n';
     });
     for (let i = partners.length; i < 10; i++) {
       const num = (page - 1) * 10 + i + 1;
-      content += "**" + num + ".** @none\n-# <:00:1360567203325542431>Server Link: `none`\n";
+      content += '**' + num + '.** @none\n-# <:00:1360567203325542431>Server Link: `none`\n';
     }
     const now = Math.floor(Date.now() / 1000);
     return {
@@ -375,13 +375,13 @@ const T = {
             type: 2, style: 2, flow: { actions: [] }, custom_id: 'p_search', label: 'Search'
           }},
           { type: 14 },
-          { type: 10, content: `-# Terakhir diperbarui: <t:${now}:R> • Total partnership: ${totalCount}` },
+          { type: 10, content: '-# Terakhir diperbarui: <t:' + now + ':R> • Total partnership: ' + totalCount },
           { type: 1, components: [
-            { type: 2, style: 2, flow: { actions: [] }, custom_id: `p_list_first_${page}_${totalPages}`, label: '◀◀' },
-            { type: 2, style: 2, flow: { actions: [] }, custom_id: `p_list_prev_${page}_${totalPages}`, label: '◀' },
-            { type: 2, style: 2, flow: { actions: [] }, custom_id: `p_list_page_${page}_${totalPages}`, label: `${page}/${totalPages}`, disabled: true },
-            { type: 2, style: 2, flow: { actions: [] }, custom_id: `p_list_next_${page}_${totalPages}`, label: '▶' },
-            { type: 2, style: 2, flow: { actions: [] }, custom_id: `p_list_last_${page}_${totalPages}`, label: '▶▶' }
+            { type: 2, style: 2, flow: { actions: [] }, custom_id: 'p_list_first_' + page + '_' + totalPages, label: '◀◀' },
+            { type: 2, style: 2, flow: { actions: [] }, custom_id: 'p_list_prev_' + page + '_' + totalPages, label: '◀' },
+            { type: 2, style: 2, flow: { actions: [] }, custom_id: 'p_list_page_' + page + '_' + totalPages, label: page + '/' + totalPages, disabled: true },
+            { type: 2, style: 2, flow: { actions: [] }, custom_id: 'p_list_next_' + page + '_' + totalPages, label: '▶' },
+            { type: 2, style: 2, flow: { actions: [] }, custom_id: 'p_list_last_' + page + '_' + totalPages, label: '▶▶' }
           ] },
           { type: 14 },
           { type: 10, content: '-# © Guild Partnership - EmpireBS' }
@@ -401,17 +401,17 @@ const T = {
           type: 17,
           accent_color: color,
           components: [
-            { type: 10, content: `# ${data.title || serverName}` },
+            { type: 10, content: '# ' + (data.title || serverName) },
             { type: 14 },
             { type: 10, content: data.description },
             { type: 14 },
             ...(data.banner ? [{ type: 12, items: [{ media: { url: data.banner } }] }] : []),
             { type: 14 },
             { type: 1, components: [
-              { type: 2, style: 3, label: 'Accept', custom_id: `p_accept_${type}_${data.userId}`, flow: { actions: [] } },
-              { type: 2, style: 4, label: 'Reject', custom_id: `p_reject_${type}_${data.userId}`, flow: { actions: [] } },
-              { type: 2, style: 1, label: 'Edit Pesan', custom_id: `p_edit_${type}_${data.userId}`, flow: { actions: [] } },
-              { type: 2, style: 2, label: serverName, custom_id: `p_name_${type}_${data.userId}`, flow: { actions: [] } }
+              { type: 2, style: 3, label: 'Accept', custom_id: 'p_accept_' + type + '_' + data.userId, flow: { actions: [] } },
+              { type: 2, style: 4, label: 'Reject', custom_id: 'p_reject_' + type + '_' + data.userId, flow: { actions: [] } },
+              { type: 2, style: 1, label: 'Edit Pesan', custom_id: 'p_edit_' + type + '_' + data.userId, flow: { actions: [] } },
+              { type: 2, style: 2, label: serverName, custom_id: 'p_name_' + type + '_' + data.userId, flow: { actions: [] } }
             ] },
             { type: 14 },
             { type: 10, content: '-# © Guild Partnership - EmpireBS' }
@@ -420,14 +420,14 @@ const T = {
       };
     } else {
       return {
-        content: `${data.description}\n\n📎 | Server Link: [${data.link}](<<${data.link}>)\n🏷️ | Partner By: <@${data.userId}>\n\n-# © Guild Partnership - EmpireBS`,
+        content: data.description + '\n\n📎 | Server Link: [' + data.link + '](<' + data.link + '>)\n🏷️ | Partner By: <@' + data.userId + '>\n\n-# © Guild Partnership - EmpireBS',
         components: [{
           type: 1,
           components: [
-            { type: 2, style: 3, label: 'Accept', custom_id: `p_accept_${type}_${data.userId}` },
-            { type: 2, style: 4, label: 'Reject', custom_id: `p_reject_${type}_${data.userId}` },
-            { type: 2, style: 1, label: 'Edit Pesan', custom_id: `p_edit_${type}_${data.userId}` },
-            { type: 2, style: 2, label: serverName, custom_id: `p_name_${type}_${data.userId}` }
+            { type: 2, style: 3, label: 'Accept', custom_id: 'p_accept_' + type + '_' + data.userId },
+            { type: 2, style: 4, label: 'Reject', custom_id: 'p_reject_' + type + '_' + data.userId },
+            { type: 2, style: 1, label: 'Edit Pesan', custom_id: 'p_edit_' + type + '_' + data.userId },
+            { type: 2, style: 2, label: serverName, custom_id: 'p_name_' + type + '_' + data.userId }
           ]
         }]
       };
@@ -436,26 +436,37 @@ const T = {
 
   forumLog(data, type, accepter, duration, messageId) {
     const user = data.user;
-    const createdTimestamp = user?.createdAt ? Math.floor(user.createdAt / 1000) : Math.floor(Date.now() / 1000);
-    const daysSince = user?.createdAt ? Math.floor((Date.now() - user.createdAt) / 86400000) : 0;
+    const createdTimestamp = user && user.createdAt ? Math.floor(user.createdAt / 1000) : Math.floor(Date.now() / 1000);
+    const daysSince = user && user.createdAt ? Math.floor((Date.now() - user.createdAt) / 86400000) : 0;
     const now = new Date();
     const timeStr = now.toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('.', ':');
     const titles = { partnership: 'Success Partnership', repost: 'Success Re-Posting Partnership', event: 'Success Events Posts' };
-    const logId = `PARTNER-${data.userId}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const logId = 'PARTNER-' + data.userId + '-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const userName = user ? user.username : 'Unknown';
+    const dispName = user ? (user.displayName || user.username) : 'Unknown';
+    const accepterName = accepter ? accepter.username : 'Unknown';
+    const accepterId = accepter ? accepter.id : '0';
+    const statusRole = data.partnerRoleGiven ? 'Yes' : 'No';
+    const edited = data.edited ? 'Yes' : 'No';
+    const boost = data.boost ? 'Yes' : 'No';
+    const serverName = data.serverName || 'Unknown';
+    const link = data.link || 'N/A';
+    const chId = data.channelId || CFG.CH_SERVER_PARTNER;
+
     return {
       flags: 32768,
       components: [{
         type: 17,
         components: [
-          { type: 10, content: `## ✅ ${data.serverName} ${titles[type]}` },
+          { type: 10, content: '## ✅ ' + serverName + ' ' + titles[type] },
           { type: 14 },
-          { type: 10, content: `**👤 Informasi User**\n> **Username:** [${user?.username || 'Unknown'}](https://discord.com/users/${data.userId})\n> **ID:** \\`${data.userId}\\`\n> **Display Name:** ${user?.displayName || 'Unknown'}\n> **Akun Dibuat:** <t:${createdTimestamp}:R> (${daysSince} hari)` },
+          { type: 10, content: '**👤 Informasi User**\n> **Username:** [' + userName + '](https://discord.com/users/' + data.userId + ')\n> **ID:** `' + data.userId + '`\n> **Display Name:** ' + dispName + '\n> **Akun Dibuat:** <t:' + createdTimestamp + ':R> (' + daysSince + ' hari)' },
           { type: 14 },
-          { type: 10, content: `**📊 Detail Verifikasi**\n> **Waktu Selesai:** ${timeStr}\n> **Total Durasi:** ${duration}\n> **Accept Partner:** [${accepter?.username || 'Unknown'}](https://discord.com/users/${accepter?.id || '0'})\n> **Pesan Partner:** [Go To Messages](https://discord.com/channels/${CFG.GUILD_ID}/${data.channelId || CFG.CH_SERVER_PARTNER}/${messageId})\n> **Link Server:** ${data.link || 'N/A'}` },
+          { type: 10, content: '**📊 Detail Verifikasi**\n> **Waktu Selesai:** ' + timeStr + '\n> **Total Durasi:** ' + duration + '\n> **Accept Partner:** [' + accepterName + '](https://discord.com/users/' + accepterId + ')\n> **Pesan Partner:** [Go To Messages](https://discord.com/channels/' + CFG.GUILD_ID + '/' + chId + '/' + messageId + ')\n> **Link Server:** ' + link },
           { type: 14 },
-          { type: 10, content: `**🛡️ Security Info**\n> **Status:** ${data.partnerRoleGiven ? 'Yes' : 'No'}\n> **Edit Pesan:** ${data.edited ? 'Yes' : 'No'}\n> **Boost:** ${data.boost ? 'Yes' : 'No'}\n> **System:** Component V2 + MongoDB${type !== 'partnership' ? `\n> **Nama Server:** ${data.serverName}` : ''}` },
+          { type: 10, content: '**🛡️ Security Info**\n> **Status:** ' + statusRole + '\n> **Edit Pesan:** ' + edited + '\n> **Boost:** ' + boost + '\n> **System:** Component V2 + MongoDB' + (type !== 'partnership' ? '\n> **Nama Server:** ' + serverName : '') },
           { type: 14 },
-          { type: 10, content: `\n-# Log ID: ${logId}` }
+          { type: 10, content: '\n-# Log ID: ' + logId }
         ]
       }]
     };
@@ -500,7 +511,7 @@ class PartnershipSystem {
 
   async handleInteraction(interaction) {
     if (!interaction.guild || interaction.guild.id !== CFG.GUILD_ID) return false;
-    if (!interaction.customId?.startsWith('p_')) return false;
+    if (!interaction.customId || !interaction.customId.startsWith('p_')) return false;
     try {
       if (interaction.isStringSelectMenu()) await this.handleSelectMenu(interaction);
       else if (interaction.isButton()) await this.handleButton(interaction);
@@ -521,7 +532,7 @@ class PartnershipSystem {
             }]
           });
         }
-      } catch {}
+      } catch (e) {}
       return true;
     }
   }
@@ -564,17 +575,23 @@ class PartnershipSystem {
     if (cid === 'p_btn_rules') { await replyV2Ephemeral(interaction, T.rules()); return; }
 
     if (cid.startsWith('p_accept_')) {
-      const [, , type, userId] = cid.split('_');
+      const parts = cid.split('_');
+      const type = parts[2];
+      const userId = parts[3];
       await this.handleAccept(interaction, type, userId);
       return;
     }
     if (cid.startsWith('p_reject_')) {
-      const [, , type, userId] = cid.split('_');
+      const parts = cid.split('_');
+      const type = parts[2];
+      const userId = parts[3];
       await this.handleReject(interaction, type, userId);
       return;
     }
     if (cid.startsWith('p_edit_')) {
-      const [, , type, userId] = cid.split('_');
+      const parts = cid.split('_');
+      const type = parts[2];
+      const userId = parts[3];
       await this.handleEdit(interaction, type, userId);
       return;
     }
@@ -624,8 +641,8 @@ class PartnershipSystem {
     const container = template.components[0];
     const row = container.components.find(c => c.type === 1);
     row.components.forEach(btn => {
-      if (btn.custom_id === `p_yes_${type}`) btn.disabled = isYes;
-      if (btn.custom_id === `p_no_${type}`) btn.disabled = !isYes;
+      if (btn.custom_id === 'p_yes_' + type) btn.disabled = isYes;
+      if (btn.custom_id === 'p_no_' + type) btn.disabled = !isYes;
     });
     await updateV2(interaction, template);
   }
@@ -635,13 +652,14 @@ class PartnershipSystem {
   }
 
   async showFormModal(interaction, type) {
-    const yesBtn = interaction.message.components?.[0]?.components
-      ?.find(c => c.type === 1)?.components
-      ?.find(b => b.custom_id?.includes('yes'));
-    const isV2 = yesBtn?.disabled || false;
+    const yesBtn = interaction.message.components && interaction.message.components[0] && interaction.message.components[0].components
+      ? interaction.message.components[0].components.find(c => c.type === 1)
+      : null;
+    const isV2 = yesBtn && yesBtn.components ? yesBtn.components.find(b => b.custom_id && b.custom_id.includes('yes')) : null;
+    const useV2 = isV2 ? isV2.disabled : false;
 
     const modal = new ModalBuilder()
-      .setCustomId(`p_modal_${type}_${isV2}`)
+      .setCustomId('p_modal_' + type + '_' + useV2)
       .setTitle(type === 'event' ? 'Formulir Posting Events' : type === 'repost' ? 'Formulir Re-Posting' : 'Formulir Partnership');
 
     const inputs = [];
@@ -652,7 +670,7 @@ class PartnershipSystem {
       new TextInputBuilder().setCustomId('deskripsi').setLabel('Deskripsi Server').setPlaceholder('Jelaskan deskripsi server Anda secara detail').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(4000)
     ));
 
-    if (isV2) {
+    if (useV2) {
       inputs.push(new ActionRowBuilder().addComponents(
         new TextInputBuilder().setCustomId('banner').setLabel('Banner (Link Banner)').setPlaceholder('https://cdn.discordapp.com/attachments/.../banner.gif').setStyle(TextInputStyle.Short).setRequired(true)
       ));
@@ -662,7 +680,7 @@ class PartnershipSystem {
       new TextInputBuilder().setCustomId('link').setLabel('Link Server').setPlaceholder('https://discord.gg/invite').setStyle(TextInputStyle.Short).setRequired(true)
     ));
 
-    if (isV2) {
+    if (useV2) {
       inputs.push(new ActionRowBuilder().addComponents(
         new TextInputBuilder().setCustomId('color').setLabel('Sidebar Color (Opsional)').setPlaceholder('#FF5733 atau kosongkan untuk default').setStyle(TextInputStyle.Short).setRequired(false)
       ));
@@ -675,13 +693,19 @@ class PartnershipSystem {
   async handleModal(interaction) {
     const cid = interaction.customId;
     if (cid.startsWith('p_modal_')) {
-      const [, , type, isV2] = cid.split('_');
-      await this.handleFormSubmit(interaction, type, isV2 === 'true');
+      const parts = cid.split('_');
+      const type = parts[2];
+      const isV2 = parts[3] === 'true';
+      await this.handleFormSubmit(interaction, type, isV2);
     } else if (cid.startsWith('p_reject_modal_')) {
-      const [, , , type, userId] = cid.split('_');
+      const parts = cid.split('_');
+      const type = parts[3];
+      const userId = parts[4];
       await this.handleRejectSubmit(interaction, type, userId);
     } else if (cid.startsWith('p_edit_modal_')) {
-      const [, , , type, userId] = cid.split('_');
+      const parts = cid.split('_');
+      const type = parts[3];
+      const userId = parts[4];
       await this.handleEditSubmit(interaction, type, userId);
     } else if (cid === 'p_search_modal') {
       await this.handleSearchSubmit(interaction);
@@ -689,7 +713,6 @@ class PartnershipSystem {
   }
 
   async handleFormSubmit(interaction, type, isV2) {
-    // Cek limit channel (!partner)
     const limit = await this.limits.findOne({ channelId: interaction.channel.id });
     if (limit && limit.count >= 3) {
       return replyV2Ephemeral(interaction, T.warningLimit());
@@ -724,7 +747,6 @@ class PartnershipSystem {
       { upsert: true }
     );
 
-    // Increment limit jika ada
     if (limit) {
       await this.limits.updateOne({ channelId: interaction.channel.id }, { $inc: { count: 1 } });
     }
@@ -741,7 +763,7 @@ class PartnershipSystem {
       );
 
       if (type === 'event') {
-        const dmMsg = await sendV2(reviewChannel, { ...T.dmToggle('no'), content: `-# [.](${link})` });
+        const dmMsg = await sendV2(reviewChannel, { ...T.dmToggle('no'), content: '-# [.](' + link + ')' });
         await this.partners.updateOne(
           { userId: interaction.user.id, type, status: 'pending' },
           { $set: { dmToggleMessageId: dmMsg.id } }
@@ -753,7 +775,7 @@ class PartnershipSystem {
       components: [{
         type: 17,
         components: [
-          { type: 10, content: `✅ Formulir ${type === 'event' ? 'Posting Events' : type === 'repost' ? 'Re-Posting' : 'Partnership'} berhasil dikirim! Silakan tunggu review dari admin.` },
+          { type: 10, content: '✅ Formulir ' + (type === 'event' ? 'Posting Events' : type === 'repost' ? 'Re-Posting' : 'Partnership') + ' berhasil dikirim! Silakan tunggu review dari admin.' },
           { type: 14 },
           { type: 10, content: '-# © Guild Partnership - EmpireBS' }
         ]
@@ -782,14 +804,13 @@ class PartnershipSystem {
     const durationMs = Date.now() - startTime;
     const duration = this.formatDuration(durationMs);
 
-    // Beri role partner
     const guild = interaction.guild;
     const member = await guild.members.fetch(userId).catch(() => null);
     if (member && !member.roles.cache.has(CFG.ROLE_PARTNER)) {
       await member.roles.add(CFG.ROLE_PARTNER).catch(() => {});
       partner.partnerRoleGiven = true;
     } else {
-      partner.partnerRoleGiven = member?.roles.cache.has(CFG.ROLE_PARTNER) || false;
+      partner.partnerRoleGiven = member && member.roles.cache.has(CFG.ROLE_PARTNER) ? true : false;
     }
 
     partner.status = 'accepted';
@@ -804,7 +825,6 @@ class PartnershipSystem {
     let publicMessageId = null;
 
     if (targetChannel) {
-      // Hapus post lama jika repost
       if (type === 'repost') {
         const oldPosts = await this.posts.find({ userId, channelId: CFG.CH_SERVER_PARTNER }).toArray();
         for (const old of oldPosts) {
@@ -822,13 +842,13 @@ class PartnershipSystem {
             type: 17,
             accent_color: color,
             components: [
-              { type: 10, content: `# ${partner.title}` },
+              { type: 10, content: '# ' + partner.title },
               { type: 14 },
               { type: 10, content: partner.description },
               { type: 14 },
               ...(partner.banner ? [{ type: 12, items: [{ media: { url: partner.banner } }] }] : []),
               { type: 14 },
-              { type: 10, content: `📎 | Server Link: [${partner.link}](<<${partner.link}>)\n🏷️ | Partner By: <@${userId}>` },
+              { type: 10, content: '📎 | Server Link: [' + partner.link + '](<' + partner.link + '>)\n🏷️ | Partner By: <@' + userId + '>' },
               { type: 14 },
               { type: 10, content: '-# © Guild Partnership - EmpireBS' }
             ]
@@ -836,8 +856,8 @@ class PartnershipSystem {
         };
         publicMessage = await sendV2(targetChannel, payload);
       } else {
-        let content = `${partner.description}\n\n📎 | Server Link: [${partner.link}](<<${partner.link}>)\n🏷️ | Partner By: <@${userId}>\n\n-# © Guild Partnership - EmpireBS`;
-        if (type === 'event') content += `\n-# [.](${partner.link})`;
+        let content = partner.description + '\n\n📎 | Server Link: [' + partner.link + '](<' + partner.link + '>)\n🏷️ | Partner By: <@' + userId + '>\n\n-# © Guild Partnership - EmpireBS';
+        if (type === 'event') content += '\n-# [.](' + partner.link + ')';
         publicMessage = await targetChannel.send({ content });
       }
 
@@ -858,7 +878,6 @@ class PartnershipSystem {
       { $set: { status: 'accepted', partnerRoleGiven: partner.partnerRoleGiven, publicMessageId, publicChannelId: targetChannelId } }
     );
 
-    // Forum Log
     const user = await this.client.users.fetch(userId).catch(() => null);
     await this.createOrUpdateForumLog({
       ...partner,
@@ -866,10 +885,9 @@ class PartnershipSystem {
       channelId: targetChannelId
     }, type, interaction.user, duration, publicMessageId);
 
-    // DM Notifikasi untuk Events
     if (type === 'event') {
       const dmSetting = await this.dmSettings.findOne({ userId });
-      if (dmSetting?.dmEnabled) {
+      if (dmSetting && dmSetting.dmEnabled) {
         const targetUser = await this.client.users.fetch(userId).catch(() => null);
         if (targetUser) {
           const dmCh = targetUser.dmChannel || await targetUser.createDM().catch(() => null);
@@ -880,7 +898,6 @@ class PartnershipSystem {
       }
     }
 
-    // Hapus review message
     if (partner.reviewMessageId && partner.reviewChannelId) {
       const ch = await this.client.channels.fetch(partner.reviewChannelId).catch(() => null);
       if (ch) {
@@ -894,7 +911,7 @@ class PartnershipSystem {
       components: [{
         type: 17,
         components: [
-          { type: 10, content: `✅ ${type === 'event' ? 'Event' : 'Partnership'} telah di-accept!` },
+          { type: 10, content: '✅ ' + (type === 'event' ? 'Event' : 'Partnership') + ' telah di-accept!' },
           { type: 14 },
           { type: 10, content: '-# © Guild Partnership - EmpireBS' }
         ]
@@ -904,7 +921,7 @@ class PartnershipSystem {
 
   async handleReject(interaction, type, userId) {
     const modal = new ModalBuilder()
-      .setCustomId(`p_reject_modal_${type}_${userId}`)
+      .setCustomId('p_reject_modal_' + type + '_' + userId)
       .setTitle('Alasan Penolakan');
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder()
@@ -952,7 +969,7 @@ class PartnershipSystem {
             components: [
               { type: 10, content: '## ❌ Partnership Ditolak' },
               { type: 14 },
-              { type: 10, content: `Maaf, pengajuan ${type === 'event' ? 'Posting Events' : type === 'repost' ? 'Re-Posting Partnership' : 'Partnership'} Anda telah ditolak.\n\n**Alasan:**\n> ${reason}\n\nSilakan perbaiki sesuai ketentuan dan ajukan kembali.` },
+              { type: 10, content: 'Maaf, pengajuan ' + (type === 'event' ? 'Posting Events' : type === 'repost' ? 'Re-Posting Partnership' : 'Partnership') + ' Anda telah ditolak.\n\n**Alasan:**\n> ' + reason + '\n\nSilakan perbaiki sesuai ketentuan dan ajukan kembali.' },
               { type: 14 },
               { type: 10, content: '-# © Guild Partnership - EmpireBS' }
             ]
@@ -962,7 +979,7 @@ class PartnershipSystem {
     }
 
     const partner = await this.partners.findOne({ userId, type, status: 'rejected' });
-    if (partner?.reviewMessageId && partner?.reviewChannelId) {
+    if (partner && partner.reviewMessageId && partner.reviewChannelId) {
       const ch = await this.client.channels.fetch(partner.reviewChannelId).catch(() => null);
       if (ch) {
         const msg = await ch.messages.fetch(partner.reviewMessageId).catch(() => null);
@@ -998,7 +1015,7 @@ class PartnershipSystem {
       });
     }
     const modal = new ModalBuilder()
-      .setCustomId(`p_edit_modal_${type}_${userId}`)
+      .setCustomId('p_edit_modal_' + type + '_' + userId)
       .setTitle('Edit Pesan Partnership');
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder()
@@ -1022,7 +1039,7 @@ class PartnershipSystem {
     );
 
     const partner = await this.partners.findOne({ userId, type, status: 'pending' });
-    if (partner?.reviewMessageId && partner?.reviewChannelId) {
+    if (partner && partner.reviewMessageId && partner.reviewChannelId) {
       const ch = await this.client.channels.fetch(partner.reviewChannelId).catch(() => null);
       if (ch) {
         const payload = T.pendingReview({ ...partner, description: newDesc }, type);
@@ -1106,7 +1123,7 @@ class PartnershipSystem {
     const forum = await this.client.channels.fetch(CFG.CH_FORUM_LOG).catch(() => null);
     if (!forum) return;
     const serverName = data.serverName;
-    const threadName = `1) ${serverName}`;
+    const threadName = '1) ' + serverName;
     const existingThread = forum.threads.cache.find(t => t.name === threadName);
 
     const payload = T.forumLog(data, type, accepter, duration, messageId);
@@ -1148,7 +1165,7 @@ class PartnershipSystem {
     if (!currentLimit) {
       const count = partnerChannels.length + 1;
       targetChannel = await message.guild.channels.create({
-        name: `partner-request-${count}`,
+        name: 'partner-request-' + count,
         type: ChannelType.GuildText,
         parent: CFG.CAT_PARTNER,
         permissionOverwrites: [
@@ -1169,7 +1186,7 @@ class PartnershipSystem {
 
     await sendV2(targetChannel, T.partnerCmdForm(true));
     if (targetChannel.id !== message.channel.id) {
-      await message.reply(`✅ Channel partnership dibuat: ${targetChannel}`);
+      await message.reply('✅ Channel partnership dibuat: ' + targetChannel.toString());
     }
   }
 
@@ -1178,10 +1195,10 @@ class PartnershipSystem {
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    if (days > 0) return `${days}h ${minutes % 60}m ${seconds % 60}s`;
-    if (hours > 0) return `${hours}j ${minutes % 60}m ${seconds % 60}s`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-    return `${seconds}s`;
+    if (days > 0) return days + 'h ' + (minutes % 60) + 'm ' + (seconds % 60) + 's';
+    if (hours > 0) return hours + 'j ' + (minutes % 60) + 'm ' + (seconds % 60) + 's';
+    if (minutes > 0) return minutes + 'm ' + (seconds % 60) + 's';
+    return seconds + 's';
   }
 }
 
