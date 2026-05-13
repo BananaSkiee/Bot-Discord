@@ -1,972 +1,1489 @@
 // modules/partnership.js
-// Guild Partnership System - EmpireBS
-// Component V2 + MongoDB | Fixed: single ack, optional banner, search modal
-
 const { MongoClient } = require("mongodb");
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require("discord.js");
 
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
 const MONGO_URI = "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/?retryWrites=true&w=majority&appName=AeroX";
 const DB_NAME   = "partnership_akira";
 
 const CHANNEL = {
-  DASHBOARD:      "1498934645096448010",
-  SERVER_PARTNER: "1498934926630850693",
-  EVENTS:         "1502206484489175101",
-};
-
-const FORUM = {
-  LOG_FORUM: "1503130728278392853",
+  DASHBOARD:   "1498934645096448010",
+  LOG_ADMIN:   "1503704709779820605",
+  PARTNER_POST:"1498934926630850693",
+  EVENTS_POST: "1502206484489175101",
+  PARTNER_FORUM:"1503130728278392853",
+  TICKET_CAT:  "1498933997005443082",
+  STOP_CAT:    "1504152063154847955",
 };
 
 const ROLE = {
-  PARTNER: "1357693246268244209",
-  STAFF:   "1352286232779948144",
+  PARTNER:   "1357693246268244209",
+  STAFF:     "1352286232779948144",
 };
 
-const CATEGORY_ID          = "1498933997005443082";
-const PARTNER_CHANNEL_LIMIT = 3;
-const ITEMS_PER_PAGE        = 10;
+const BOT_ID = "1447102808900898887";
 
-// ─── MONGODB ──────────────────────────────────────────────────────────────────
-let _db = null;
-async function getDB() {
-  if (_db) return _db;
+// ─── MONGO ───────────────────────────────────────────────────────────────────
+let db;
+async function getDb() {
+  if (db) return db;
   const client = new MongoClient(MONGO_URI);
   await client.connect();
-  _db = client.db(DB_NAME);
-  return _db;
+  db = client.db(DB_NAME);
+  return db;
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-function generateLogId(userId) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let rand = "";
-  for (let i = 0; i < 8; i++) rand += chars[Math.floor(Math.random() * chars.length)];
-  return `PARTNER-${userId}-${rand}`;
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function hasPartnerRole(member) {
+  return member.roles.cache.has(ROLE.PARTNER);
 }
-
-function parseSidebarColor(input) {
-  if (!input) return 0x5865f2;
-  const parsed = parseInt(input.replace("#", ""), 16);
-  return isNaN(parsed) ? 0x5865f2 : parsed;
+function hasStaffRole(member) {
+  return member.roles.cache.has(ROLE.STAFF);
 }
-
 function formatDuration(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+  const secs  = Math.floor(ms / 1000);
+  const mins  = Math.floor(secs / 60);
+  const hours = Math.floor(mins / 60);
+  if (hours > 0) return `${hours}j ${mins % 60}m ${secs % 60}s`;
+  if (mins  > 0) return `${mins}m ${secs % 60}s`;
+  return `${secs}s`;
+}
+function formatDate(date) {
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta"
+  }).format(date).replace(".", ".");
+}
+function accountAgeText(createdAt) {
+  const days = Math.floor((Date.now() - createdAt.getTime()) / 86400000);
+  return `${days} hari`;
+}
+function parseColorHex(str) {
+  if (!str) return null;
+  const clean = str.replace(/^#/, "");
+  const num = parseInt(clean, 16);
+  return isNaN(num) ? null : num;
+}
+function parseBanners(str) {
+  if (!str) return [];
+  return str.split(",").map(s => s.trim()).filter(Boolean);
 }
 
-function accountAgeDays(user) {
-  return Math.floor((Date.now() - user.createdTimestamp) / 86400000);
-}
-
-// ─── COMPONENT V2 BUILDER ─────────────────────────────────────────────────────
-function makeV2(components, accentColor) {
+// ─── CV2 MESSAGE BUILDER ─────────────────────────────────────────────────────
+function cv2(components, accentColor) {
   const container = { type: 17, components };
-  if (accentColor !== undefined) container.accent_color = accentColor;
+  if (accentColor !== undefined && accentColor !== null) container.accent_color = accentColor;
   return { flags: 32768, components: [container] };
 }
+const SEP  = { type: 14 };
+const text = (content) => ({ type: 10, content });
 
-const SEP = { type: 14 };
-const txt = (content) => ({ type: 10, content });
-
-// ─── MESSAGE BUILDERS (100% SESUAI TEMPLATE) ──────────────────────────────────
-function msgDashboard() {
-  return makeV2([
-    txt("## <:1_:1486297322848653425> Partnership Requirement<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>"),
+// ─── DASHBOARD ───────────────────────────────────────────────────────────────
+async function sendDashboard(channel) {
+  await channel.send(cv2([
+    text("## <:1_:1486297322848653425> Partnership Requirement<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>"),
     SEP,
-    txt("> - Member dan Staff server aktif\n> - Tidak mengandung konten NSFW.\n> - Tiada minimal jumlah member server.\n> - Gunakan channels partner bukan forum.\n> - Tidak menerima server khusus berjualan.\n> - Bebas dari konflik dengan komunitas lain."),
+    text("> - Member dan Staff server aktif\n> - Tidak mengandung konten NSFW.\n> - Tiada minimal jumlah member server.\n> - Gunakan channels partner bukan forum.\n> - Tidak menerima server khusus berjualan.\n> - Bebas dari konflik dengan komunitas lain."),
     SEP,
     {
       type: 1,
       components: [{
         type: 3,
-        custom_id: "partner_select_menu",
+        custom_id: "partner_menu",
         min_values: 1,
         max_values: 1,
         options: [
-          { label: "Open Partnership",   value: "open_partnership",   emoji: { name: "🔍" } },
-          { label: "Posting Events",     value: "posting_events",     emoji: { name: "📥" } },
-          { label: "Re-Posting Partner", value: "reposting_partner",  emoji: { name: "🔃" } },
-          { label: "List Partnership",   value: "list_partnership",   emoji: { name: "📜" } },
-        ],
-      }],
+          { label: "Open Partnership",    value: "open_partnership",    emoji: { name: "🔍" } },
+          { label: "Posting Events",      value: "posting_events",      emoji: { name: "📥" } },
+          { label: "Re-Posting Partner",  value: "reposting_partner",   emoji: { name: "🔃" } },
+          { label: "List Partnership",    value: "list_partnership",    emoji: { name: "📜" } },
+          { label: "Berhenti Partnership",value: "stop_partnership",    emoji: { name: "🛑" } },
+        ]
+      }]
     },
     SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
+    text("-# © Guild Partnership - EmpireBS"),
+  ]));
 }
 
-function msgOpenPartnership() {
-  return makeV2([
-    txt("## 🔍 Pengajuan Partnership"),
-    SEP,
-    txt("> - Pencet tombol **Open Tiket** di bawah dan pilih Request Partner\n> - Antri dan tertib tunggu diproses sesuai urutan, mohon bersabar\n> - Dilarang spam pesan berulang atau mention, demi kenyamanan"),
-    SEP,
-    {
-      type: 1,
-      components: [
-        { type: 2, style: 5, label: "Open Ticket", emoji: { name: "📫" }, url: "https://discord.com/channels/1347233781391560837/1498935151441219584" },
-        { type: 2, style: 3, label: " Benefit",          emoji: { name: "🎀" }, custom_id: "partner_benefit" },
-        { type: 2, style: 1, label: "Ketentuan Partner", emoji: { name: "📋" }, custom_id: "partner_ketentuan" },
-      ],
-    },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
+// ─── MENU HANDLER ────────────────────────────────────────────────────────────
+async function handleMenu(interaction) {
+  if (!interaction.isStringSelectMenu()) return false;
+  if (interaction.customId !== "partner_menu") return false;
 
-function msgPostingEvents(useEmbed) {
-  return makeV2([
-    txt("## 📥 Posting Events"),
-    SEP,
-    txt("### Ketentuan Events: <:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>\n> - Wajib gunakan mention khusus yang tersedia.\n> - Postingan ditinjau admin sebelum dipublikasikan.\n> - Admin berhak menyesuaikan teks sesuai ketentuan.\n### Prosedur:\n> - Pilih Yes/No untuk memakai embed atau tidak.\n> - Klik tombol di bawah dan lengkapi detail acara anda."),
-    SEP,
-    {
-      type: 1,
-      components: [
-        { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "partner_form_events" },
-        { type: 2, style: 3, label: "Yes", custom_id: "partner_events_yes", disabled: useEmbed === true },
-        { type: 2, style: 4, label: "No",  custom_id: "partner_events_no",  disabled: useEmbed === false },
-      ],
-    },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
+  const val = interaction.values[0];
+  const member = interaction.member;
 
-function msgRepostingPartner(useEmbed) {
-  return makeV2([
-    txt("## 🔃 Re-Posting Partnership"),
-    SEP,
-    txt("### Ketentuan Utama:<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>\n> - Cooldown 1 minggu sekali.\n> - Saling memposting ulang deskripsi.\n> - Gunakan mention khusus yang tersedia.\n### Prosedur:\n> - Pilih Yes/No untuk memakai embed atau tidak.\n> - Postingan ditinjau admin sebelum dipublikasikan.\n> - Admin berhak menyesuaikan teks sesuai ketentuan.\n> - Klik tombol di bawah dan lengkapi data server anda."),
-    SEP,
-    {
-      type: 1,
-      components: [
-        { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "partner_form_repost" },
-        { type: 2, style: 3, label: "Yes", custom_id: "partner_repost_yes", disabled: useEmbed === true },
-        { type: 2, style: 4, label: "No",  custom_id: "partner_repost_no",  disabled: useEmbed === false },
-      ],
-    },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
+  await interaction.deferUpdate();
 
-function msgKetentuan() {
-  return makeV2([
-    txt("## 📋 Ketentuan Partnership"),
-    SEP,
-    txt("> -  Perwakilan staff wajib bergabung sebagai perwakilan. Saling post event bersifat timbal balik.\n\n> - Gunakan tiket untuk pengajuan event. Dilarang menggunakan mention everyone tanpa izin.\n\n> - Wajib memposting deskripsi/event server kami. Kelalaian dalam posting dapat mengakibatkan pemutusan kerja sama.\n\n> - Perwakilan dilarang keluar server tanpa koordinasi. Jika perwakilan keluar tanpa alasan, partner akan diputus.\n\n> - Admin berhak mengedit konten postingan dan memutus kerja sama jika melanggar ketentuan di atas."),
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgBenefit() {
-  return makeV2([
-    txt("## 🎀 Benefit Partnership <:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>"),
-    SEP,
-    txt("> - Relasi: Membangun koneksi antar-server secara resmi\n\n> - Promosi Event: Kesempatan membagikan event Anda\n\n> - Kolaborasi: Mengadakan proyek bersama EmpireBS\n\n> - Role Eksklusif: Mendapatkan role khusus Partnership"),
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgAlreadyPartner() {
-  return makeV2([
-    txt("## Kamu Sudah Berpartnership"),
-    SEP,
-    txt("Kamu sudah memiliki role Partnership. Untuk pengajuan baru tidak diperlukan, namun kamu tetap bisa menggunakan fitur **Posting Events** dan **Re-Posting Partnership**."),
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgNeedPartner() {
-  return makeV2([
-    txt("## Berpartnership Terlebih dahulu"),
-    SEP,
-    txt("Kamu belum memiliki role Partnership. Silakan lakukan pengajuan melalui menu **Open Partnership** terlebih dahulu sebelum menggunakan fitur ini."),
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgNotStaff() {
-  return makeV2([
-    txt("## ⚠️ Akses Terbatas"),
-    SEP,
-    txt("Maaf, perintah `!partner` hanya dapat digunakan oleh **Staff** yang memiliki role yang sesuai. Jika kamu merasa ini adalah kesalahan, silakan hubungi admin server."),
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgPartnerLimit() {
-  return makeV2([
-    txt("## ⚠️ Batas Penggunaan Tercapai"),
-    SEP,
-    txt("Kamu telah mencapai batas maksimal **3 kali** penggunaan perintah `!partner` di channel ini. Setiap channel hanya diperbolehkan 3 kali pengiriman formulir partnership.\n\nUntuk informasi lebih lanjut, silakan hubungi admin server."),
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgGuildForm(useEmbed) {
-  const yesDisabled = useEmbed !== false;
-  const noDisabled  = useEmbed === false;
-  return makeV2([
-    txt("## ✉️ Pengajuan Partnership"),
-    SEP,
-    txt("> Click dibawah ini untuk isi deskripsi server kamu\n\n**Note:** Pilih Yes/No untuk menggunakan embed atau tidak."),
-    SEP,
-    {
-      type: 1,
-      components: [
-        { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "partner_form_open" },
-        { type: 2, style: 3, label: "Yes", custom_id: "partner_open_yes", disabled: yesDisabled },
-        { type: 2, style: 4, label: "No",  custom_id: "partner_open_no",  disabled: noDisabled },
-      ],
-    },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgDMNotifikasi(dmActive) {
-  const note = dmActive
-    ? "Saat ini tombol **Iya Pake**"
-    : "Saat ini tombol **Tidak Pake**, (nnti sesuaikan ya, kalo pencet tombol yes nnti berubah jadi, \"Saat ini tombol **Iya Pake**\")";
-  return makeV2([
-    txt("## 🔈 Notifikasi DM"),
-    SEP,
-    txt(`Saat pilih tombol **Iya Pake** bot <@1364585069812912148> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#${CHANNEL.EVENTS}>\n\nNote: ${note}`),
-    SEP,
-    {
-      type: 1,
-      components: [
-        { type: 2, style: 3, label: "Iya Pake",   custom_id: "partner_dm_yes", disabled: dmActive === true },
-        { type: 2, style: 4, label: "Tidak Pake", custom_id: "partner_dm_no",  disabled: dmActive === false },
-      ],
-    },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgAdminReview(data) {
-  const components = [
-    txt(data.useEmbed ? `# ${data.title}` : `# ${data.title}`),
-    SEP,
-    txt(data.desc),
-    SEP,
-  ];
-  if (data.useEmbed && data.banner) {
-    components.push({ type: 12, items: [{ media: { url: data.banner } }] });
-    components.push(SEP);
+  switch (val) {
+    case "open_partnership":    return handleOpenPartnership(interaction, member);
+    case "posting_events":      return handlePostingEvents(interaction, member);
+    case "reposting_partner":   return handleRepostingPartner(interaction, member);
+    case "list_partnership":    return handleListPartnership(interaction, member);
+    case "stop_partnership":    return handleStopPartnership(interaction, member);
   }
-  components.push({
-    type: 1,
-    components: [
-      { type: 2, style: 3, label: "Accept",     custom_id: `partner_accept_${data.type}_${data.senderId}_${data.logId}` },
-      { type: 2, style: 4, label: "Reject",     custom_id: `partner_reject_${data.type}_${data.senderId}_${data.logId}` },
-      { type: 2, style: 1, label: "Edit Pesan", custom_id: `partner_edit_${data.type}_${data.senderId}_${data.logId}` },
-      { type: 2, style: 2, label: data.senderTag, custom_id: `partner_info_${data.senderId}`, disabled: true },
-    ],
-  });
-  components.push(SEP);
-  components.push(txt("-# © Guild Partnership - EmpireBS"));
-  return makeV2(components, data.useEmbed ? parseSidebarColor(data.color) : undefined);
-}
-
-function msgPublishNoEmbed(data) {
-  return { content: data.desc };
-}
-
-function msgPublishEmbed(data) {
-  const msg = makeV2([
-    txt(`# ${data.title}`),
-    SEP,
-    txt(data.desc),
-    SEP,
-    { type: 12, items: [{ media: { url: data.banner } }] },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ], parseSidebarColor(data.color));
-  return [msg, { content: `-# [.](${data.link})` }];
-}
-
-function msgListPartnership(partners, page, totalPages, totalCount, lastUpdated) {
-  const start = page * ITEMS_PER_PAGE;
-  const slice = partners.slice(start, start + ITEMS_PER_PAGE);
-  let listContent = slice.map((p, i) =>
-    `**${start + i + 1}.** <@${p.userId}>\n-# <:00:1360567203325542431>Server Link: [${p.serverName}](${p.serverLink})`
-  ).join("\n");
-  if (!listContent) listContent = "*Belum ada partnership terdaftar.*";
-
-  const pageLabel = `${page + 1}/${totalPages || 1}`;
-  const ts = Math.floor((lastUpdated || Date.now()) / 1000);
-
-  return makeV2([
-    txt("## 📜 List Partnership"),
-    SEP,
-    {
-      type: 9,
-      components: [txt(listContent)],
-      accessory: { type: 2, style: 2, custom_id: "partner_search", label: "Search" },
-    },
-    SEP,
-    txt(`-# Terakhir diperbarui: <t:${ts}:R> • Total partnership: ${totalCount}`),
-    {
-      type: 1,
-      components: [
-        { type: 2, style: 2, custom_id: `partner_list_first_${page}`, label: "◀◀" },
-        { type: 2, style: 2, custom_id: `partner_list_prev_${page}`,  label: "◀" },
-        { type: 2, style: 2, custom_id: `partner_list_page_${page}`,  label: pageLabel, disabled: true },
-        { type: 2, style: 2, custom_id: `partner_list_next_${page}`,  label: "▶" },
-        { type: 2, style: 2, custom_id: `partner_list_last_${page}`,  label: "▶▶" },
-      ],
-    },
-    SEP,
-    txt("-# © Guild Partnership - EmpireBS"),
-  ]);
-}
-
-function msgForumLog(data, actionType) {
-  const title =
-    actionType === "open"   ? "Success Partnership" :
-    actionType === "repost" ? "Success Re-Posting Partnership" :
-                              "Success Events Posts";
-  const ageDays  = accountAgeDays(data.user);
-  const duration = formatDuration(data.duration);
-  const now      = Math.floor(Date.now() / 1000);
-
-  const detailLink = actionType === "events"
-    ? `https://discord.com/channels/1347233781391560837/${CHANNEL.EVENTS}/${data.messageId}`
-    : `https://discord.com/channels/1347233781391560837/${CHANNEL.SERVER_PARTNER}/${data.messageId}`;
-
-  const securityExtra = (actionType === "open")
-    ? `> **System:** Component V2 + MongoDB`
-    : `> **Nama Server:** ${data.serverName || data.title}`;
-
-  return makeV2([
-    txt(`## ✅ <@${data.user.id}> ${title}`),
-    SEP,
-    txt(`**👤 Informasi User**\n> **Username:** [${data.user.username}](https://discord.com/users/${data.user.id})\n> **ID:** \`${data.user.id}\`\n> **Display Name:** ${data.user.displayName || data.user.username}\n> **Akun Dibuat:** <t:${Math.floor(data.user.createdTimestamp / 1000)}:R> (${ageDays} hari)`),
-    SEP,
-    txt(`**📊 Detail Verifikasi**\n> **Waktu Selesai:** <t:${now}:f>\n> **Total Durasi:** ${duration}\n> **Accept Partner:** [${data.acceptorUsername}](https://discord.com/users/${data.acceptorId})\n> **Pesan Partner:** [Go To Messages](${detailLink})\n> **Link Server:** ${data.serverLink}`),
-    SEP,
-    txt(`**🛡️ Security Info**\n> **Status:** ${data.hasRole ? "Yes" : "No"} (user yg Berpartner sudah di kasih role id <@&${ROLE.PARTNER}>)\n> **Edit Pesan:** ${data.wasEdited ? "Yes" : "No"}\n> **Boost:** ${data.isBoosting ? "Yes" : "No"}\n${securityExtra}`),
-    SEP,
-    txt(`\n-# Log ID: ${data.logId}`),
-  ]);
-}
-
-function msgDMAccepted(data) {
-  const now = Math.floor(Date.now() / 1000);
-  return makeV2([
-    {
-      type: 9,
-      components: [txt("## <:1_:1486297322848653425> Notifikasi DM")],
-      accessory: {
-        type: 2, style: 5, label: "Messages",
-        url: `https://discord.com/channels/1347233781391560837/${data.channelId}/${data.messageId}`,
-      },
-    },
-    SEP,
-    txt(`Postingan Events kamu sudah kekirim di <#${data.channelId}>\nDi Accept oleh: <@${data.acceptorId}>`),
-    SEP,
-    txt(`-# © Guild Partnership - EmpireBS <t:${now}:R>`),
-  ]);
-}
-
-// ─── IN-MEMORY STATE ──────────────────────────────────────────────────────────
-const embedState      = new Map();
-const rejectCtx       = new Map();
-const editCtx         = new Map();
-const channelUseCount = new Map();
-
-// ─── MODALS ───────────────────────────────────────────────────────────────────
-function buildPartnerModal(useEmbed, type) {
-  const titles = { open: "Formulir Pengajuan Partnership", repost: "Formulir Re-Posting Partnership", events: "Formulir Posting Events" };
-  const modal = new ModalBuilder()
-    .setTitle(titles[type] || "Formulir Partnership")
-    .setCustomId(`partner_modal_${type}_${useEmbed ? "yes" : "no"}`);
-
-  const rows = [
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("field_title").setLabel("Judul / Nama Server")
-        .setPlaceholder("Contoh: EmpireBS — Free Hosting Server")
-        .setStyle(TextInputStyle.Short).setRequired(true)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("field_desc").setLabel("Deskripsi Server")
-        .setPlaceholder("Tulis deskripsi lengkap server kamu di sini...")
-        .setStyle(TextInputStyle.Paragraph).setRequired(true)
-    ),
-  ];
-
-  if (useEmbed) {
-    rows.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("field_banner").setLabel("Banner / Gambar (URL)")
-          .setPlaceholder("https://cdn.discordapp.com/...")
-          .setStyle(TextInputStyle.Short).setRequired(false)  // ❗ OPSIONAL
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("field_link").setLabel("Link Server")
-          .setPlaceholder("https://discord.gg/xxxxxxx")
-          .setStyle(TextInputStyle.Short).setRequired(true)
-      ),
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("field_color").setLabel("Sidebar Color (Hex)")
-          .setPlaceholder("Contoh: #FF0055 atau FF0055")
-          .setStyle(TextInputStyle.Short).setRequired(true)
-      )
-    );
-  } else {
-    rows.push(
-      new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId("field_link").setLabel("Link Server")
-          .setPlaceholder("https://discord.gg/xxxxxxx")
-          .setStyle(TextInputStyle.Short).setRequired(true)
-      )
-    );
-  }
-
-  modal.addComponents(...rows);
-  return modal;
-}
-
-function buildRejectModal() {
-  const modal = new ModalBuilder().setTitle("Alasan Penolakan").setCustomId("partner_reject_modal");
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("reject_reason").setLabel("Alasan Penolakan (min. 10 kata)")
-        .setPlaceholder("Tuliskan alasan penolakan dengan jelas dan sopan...")
-        .setStyle(TextInputStyle.Paragraph).setRequired(true).setMinLength(40)
-    )
-  );
-  return modal;
-}
-
-function buildEditModal(currentDesc) {
-  const modal = new ModalBuilder().setTitle("Edit Pesan Partnership").setCustomId("partner_edit_modal");
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("edit_desc").setLabel("Deskripsi Baru")
-        .setPlaceholder("Edit deskripsi sesuai ketentuan...")
-        .setStyle(TextInputStyle.Paragraph).setRequired(true)
-        .setValue(currentDesc || "")
-    )
-  );
-  return modal;
-}
-
-function buildSearchModal() {
-  const modal = new ModalBuilder().setTitle("Cari Partnership").setCustomId("partner_search_modal");
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("search_name").setLabel("Nama Server")
-        .setPlaceholder("Ketik nama server...")
-        .setStyle(TextInputStyle.Short).setRequired(true)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("search_link").setLabel("Link Server (opsional)")
-        .setPlaceholder("https://discord.gg/...")
-        .setStyle(TextInputStyle.Short).setRequired(false)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("search_user").setLabel("Nama Yg berpartner (opsional)")
-        .setPlaceholder("Ketik nama user...")
-        .setStyle(TextInputStyle.Short).setRequired(false)
-    ),
-  );
-  return modal;
-}
-
-// ─── INTERACTION HANDLER (STRICT SINGLE-ACKNOWLEDGE) ──────────────────────────
-async function handleInteraction(interaction) {
-  if (!interaction.guild) return false;
-  const id = interaction.customId;
-  if (!id || !id.startsWith("partner_")) return false;
-
-  try {
-    // 1) Tombol yang langsung showModal (TANPA defer)
-    if (interaction.isButton()) {
-      if (id === "partner_form_open" || id === "partner_form_events" || id === "partner_form_repost") {
-        const typeMap = { partner_form_open: "open", partner_form_events: "events", partner_form_repost: "repost" };
-        const type    = typeMap[id];
-        const key     = `${type}_${interaction.user.id}`;
-        const use     = embedState.get(key) ?? true;
-        return interaction.showModal(buildPartnerModal(use, type));
-      }
-      if (id.startsWith("partner_reject_") && !id.includes("modal")) {
-        const parts   = id.split("_");
-        const logId   = parts[parts.length - 1];
-        const db2     = await getDB();
-        const pending = await db2.collection("pending").findOne({ logId });
-        if (!pending) return interaction.reply({ content: "❌ Data tidak ditemukan.", flags: 64 });
-        rejectCtx.set(interaction.user.id, pending);
-        return interaction.showModal(buildRejectModal());
-      }
-      if (id.startsWith("partner_edit_") && !id.includes("modal")) {
-        const parts   = id.split("_");
-        const logId   = parts[parts.length - 1];
-        const db2     = await getDB();
-        const pending = await db2.collection("pending").findOne({ logId });
-        editCtx.set(interaction.user.id, pending || { logId, desc: "" });
-        return interaction.showModal(buildEditModal(pending?.desc || ""));
-      }
-      if (id === "partner_search") {
-        return interaction.showModal(buildSearchModal());
-      }
-    }
-
-    // 2) Tombol yang hanya update pesan (Yes/No, List pagination, Info) -> deferUpdate
-    if (interaction.isButton()) {
-      const isToggle = id.endsWith("_yes") || id.endsWith("_no");
-      const isList   = id.startsWith("partner_list_");
-      const isInfo   = id.startsWith("partner_info_");
-      if (isToggle || isList || isInfo) {
-        await interaction.deferUpdate();
-        if (id === "partner_events_yes") { embedState.set(`events_${interaction.user.id}`, true); return interaction.editReply(msgPostingEvents(true)); }
-        if (id === "partner_events_no")  { embedState.set(`events_${interaction.user.id}`, false); return interaction.editReply(msgPostingEvents(false)); }
-        if (id === "partner_repost_yes") { embedState.set(`repost_${interaction.user.id}`, true); return interaction.editReply(msgRepostingPartner(true)); }
-        if (id === "partner_repost_no")  { embedState.set(`repost_${interaction.user.id}`, false); return interaction.editReply(msgRepostingPartner(false)); }
-        if (id === "partner_open_yes")   { embedState.set(`open_${interaction.user.id}`, true); return interaction.editReply(msgGuildForm(true)); }
-        if (id === "partner_open_no")    { embedState.set(`open_${interaction.user.id}`, false); return interaction.editReply(msgGuildForm(false)); }
-        if (id === "partner_dm_yes")     { return interaction.editReply(msgDMNotifikasi(true)); }
-        if (id === "partner_dm_no")      { return interaction.editReply(msgDMNotifikasi(false)); }
-        if (isList) return handleListPagination(interaction);
-        if (isInfo) return interaction.editReply({});
-      }
-    }
-
-    // 3) Select menu -> deferReply (ephemeral)
-    if (interaction.isStringSelectMenu()) {
-      await interaction.deferReply({ flags: 64 });
-      const val = interaction.values[0];
-      const hasPartnerRole = interaction.member.roles.cache.has(ROLE.PARTNER);
-      if (val === "open_partnership") {
-        if (hasPartnerRole) return interaction.editReply(msgAlreadyPartner());
-        return interaction.editReply(msgOpenPartnership());
-      }
-      if (val === "posting_events") {
-        if (!hasPartnerRole) return interaction.editReply(msgNeedPartner());
-        embedState.set(`events_${interaction.user.id}`, true);
-        return interaction.editReply(msgPostingEvents(true));
-      }
-      if (val === "reposting_partner") {
-        if (!hasPartnerRole) return interaction.editReply(msgNeedPartner());
-        embedState.set(`repost_${interaction.user.id}`, true);
-        return interaction.editReply(msgRepostingPartner(true));
-      }
-      if (val === "list_partnership") {
-        const db2       = await getDB();
-        const partners  = await db2.collection("partners").find({}).toArray();
-        const totalPages = Math.max(1, Math.ceil(partners.length / ITEMS_PER_PAGE));
-        return interaction.editReply(msgListPartnership(partners, 0, totalPages, partners.length, Date.now()));
-      }
-      return interaction.editReply({ content: "❌ Pilihan tidak dikenali." });
-    }
-
-    // 4) Tombol benefit, ketentuan, accept -> deferReply (ephemeral)
-    if (interaction.isButton()) {
-      await interaction.deferReply({ flags: 64 });
-      if (id === "partner_ketentuan") return interaction.editReply(msgKetentuan());
-      if (id === "partner_benefit")   return interaction.editReply(msgBenefit());
-      if (id.startsWith("partner_accept_")) return handleAccept(interaction);
-      return interaction.editReply({ content: "❌ Tombol tidak dikenali." });
-    }
-
-    // 5) Modal submit -> deferReply (ephemeral)
-    if (interaction.isModalSubmit()) {
-      await interaction.deferReply({ flags: 64 });
-      if (id.startsWith("partner_modal_")) return handleFormSubmit(interaction);
-      if (id === "partner_reject_modal")   return handleRejectModal(interaction);
-      if (id === "partner_edit_modal")     return handleEditModal(interaction);
-      if (id === "partner_search_modal")   return handleSearchModalSubmit(interaction);
-    }
-
-    return false;
-  } catch (err) {
-    console.error("❌ Partnership interaction error:", err);
-    try {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: "❌ Terjadi kesalahan. Coba lagi.", flags: 64 });
-      } else if (interaction.deferred && !interaction.replied) {
-        await interaction.editReply({ content: "❌ Terjadi kesalahan. Coba lagi." });
-      } else {
-        await interaction.followUp({ content: "❌ Terjadi kesalahan. Coba lagi.", flags: 64 });
-      }
-    } catch (e) {
-      console.error("Gagal kirim error reply:", e.message);
-    }
-    return true;
-  }
-}
-
-// ─── LIST PAGINATION ──────────────────────────────────────────────────────────
-async function handleListPagination(interaction) {
-  const parts       = interaction.customId.split("_");
-  const action      = parts[2]; // first | prev | page | next | last
-  const currentPage = parseInt(parts[3]) || 0;
-
-  const db2        = await getDB();
-  const partners   = await db2.collection("partners").find({}).toArray();
-  const totalPages = Math.max(1, Math.ceil(partners.length / ITEMS_PER_PAGE));
-
-  let newPage = currentPage;
-  if (action === "prev") {
-    newPage = currentPage <= 0 ? totalPages - 1 : currentPage - 1;
-  } else if (action === "next") {
-    newPage = currentPage >= totalPages - 1 ? 0 : currentPage + 1;
-  } else if (action === "first") {
-    if (currentPage === 0) {
-      newPage = totalPages - 1;
-    } else {
-      newPage = Math.max(0, currentPage - 5);
-    }
-  } else if (action === "last") {
-    if (currentPage === totalPages - 1) {
-      newPage = 0;
-    } else {
-      newPage = Math.min(totalPages - 1, currentPage + 5);
-    }
-  }
-
-  return interaction.editReply(msgListPartnership(partners, newPage, totalPages, partners.length, Date.now()));
-}
-
-// ─── FORM SUBMIT ──────────────────────────────────────────────────────────────
-async function handleFormSubmit(interaction) {
-  const parts    = interaction.customId.split("_"); // partner_modal_{type}_{embed}
-  const type     = parts[2];
-  const useEmbed = parts[3] === "yes";
-
-  const title  = interaction.fields.getTextInputValue("field_title");
-  const desc   = interaction.fields.getTextInputValue("field_desc");
-  const link   = interaction.fields.getTextInputValue("field_link");
-  const banner = useEmbed ? interaction.fields.getTextInputValue("field_banner") || null : null;
-  const color  = useEmbed ? interaction.fields.getTextInputValue("field_color")  : null;
-
-  const logId     = generateLogId(interaction.user.id);
-  const startTime = Date.now();
-
-  const db2 = await getDB();
-  await db2.collection("pending").insertOne({
-    logId, type, useEmbed, title, desc, link, banner, color,
-    senderId:   interaction.user.id,
-    senderTag:  interaction.user.username,
-    guildId:    interaction.guildId,
-    startTime,
-    wasEdited:  false,
-    dmNotif:    false,
-  });
-
-  const reviewChannelId = type === "events" ? CHANNEL.EVENTS : CHANNEL.SERVER_PARTNER;
-  const reviewChannel   = await interaction.client.channels.fetch(reviewChannelId).catch(() => null);
-  if (!reviewChannel) {
-    return interaction.editReply({ content: "❌ Channel review tidak ditemukan. Hubungi admin." });
-  }
-
-  const reviewMsg = await reviewChannel.send(msgAdminReview({
-    title, desc, banner, link, color,
-    senderTag: interaction.user.username,
-    senderId:  interaction.user.id,
-    useEmbed, type, logId,
-  }));
-
-  await db2.collection("pending").updateOne(
-    { logId },
-    { $set: { reviewMessageId: reviewMsg.id, reviewChannelId } }
-  );
-
-  if (type === "events") {
-    return interaction.editReply(msgDMNotifikasi(false));
-  }
-  return interaction.editReply({ content: "✅ Formulir kamu sudah terkirim! Tunggu review dari admin." });
-}
-
-// ─── ACCEPT ───────────────────────────────────────────────────────────────────
-async function handleAccept(interaction) {
-  const parts  = interaction.customId.split("_"); // partner_accept_{type}_{userId}_{logId}
-  const type   = parts[2];
-  const userId = parts[3];
-  const logId  = parts[4];
-
-  const db2     = await getDB();
-  const pending = await db2.collection("pending").findOne({ logId });
-  if (!pending) return interaction.editReply({ content: "❌ Data tidak ditemukan atau sudah diproses." });
-
-  const guild    = interaction.guild;
-  const member   = await guild.members.fetch(userId).catch(() => null);
-  const duration = Date.now() - pending.startTime;
-
-  let hasRole = member?.roles.cache.has(ROLE.PARTNER) || false;
-  if (type === "open" && member && !hasRole) {
-    await member.roles.add(ROLE.PARTNER).catch(console.error);
-    hasRole = true;
-  }
-
-  const isBoosting      = !!member?.premiumSince;
-  const targetChannelId = type === "events" ? CHANNEL.EVENTS : CHANNEL.SERVER_PARTNER;
-  const targetChannel   = await interaction.client.channels.fetch(targetChannelId).catch(() => null);
-
-  let publishedMsgId = null;
-  if (targetChannel) {
-    if (type === "repost") {
-      const prev = await db2.collection("published").findOne({ senderId: userId, type: "repost" });
-      if (prev?.messageId) {
-        const old = await targetChannel.messages.fetch(prev.messageId).catch(() => null);
-        if (old) await old.delete().catch(console.error);
-      }
-    }
-
-    if (pending.useEmbed) {
-      const [mainMsg, linkMsg] = msgPublishEmbed(pending);
-      const sent = await targetChannel.send(mainMsg);
-      await targetChannel.send(linkMsg);
-      publishedMsgId = sent.id;
-    } else {
-      const sent = await targetChannel.send(msgPublishNoEmbed(pending));
-      publishedMsgId = sent.id;
-    }
-  }
-
-  await db2.collection("published").updateOne(
-    { senderId: userId, type },
-    { $set: { senderId: userId, type, messageId: publishedMsgId, serverName: pending.title, serverLink: pending.link, timestamp: Date.now() } },
-    { upsert: true }
-  );
-
-  if (type === "open") {
-    const username = member?.user.username || pending.senderTag;
-    await db2.collection("partners").updateOne(
-      { userId },
-      { $set: { userId, username, serverName: pending.title, serverLink: pending.link, addedAt: Date.now() } },
-      { upsert: true }
-    );
-  }
-
-  await handleForumLog({
-    client:           interaction.client,
-    user:             member?.user || { id: userId, username: pending.senderTag, createdTimestamp: Date.now(), displayName: pending.senderTag },
-    type, logId, duration,
-    acceptorUsername: interaction.user.username,
-    acceptorId:       interaction.user.id,
-    serverLink:       pending.link,
-    serverName:       pending.title,
-    hasRole, isBoosting,
-    wasEdited:        pending.wasEdited,
-    messageId:        publishedMsgId,
-    channelId:        targetChannelId,
-  });
-
-  if (type === "events" && pending.dmNotif) {
-    const dmUser = await interaction.client.users.fetch(userId).catch(() => null);
-    if (dmUser) await dmUser.send(msgDMAccepted({ channelId: targetChannelId, messageId: publishedMsgId, acceptorId: interaction.user.id, duration })).catch(console.error);
-  }
-
-  await db2.collection("pending").deleteOne({ logId });
-
-  const revCh = await interaction.client.channels.fetch(pending.reviewChannelId).catch(() => null);
-  if (revCh && pending.reviewMessageId) {
-    const revMsg = await revCh.messages.fetch(pending.reviewMessageId).catch(() => null);
-    if (revMsg) await revMsg.edit({ components: [] }).catch(console.error);
-  }
-
-  return interaction.editReply({ content: `✅ Berhasil di-accept! Postingan sudah terkirim ke <#${targetChannelId}>.` });
-}
-
-// ─── REJECT MODAL ─────────────────────────────────────────────────────────────
-async function handleRejectModal(interaction) {
-  const reason  = interaction.fields.getTextInputValue("reject_reason");
-  const pending = rejectCtx.get(interaction.user.id);
-  if (!pending) return interaction.editReply({ content: "❌ Tidak ada pengajuan yang sedang diproses." });
-  rejectCtx.delete(interaction.user.id);
-
-  const dmUser = await interaction.client.users.fetch(pending.senderId).catch(() => null);
-  if (dmUser) {
-    await dmUser.send(makeV2([
-      txt("## ❌ Pengajuan Ditolak"),
-      SEP,
-      txt(`Pengajuan **${pending.type === "events" ? "Posting Events" : pending.type === "repost" ? "Re-Posting Partnership" : "Partnership"}** kamu telah ditolak.\n\n**Alasan:**\n> ${reason}`),
-      SEP,
-      txt("-# © Guild Partnership - EmpireBS"),
-    ])).catch(console.error);
-  }
-
-  const db2 = await getDB();
-  await db2.collection("pending").deleteOne({ logId: pending.logId });
-
-  const revCh = await interaction.client.channels.fetch(pending.reviewChannelId).catch(() => null);
-  if (revCh && pending.reviewMessageId) {
-    const revMsg = await revCh.messages.fetch(pending.reviewMessageId).catch(() => null);
-    if (revMsg) await revMsg.edit({ components: [] }).catch(console.error);
-  }
-
-  return interaction.editReply({ content: "✅ Pengajuan berhasil ditolak dan notifikasi sudah dikirim ke user." });
-}
-
-// ─── EDIT MODAL ───────────────────────────────────────────────────────────────
-async function handleEditModal(interaction) {
-  const newDesc = interaction.fields.getTextInputValue("edit_desc");
-  const ctx     = editCtx.get(interaction.user.id);
-  if (!ctx) return interaction.editReply({ content: "❌ Konteks edit tidak ditemukan." });
-  editCtx.delete(interaction.user.id);
-
-  const db2 = await getDB();
-  await db2.collection("pending").updateOne({ logId: ctx.logId }, { $set: { desc: newDesc, wasEdited: true } });
-
-  const revCh = await interaction.client.channels.fetch(ctx.reviewChannelId).catch(() => null);
-  if (revCh && ctx.reviewMessageId) {
-    const revMsg = await revCh.messages.fetch(ctx.reviewMessageId).catch(() => null);
-    if (revMsg) await revMsg.edit(msgAdminReview({ ...ctx, desc: newDesc })).catch(console.error);
-  }
-
-  return interaction.editReply({ content: "✅ Pesan berhasil diedit." });
-}
-
-// ─── SEARCH MODAL ─────────────────────────────────────────────────────────────
-async function handleSearchModalSubmit(interaction) {
-  const nameFilter = interaction.fields.getTextInputValue("search_name").toLowerCase();
-  const linkFilter = interaction.fields.getTextInputValue("search_link").toLowerCase() || "";
-  const userFilter = interaction.fields.getTextInputValue("search_user").toLowerCase() || "";
-
-  const db2      = await getDB();
-  const all      = await db2.collection("partners").find({}).toArray();
-
-  const filtered = all.filter(p => {
-    const matchName  = nameFilter ? (p.serverName?.toLowerCase().includes(nameFilter)) : true;
-    const matchLink  = linkFilter ? (p.serverLink?.toLowerCase().includes(linkFilter)) : true;
-    const matchUser  = userFilter ? (p.username?.toLowerCase().includes(userFilter) || p.userId?.includes(userFilter)) : true;
-    return matchName && matchLink && matchUser;
-  });
-
-  if (filtered.length === 0) {
-    return interaction.editReply({ content: "🔎 Tidak ditemukan partner dengan kriteria tersebut.", flags: 64 });
-  }
-
-  const list = filtered.slice(0, 10).map((p, i) =>
-    `**${i + 1}.** <@${p.userId}> — ${p.serverName}\n-# <:00:1360567203325542431>[${p.serverLink}](${p.serverLink})`
-  ).join("\n");
-
-  const msg = makeV2([
-    txt("## 🔍 Hasil Pencarian Partnership"),
-    SEP,
-    txt(list),
-    SEP,
-    txt(`-# Ditemukan ${filtered.length} partner.`),
-  ]);
-
-  return interaction.editReply(msg);
-}
-
-// ─── FORUM LOG ────────────────────────────────────────────────────────────────
-async function handleForumLog(data) {
-  try {
-    const forumChannel = await data.client.channels.fetch(FORUM.LOG_FORUM).catch(() => null);
-    if (!forumChannel) return;
-
-    const forumTitle = `1) ${data.serverName}`;
-    const logMsg     = msgForumLog(data, data.type);
-
-    const active   = await forumChannel.threads.fetchActive();
-    let thread     = active.threads.find(t => t.name === forumTitle);
-
-    if (!thread) {
-      const archived = await forumChannel.threads.fetchArchived();
-      thread = archived.threads.find(t => t.name === forumTitle);
-    }
-
-    if (data.type === "open") {
-      if (!thread) {
-        await forumChannel.threads.create({ name: forumTitle, message: logMsg });
-      } else {
-        await thread.send(logMsg);
-      }
-      return;
-    }
-
-    if (!thread) return;
-
-    if (data.type === "repost") {
-      const db2 = await getDB();
-      const prev = await db2.collection("forumPosts").findOne({ serverName: data.serverName, type: "repost" });
-      if (prev?.msgId) {
-        const prevMsg = await thread.messages.fetch(prev.msgId).catch(() => null);
-        if (prevMsg) await prevMsg.delete().catch(console.error);
-      }
-    }
-
-    const sent = await thread.send(logMsg);
-    const db2  = await getDB();
-    await db2.collection("forumPosts").updateOne(
-      { serverName: data.serverName, type: data.type },
-      { $set: { serverName: data.serverName, type: data.type, msgId: sent.id, threadId: thread.id } },
-      { upsert: true }
-    );
-  } catch (err) {
-    console.error("❌ Forum log error:", err);
-  }
-}
-
-// ─── !partner COMMAND ─────────────────────────────────────────────────────────
-async function handlePartnerCommand(message) {
-  if (!message.guild) return false;
-  if (message.content.toLowerCase() !== "!partner") return false;
-
-  const channel = message.channel;
-  if (!channel.parentId || channel.parentId !== CATEGORY_ID) return false;
-
-  if (!message.member.roles.cache.has(ROLE.STAFF)) {
-    await message.reply(msgNotStaff());
-    return true;
-  }
-
-  if (!channelUseCount.has(channel.id)) channelUseCount.set(channel.id, new Map());
-  const chMap = channelUseCount.get(channel.id);
-  const count = chMap.get(message.author.id) || 0;
-
-  if (count >= PARTNER_CHANNEL_LIMIT) {
-    await message.reply(msgPartnerLimit());
-    return true;
-  }
-
-  chMap.set(message.author.id, count + 1);
-
-  const useEmbed = embedState.get(`open_${message.author.id}`) ?? true;
-  await message.reply(msgGuildForm(useEmbed));
   return true;
 }
 
-// ─── SEND DASHBOARD ───────────────────────────────────────────────────────────
-async function sendDashboard(client) {
-  try {
-    const channel = await client.channels.fetch(CHANNEL.DASHBOARD);
-    if (!channel) return;
-    await channel.send(msgDashboard());
-    console.log("✅ Partnership Dashboard terkirim.");
-  } catch (err) {
-    console.error("❌ Gagal kirim dashboard partnership:", err);
+// ─── OPEN PARTNERSHIP ────────────────────────────────────────────────────────
+async function handleOpenPartnership(interaction, member) {
+  if (hasPartnerRole(member)) {
+    return interaction.followUp({
+      ...cv2([
+        text("## Kamu Sudah Berpartnership"),
+        SEP,
+        text("Kamu sudah memiliki role **Partner**. Gunakan menu **Re-Posting Partner** atau **Posting Events** untuk kegiatan partnership selanjutnya."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ]),
+      ephemeral: true
+    });
+  }
+
+  await interaction.followUp({
+    ...cv2([
+      text("## 🔍 Pengajuan Partnership"),
+      SEP,
+      text("> - Pencet tombol **Open Tiket** di bawah dan pilih Request Partner\n> - Antri dan tertib tunggu diproses sesuai urutan, mohon bersabar\n> - Dilarang spam pesan berulang atau mention, demi kenyamanan"),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 5, label: "Open Ticket", emoji: { name: "📫" }, url: "https://discord.com/channels/1347233781391560837/1498935151441219584", custom_id: "p_open_ticket_link" },
+          { type: 2, style: 3, label: " Benefit",         emoji: { name: "🎀" }, custom_id: "partner_benefit" },
+          { type: 2, style: 1, label: "Ketentuan Partner", emoji: { name: "📋" }, custom_id: "partner_ketentuan" },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+// ─── KETENTUAN / BENEFIT ─────────────────────────────────────────────────────
+async function handleKetentuan(interaction) {
+  await interaction.reply({
+    ...cv2([
+      text("## 📋 Ketentuan Partnership"),
+      SEP,
+      text("> -  Perwakilan staff wajib bergabung sebagai perwakilan. Saling post event bersifat timbal balik.\n\n> - Gunakan tiket untuk pengajuan event. Dilarang menggunakan mention everyone tanpa izin.\n\n> - Wajib memposting deskripsi/event server kami. Kelalaian dalam posting dapat mengakibatkan pemutusan kerja sama.\n\n> - Perwakilan dilarang keluar server tanpa koordinasi. Jika perwakilan keluar tanpa alasan, partner akan diputus.\n\n> - Admin berhak mengedit konten postingan dan memutus kerja sama jika melanggar ketentuan di atas."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+async function handleBenefit(interaction) {
+  await interaction.reply({
+    ...cv2([
+      text("## 🎀 Benefit Partnership <:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>"),
+      SEP,
+      text("> - Relasi: Membangun koneksi antar-server secara resmi\n\n> - Promosi Event: Kesempatan membagikan event Anda\n\n> - Kolaborasi: Mengadakan proyek bersama EmpireBS\n\n> - Role Eksklusif: Mendapatkan role khusus Partnership"),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+// ─── POSTING EVENTS ──────────────────────────────────────────────────────────
+// state per user: { embedMode: bool }
+const eventsEmbedState = new Map(); // userId -> boolean (true = embed)
+
+async function handlePostingEvents(interaction, member) {
+  if (!hasPartnerRole(member)) {
+    return interaction.followUp({
+      ...cv2([
+        text("## Berpartnership Terlebih dahulu"),
+        SEP,
+        text("Kamu belum memiliki role **Partner**. Silakan lakukan **Open Partnership** terlebih dahulu melalui menu."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ]),
+      ephemeral: true
+    });
+  }
+
+  // default: embed (yes disabled, no active)
+  eventsEmbedState.set(interaction.user.id, true);
+
+  await interaction.followUp({
+    ...cv2([
+      text("## 📥 Posting Events"),
+      SEP,
+      text("### Ketentuan Events: <:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>\n> - Wajib gunakan mention khusus yang tersedia.\n> - Postingan ditinjau admin sebelum dipublikasikan.\n> - Admin berhak menyesuaikan teks sesuai ketentuan.\n### Prosedur:\n> - Pilih Yes/No untuk memakai embed atau tidak.\n> - Klik tombol di bawah dan lengkapi detail acara anda."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "events_form" },
+          { type: 2, style: 3, label: "Yes", custom_id: "events_yes", disabled: true },
+          { type: 2, style: 4, label: "No",  custom_id: "events_no",  disabled: false },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+async function handleEventsYesNo(interaction) {
+  const isYes = interaction.customId === "events_yes";
+  eventsEmbedState.set(interaction.user.id, isYes);
+  await interaction.update({
+    ...cv2([
+      text("## 📥 Posting Events"),
+      SEP,
+      text("### Ketentuan Events: <:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>\n> - Wajib gunakan mention khusus yang tersedia.\n> - Postingan ditinjau admin sebelum dipublikasikan.\n> - Admin berhak menyesuaikan teks sesuai ketentuan.\n### Prosedur:\n> - Pilih Yes/No untuk memakai embed atau tidak.\n> - Klik tombol di bawah dan lengkapi detail acara anda."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "events_form" },
+          { type: 2, style: 3, label: "Yes", custom_id: "events_yes", disabled:  isYes },
+          { type: 2, style: 4, label: "No",  custom_id: "events_no",  disabled: !isYes },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+async function handleEventsForm(interaction) {
+  const useEmbed = eventsEmbedState.get(interaction.user.id) !== false;
+
+  if (useEmbed) {
+    await interaction.showModal({
+      title: "Formulir Posting Events (Embed)",
+      custom_id: "events_modal_embed",
+      components: [
+        { type: 1, components: [{ type: 4, custom_id: "f_nama",   label: "Nama Server",          style: 1, placeholder: "Masukkan nama server kamu", required: true,  min_length: 1, max_length: 50 }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_desc",   label: "Deskripsi Server",      style: 2, placeholder: "Tuliskan deskripsi lengkap server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_banner", label: "Banner Server (Opsional)", style: 1, placeholder: "Link banner, jika >1 pisahkan dengan koma", required: false }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_link",   label: "Link Server",           style: 1, placeholder: "https://discord.gg/...", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_color",  label: "Sidebar Color (Opsional)", style: 1, placeholder: "Contoh: FF0000 atau #FF0000", required: false }] },
+      ]
+    });
+  } else {
+    await interaction.showModal({
+      title: "Formulir Posting Events (Tanpa Embed)",
+      custom_id: "events_modal_plain",
+      components: [
+        { type: 1, components: [{ type: 4, custom_id: "f_nama",    label: "Nama Server",          style: 1, placeholder: "Masukkan nama server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_desc",    label: "Deskripsi Server",      style: 2, placeholder: "Tuliskan deskripsi lengkap server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_link",    label: "Link Server",           style: 1, placeholder: "https://discord.gg/...", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_events",  label: "Link Events (Opsional)", style: 1, placeholder: "Link events jika ada", required: false }] },
+      ]
+    });
+  }
+  return true;
+}
+
+async function handleEventsModalSubmit(interaction, isEmbed) {
+  const user      = interaction.user;
+  const member    = interaction.member;
+  const nama      = interaction.fields.getTextInputValue("f_nama");
+  const desc      = interaction.fields.getTextInputValue("f_desc");
+  const link      = interaction.fields.getTextInputValue("f_link");
+  const startedAt = Date.now();
+
+  let banners = [], color = null, eventsLink = "";
+
+  if (isEmbed) {
+    banners = parseBanners(interaction.fields.getTextInputValue("f_banner") || "");
+    color   = parseColorHex(interaction.fields.getTextInputValue("f_color") || "");
+  } else {
+    eventsLink = interaction.fields.getTextInputValue("f_events") || "";
+  }
+
+  // Save pending to DB
+  const database = await getDb();
+  const logId = `EVT-${Date.now()}-${user.id}`;
+  await database.collection("pending_events").insertOne({
+    logId, userId: user.id, userName: user.username, displayName: member.displayName,
+    guildId: interaction.guild.id, nama, desc, link, banners, color, eventsLink,
+    isEmbed, startedAt, type: "posting_events"
+  });
+
+  // Show DM notification choice
+  await interaction.reply({
+    ...cv2([
+      text("## 🔈 Notifikasi DM"),
+      SEP,
+      text("> Saat pilih tombol **Iya Pake** bot <@1364585069812912148> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#1502206484489175101>\n\nNote: Saat ini tombol **Tidak Pake**, (nnti sesuaikan ya, kalo pencet tombol yes nnti berubah jadi, \"Saat ini tombol **Iya Pake**\")"),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 3, label: "Iya Pake",   custom_id: `notif_yes_${logId}`, disabled: false },
+          { type: 2, style: 4, label: "Tidak Pake", custom_id: `notif_no_${logId}`,  disabled: true  },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+
+  // Send to admin log channel
+  await sendAdminReview(interaction.guild, logId, user, member, { nama, desc, link, banners, color, isEmbed, type: "posting_events" });
+  return true;
+}
+
+// ─── RE-POSTING PARTNER ──────────────────────────────────────────────────────
+const repostEmbedState = new Map();
+
+async function handleRepostingPartner(interaction, member) {
+  if (!hasPartnerRole(member)) {
+    return interaction.followUp({
+      ...cv2([
+        text("## Berpartnership Terlebih dahulu"),
+        SEP,
+        text("Kamu belum memiliki role **Partner**. Silakan lakukan **Open Partnership** terlebih dahulu melalui menu."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ]),
+      ephemeral: true
+    });
+  }
+
+  // Check cooldown 1 week
+  const database = await getDb();
+  const lastRepost = await database.collection("repost_cooldown").findOne({ userId: interaction.user.id });
+  if (lastRepost) {
+    const diff = Date.now() - lastRepost.lastAt;
+    const week = 7 * 24 * 60 * 60 * 1000;
+    if (diff < week) {
+      const remaining = week - diff;
+      const nextTs = Math.floor((Date.now() + remaining) / 1000);
+      return interaction.followUp({
+        ...cv2([
+          text("## ⏳ Cooldown Re-Posting"),
+          SEP,
+          text(`Kamu masih dalam cooldown re-posting. Silakan coba lagi <t:${nextTs}:R>.`),
+          SEP,
+          text("-# © Guild Partnership - EmpireBS"),
+        ]),
+        ephemeral: true
+      });
+    }
+  }
+
+  repostEmbedState.set(interaction.user.id, true);
+
+  await interaction.followUp({
+    ...cv2([
+      text("## 🔃 Re-Posting Partnership"),
+      SEP,
+      text("### Ketentuan Utama:<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>\n> - Cooldown 1 minggu sekali.\n> - Saling memposting ulang deskripsi.\n> - Gunakan mention khusus yang tersedia.\n### Prosedur:\n> - Pilih Yes/No untuk memakai embed atau tidak.\n> - Postingan ditinjau admin sebelum dipublikasikan.\n> - Admin berhak menyesuaikan teks sesuai ketentuan.\n> - Klik tombol di bawah dan lengkapi data server anda."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "repost_form" },
+          { type: 2, style: 3, label: "Yes", custom_id: "repost_yes", disabled: true  },
+          { type: 2, style: 4, label: "No",  custom_id: "repost_no",  disabled: false },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+async function handleRepostYesNo(interaction) {
+  const isYes = interaction.customId === "repost_yes";
+  repostEmbedState.set(interaction.user.id, isYes);
+  await interaction.update({
+    ...cv2([
+      text("## 🔃 Re-Posting Partnership"),
+      SEP,
+      text("### Ketentuan Utama:<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>\n> - Cooldown 1 minggu sekali.\n> - Saling memposting ulang deskripsi.\n> - Gunakan mention khusus yang tersedia.\n### Prosedur:\n> - Pilih Yes/No untuk memakai embed atau tidak.\n> - Postingan ditinjau admin sebelum dipublikasikan.\n> - Admin berhak menyesuaikan teks sesuai ketentuan.\n> - Klik tombol di bawah dan lengkapi data server anda."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "repost_form" },
+          { type: 2, style: 3, label: "Yes", custom_id: "repost_yes", disabled:  isYes },
+          { type: 2, style: 4, label: "No",  custom_id: "repost_no",  disabled: !isYes },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+async function handleRepostForm(interaction) {
+  const useEmbed = repostEmbedState.get(interaction.user.id) !== false;
+  if (useEmbed) {
+    await interaction.showModal({
+      title: "Formulir Re-Posting Partnership (Embed)",
+      custom_id: "repost_modal_embed",
+      components: [
+        { type: 1, components: [{ type: 4, custom_id: "f_nama",   label: "Nama Server",              style: 1, placeholder: "Masukkan nama server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_desc",   label: "Deskripsi Server",          style: 2, placeholder: "Tuliskan deskripsi server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_banner", label: "Banner Server (Opsional)",  style: 1, placeholder: "Link banner, jika >1 pisahkan koma", required: false }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_link",   label: "Link Server",               style: 1, placeholder: "https://discord.gg/...", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_color",  label: "Sidebar Color (Opsional)",  style: 1, placeholder: "Contoh: FF0000 atau #FF0000", required: false }] },
+      ]
+    });
+  } else {
+    await interaction.showModal({
+      title: "Formulir Re-Posting Partnership",
+      custom_id: "repost_modal_plain",
+      components: [
+        { type: 1, components: [{ type: 4, custom_id: "f_nama",  label: "Nama Server",          style: 1, placeholder: "Masukkan nama server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_desc",  label: "Deskripsi Server",      style: 2, placeholder: "Tuliskan deskripsi server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_link",  label: "Link Server",           style: 1, placeholder: "https://discord.gg/...", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_events",label: "Link Events (Opsional)", style: 1, placeholder: "Link events jika ada", required: false }] },
+      ]
+    });
+  }
+  return true;
+}
+
+async function handleRepostModalSubmit(interaction, isEmbed) {
+  const user      = interaction.user;
+  const member    = interaction.member;
+  const nama      = interaction.fields.getTextInputValue("f_nama");
+  const desc      = interaction.fields.getTextInputValue("f_desc");
+  const link      = interaction.fields.getTextInputValue("f_link");
+  const startedAt = Date.now();
+
+  let banners = [], color = null, eventsLink = "";
+  if (isEmbed) {
+    banners = parseBanners(interaction.fields.getTextInputValue("f_banner") || "");
+    color   = parseColorHex(interaction.fields.getTextInputValue("f_color") || "");
+  } else {
+    eventsLink = interaction.fields.getTextInputValue("f_events") || "";
+  }
+
+  const database = await getDb();
+  const logId = `RPT-${Date.now()}-${user.id}`;
+  await database.collection("pending_repost").insertOne({
+    logId, userId: user.id, userName: user.username, displayName: member.displayName,
+    guildId: interaction.guild.id, nama, desc, link, banners, color, eventsLink,
+    isEmbed, startedAt, type: "reposting_partner"
+  });
+
+  await interaction.reply({
+    ...cv2([
+      text("## ✅ Formulir Terkirim"),
+      SEP,
+      text("Pengajuan **Re-Posting Partnership** kamu sudah diterima dan sedang ditinjau oleh admin. Harap bersabar menunggu."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+
+  await sendAdminReview(interaction.guild, logId, user, member, { nama, desc, link, banners, color, isEmbed, type: "reposting_partner" });
+  return true;
+}
+
+// ─── PARTNER TICKET (!partner command) ───────────────────────────────────────
+const partnerUsageCache = new Map(); // channelId -> count
+
+async function handlePartnerCommand(message) {
+  if (!message.guild) return;
+  if (message.content.toLowerCase() !== "!partner") return;
+  if (!message.guild.channels.cache.get(message.channel.parentId === CHANNEL.TICKET_CAT ? message.channel.id : null)) {
+    // Validate: channel must be in TICKET_CAT category
+    if (message.channel.parentId !== CHANNEL.TICKET_CAT) return;
+  }
+  if (!hasStaffRole(message.member)) {
+    await message.reply({
+      ...cv2([
+        text("## ⛔ Akses Ditolak"),
+        SEP,
+        text("Perintah `!partner` hanya dapat digunakan oleh **Staff Partnership**. Jika kamu ingin melakukan pengajuan, gunakan menu Partnership di <#" + CHANNEL.DASHBOARD + ">."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    });
+    return;
+  }
+
+  const channelId = message.channel.id;
+  const count     = partnerUsageCache.get(channelId) || 0;
+
+  if (count >= 3) {
+    await message.reply({
+      ...cv2([
+        text("## ⚠️ Batas Penggunaan Tercapai"),
+        SEP,
+        text("Kanal ini sudah menggunakan perintah `!partner` sebanyak **3 kali**. Batas maksimal telah tercapai. Silakan hubungi admin jika diperlukan."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    });
+    return;
+  }
+
+  partnerUsageCache.set(channelId, count + 1);
+
+  // Send partnership form in the ticket channel
+  await message.channel.send({
+    ...cv2([
+      text("## ✉️ Pengajuan Partnership"),
+      SEP,
+      text("> Click dibawah ini untuk isi deskripsi server kamu\n\n**Note:** Pilih Yes/No untuk menggunakan embed atau tidak."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "ticket_partner_form" },
+          { type: 2, style: 3, label: "Yes", custom_id: "ticket_partner_yes", disabled: true  },
+          { type: 2, style: 4, label: "No",  custom_id: "ticket_partner_no",  disabled: false },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+}
+
+// state per channel for ticket form
+const ticketEmbedState = new Map();
+
+async function handleTicketYesNo(interaction) {
+  const isYes = interaction.customId === "ticket_partner_yes";
+  ticketEmbedState.set(interaction.channel.id, isYes);
+  await interaction.update({
+    ...cv2([
+      text("## ✉️ Pengajuan Partnership"),
+      SEP,
+      text("> Click dibawah ini untuk isi deskripsi server kamu\n\n**Note:** Pilih Yes/No untuk menggunakan embed atau tidak."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 1, label: "Isi Formulir Disini", emoji: { name: "📩" }, custom_id: "ticket_partner_form" },
+          { type: 2, style: 3, label: "Yes", custom_id: "ticket_partner_yes", disabled:  isYes },
+          { type: 2, style: 4, label: "No",  custom_id: "ticket_partner_no",  disabled: !isYes },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+async function handleTicketPartnerForm(interaction) {
+  const useEmbed = ticketEmbedState.get(interaction.channel.id) !== false;
+  if (useEmbed) {
+    await interaction.showModal({
+      title: "Formulir Pengajuan Partnership (Embed)",
+      custom_id: "ticket_partner_modal_embed",
+      components: [
+        { type: 1, components: [{ type: 4, custom_id: "f_nama",   label: "Nama Server",              style: 1, placeholder: "Masukkan nama server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_desc",   label: "Deskripsi Server",          style: 2, placeholder: "Tuliskan deskripsi lengkap server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_banner", label: "Banner Server (Opsional)",  style: 1, placeholder: "Link banner, jika >1 pisahkan koma", required: false }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_link",   label: "Link Server",               style: 1, placeholder: "https://discord.gg/...", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_color",  label: "Sidebar Color (Opsional)",  style: 1, placeholder: "Contoh: FF0000 atau #FF0000", required: false }] },
+      ]
+    });
+  } else {
+    await interaction.showModal({
+      title: "Formulir Pengajuan Partnership (Tanpa Embed)",
+      custom_id: "ticket_partner_modal_plain",
+      components: [
+        { type: 1, components: [{ type: 4, custom_id: "f_nama",    label: "Nama Server",          style: 1, placeholder: "Masukkan nama server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_desc",    label: "Deskripsi Server",      style: 2, placeholder: "Tuliskan deskripsi lengkap server kamu", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_link",    label: "Link Server",           style: 1, placeholder: "https://discord.gg/...", required: true }] },
+        { type: 1, components: [{ type: 4, custom_id: "f_events",  label: "Link Events (Opsional)", style: 1, placeholder: "Link events jika ada", required: false }] },
+      ]
+    });
+  }
+  return true;
+}
+
+async function handleTicketPartnerModalSubmit(interaction, isEmbed) {
+  const user      = interaction.user;
+  const member    = interaction.member;
+  const nama      = interaction.fields.getTextInputValue("f_nama");
+  const desc      = interaction.fields.getTextInputValue("f_desc");
+  const link      = interaction.fields.getTextInputValue("f_link");
+  const startedAt = Date.now();
+
+  let banners = [], color = null, eventsLink = "";
+  if (isEmbed) {
+    banners = parseBanners(interaction.fields.getTextInputValue("f_banner") || "");
+    color   = parseColorHex(interaction.fields.getTextInputValue("f_color") || "");
+  } else {
+    eventsLink = interaction.fields.getTextInputValue("f_events") || "";
+  }
+
+  const database = await getDb();
+  const logId = `PKP-${Date.now()}-${user.id}`;
+  await database.collection("pending_partnership").insertOne({
+    logId, userId: user.id, userName: user.username, displayName: member.displayName,
+    guildId: interaction.guild.id, channelId: interaction.channel.id,
+    nama, desc, link, banners, color, eventsLink,
+    isEmbed, startedAt, type: "pengajuan_partnership"
+  });
+
+  await interaction.reply({
+    ...cv2([
+      text("## ✅ Formulir Terkirim"),
+      SEP,
+      text("Pengajuan **Partnership** kamu sudah diterima dan sedang ditinjau oleh admin. Harap bersabar menunggu."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+
+  await sendAdminReview(interaction.guild, logId, user, member, { nama, desc, link, banners, color, isEmbed, type: "pengajuan_partnership", channelId: interaction.channel.id });
+  return true;
+}
+
+// ─── ADMIN REVIEW (send to log channel) ──────────────────────────────────────
+async function sendAdminReview(guild, logId, user, member, data) {
+  const logChannel = guild.channels.cache.get(CHANNEL.LOG_ADMIN);
+  if (!logChannel) return;
+
+  const typeLabel = {
+    posting_events:       "📥 Posting Events",
+    reposting_partner:    "🔃 Re-Posting Partnership",
+    pengajuan_partnership:"✉️ Pengajuan Partnership",
+  }[data.type] || data.type;
+
+  const previewComponents = [];
+
+  if (data.isEmbed) {
+    previewComponents.push(text(`# ${data.nama}`));
+    previewComponents.push(SEP);
+    previewComponents.push(text(data.desc));
+    if (data.banners && data.banners.length > 0) {
+      previewComponents.push(SEP);
+      for (const url of data.banners) {
+        previewComponents.push({ type: 12, items: [{ media: { url } }] });
+      }
+    }
+    previewComponents.push(SEP);
+    previewComponents.push(text("-# © Guild Partnership - EmpireBS"));
+  } else {
+    previewComponents.push(text(`**Preview (Plain Text):**\n\n${data.desc}`));
+  }
+
+  const accentColor = data.color || null;
+
+  // Preview container
+  const previewMsg = guild.channels.cache.get(CHANNEL.LOG_ADMIN);
+
+  // Admin action container
+  const adminMsg = cv2([
+    text(`## ${typeLabel}`),
+    SEP,
+    text(`**👤 Informasi Pengaju**\n> **Username:** [${user.username}](https://discord.com/users/${user.id})\n> **ID:** \`${user.id}\`\n> **Display Name:** ${member.displayName}\n> **Log ID:** \`${logId}\``),
+    SEP,
+    text(`**📋 Detail Pengajuan**\n> **Nama Server:** ${data.nama}\n> **Link Server:** ${data.link}\n> **Tipe:** ${typeLabel}\n> **Format:** ${data.isEmbed ? "Component V2 Embed" : "Plain Text"}`),
+    SEP,
+    {
+      type: 1,
+      components: [
+        { type: 2, style: 3, label: "Accept",      custom_id: `admin_accept_${logId}` },
+        { type: 2, style: 4, label: "Reject",       custom_id: `admin_reject_${logId}` },
+        { type: 2, style: 1, label: "Edit Pesan",   custom_id: `admin_edit_${logId}`   },
+        { type: 2, style: 2, label: data.nama,      custom_id: `admin_info_${logId}`,  disabled: true },
+      ]
+    },
+    SEP,
+    text("-# © Guild Partnership - EmpireBS"),
+  ]);
+
+  await logChannel.send(adminMsg);
+
+  // Also send the actual preview
+  if (data.isEmbed) {
+    const previewPayload = cv2(previewComponents, accentColor);
+    await logChannel.send(previewPayload);
   }
 }
 
+// ─── ADMIN ACCEPT ─────────────────────────────────────────────────────────────
+async function handleAdminAccept(interaction, logId) {
+  const database = await getDb();
+  
+  // Find pending record from all collections
+  let record = await database.collection("pending_partnership").findOne({ logId });
+  let coll = "pending_partnership";
+  if (!record) { record = await database.collection("pending_events").findOne({ logId }); coll = "pending_events"; }
+  if (!record) { record = await database.collection("pending_repost").findOne({ logId }); coll = "pending_repost"; }
+  if (!record) {
+    return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+  }
+
+  const acceptedAt = Date.now();
+  const duration   = formatDuration(acceptedAt - record.startedAt);
+  const admin      = interaction.user;
+
+  // ─ Post to correct channel ─
+  let targetChannelId;
+  if (record.type === "posting_events")   targetChannelId = CHANNEL.EVENTS_POST;
+  else                                     targetChannelId = CHANNEL.PARTNER_POST;
+
+  const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
+  let postedMsg = null;
+
+  if (targetChannel) {
+    let postPayload;
+    const accentColor = record.color || null;
+
+    if (record.isEmbed) {
+      const comps = [
+        text(`# ${record.nama}`),
+        SEP,
+        text(record.desc),
+      ];
+      if (record.banners && record.banners.length > 0) {
+        comps.push(SEP);
+        for (const url of record.banners) comps.push({ type: 12, items: [{ media: { url } }] });
+      }
+      comps.push(SEP);
+      comps.push(text("-# © Guild Partnership - EmpireBS"));
+      postPayload = { ...cv2(comps, accentColor), content: `-# [.](${record.link})` };
+    } else {
+      postPayload = { content: record.desc };
+    }
+
+    // Re-Posting: delete previous post
+    if (record.type === "reposting_partner") {
+      const prev = await database.collection("posted_messages").findOne({ userId: record.userId, type: "reposting_partner" });
+      if (prev) {
+        try {
+          const prevCh = interaction.guild.channels.cache.get(targetChannelId);
+          const prevMsg = await prevCh?.messages.fetch(prev.messageId).catch(() => null);
+          if (prevMsg) await prevMsg.delete().catch(() => {});
+        } catch (_) {}
+      }
+    }
+
+    postedMsg = await targetChannel.send(postPayload);
+
+    // Save posted message reference
+    await database.collection("posted_messages").updateOne(
+      { userId: record.userId, type: record.type },
+      { $set: { messageId: postedMsg.id, channelId: targetChannelId, postedAt: Date.now() } },
+      { upsert: true }
+    );
+  }
+
+  // ─ Get / create forum post ─
+  const forumChannel = interaction.guild.channels.cache.get(CHANNEL.PARTNER_FORUM);
+  let forumThread = null;
+  let serverName = record.nama;
+
+  if (forumChannel) {
+    // Find existing thread by server name pattern "1) (serverName)" or create new
+    const threads = await forumChannel.threads.fetchActive();
+    forumThread = threads.threads.find(t => t.name.toLowerCase().includes(serverName.toLowerCase()));
+
+    const forumLogType = {
+      pengajuan_partnership: "pengajuan_partnership",
+      reposting_partner:     "reposting_partner",
+      posting_events:        "posting_events",
+    }[record.type];
+
+    const forumTemplate = buildForumLog(record, admin, duration, acceptedAt, postedMsg, forumLogType);
+
+    if (!forumThread && record.type === "pengajuan_partnership") {
+      // Create new forum post
+      forumThread = await forumChannel.threads.create({
+        name: `1) ${serverName}`,
+        message: forumTemplate,
+      });
+    } else if (forumThread) {
+      if (record.type === "reposting_partner") {
+        // Delete old partnership post in thread
+        const msgs = await forumThread.messages.fetch({ limit: 50 });
+        for (const [, m] of msgs) {
+          if (m.author.id === interaction.client.user.id && !m.id.endsWith("0")) {
+            await m.delete().catch(() => {});
+            break;
+          }
+        }
+      }
+      await forumThread.send(forumTemplate);
+    }
+  }
+
+  // ─ Give partner role ─
+  const guild = interaction.guild;
+  const targetMember = await guild.members.fetch(record.userId).catch(() => null);
+  let hasRole = false;
+  if (targetMember) {
+    await targetMember.roles.add(ROLE.PARTNER).catch(() => {});
+    hasRole = targetMember.roles.cache.has(ROLE.PARTNER);
+  }
+
+  // ─ Set re-post cooldown ─
+  if (record.type === "reposting_partner") {
+    await database.collection("repost_cooldown").updateOne(
+      { userId: record.userId },
+      { $set: { lastAt: Date.now() } },
+      { upsert: true }
+    );
+  }
+
+  // ─ Send DM to user ─
+  const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
+  if (dmUser) {
+    const acceptTs = Math.floor(acceptedAt / 1000);
+    const startTs  = Math.floor(record.startedAt / 1000);
+    const postLink = postedMsg
+      ? `https://discord.com/channels/${guild.id}/${targetChannelId}/${postedMsg.id}`
+      : null;
+
+    await dmUser.send({
+      ...cv2([
+        {
+          type: 9,
+          components: [text("## <:1_:1486297322848653425> Notifikasi DM")],
+          accessory: postLink ? {
+            type: 2, style: 5, label: "Messages", url: postLink,
+            custom_id: "dm_link_msg"
+          } : undefined
+        },
+        SEP,
+        text(`Postingan ${record.type === "posting_events" ? "Events" : "Partnership"} kamu sudah kekirim di <#${targetChannelId}>\nDi Accept oleh: <@${admin.id}>`),
+        SEP,
+        text(`-# © Guild Partnership - EmpireBS <t:${startTs}:R>`),
+      ])
+    }).catch(() => {});
+  }
+
+  // ─ Remove from pending ─
+  await database.collection(coll).deleteOne({ logId });
+
+  // ─ Update admin message ─
+  await interaction.update({
+    ...cv2([
+      text(`## ✅ ${record.type === "posting_events" ? "Posting Events" : record.type === "reposting_partner" ? "Re-Posting Partnership" : "Pengajuan Partnership"} — Diterima`),
+      SEP,
+      text(`**Accept oleh:** [${admin.username}](https://discord.com/users/${admin.id})\n**Waktu:** <t:${Math.floor(acceptedAt / 1000)}:F>\n**Durasi:** ${duration}`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+function buildForumLog(record, admin, duration, acceptedAt, postedMsg, type) {
+  const guild      = record.guildId;
+  const postLink   = postedMsg
+    ? `https://discord.com/channels/${guild}/${postedMsg.channelId || CHANNEL.PARTNER_POST}/${postedMsg.id}`
+    : null;
+  const acceptTs   = Math.floor(acceptedAt / 1000);
+  const createdTs  = record.createdAt ? Math.floor(new Date(record.createdAt).getTime() / 1000) : null;
+
+  const typeLabel  = {
+    pengajuan_partnership: "Success Partnership",
+    reposting_partner:     "Success Re-Posting Partnership",
+    posting_events:        "Success Events Posts",
+  }[type];
+
+  const securityExtra = type === "pengajuan_partnership"
+    ? `> **System:** Component V2 + MongoDB`
+    : `> **Nama Server:** ${record.nama}`;
+
+  return cv2([
+    text(`## ✅ <@${record.userId}> ${typeLabel}`),
+    SEP,
+    text(`**👤 Informasi User**\n> **Username:** [${record.userName}](https://discord.com/users/${record.userId})\n> **ID:** \`${record.userId}\`\n> **Display Name:** ${record.displayName}${createdTs ? `\n> **Akun Dibuat:** <t:${createdTs}:R>` : ""}`),
+    SEP,
+    text(`**📊 Detail Verifikasi**\n> **Waktu Selesai:** <t:${acceptTs}:F>\n> **Total Durasi:** ${duration}\n> **Accept Partner:** [${admin.username}](https://discord.com/users/${admin.id})${postLink ? `\n> **Pesan Partner:** [Go To Messages](${postLink})` : ""}\n> **Link Server:** ${record.link}`),
+    SEP,
+    text(`**🛡️ Security Info**\n> **Status:** Yes (role <@&${ROLE.PARTNER}> diberikan)\n> **Edit Pesan:** No\n> **Boost:** No\n${securityExtra}`),
+    SEP,
+    text(`\n-# Log ID: \`${record.logId}\``),
+  ]);
+}
+
+// ─── ADMIN REJECT ─────────────────────────────────────────────────────────────
+async function handleAdminReject(interaction, logId) {
+  await interaction.showModal({
+    title: "Alasan Penolakan",
+    custom_id: `admin_reject_modal_${logId}`,
+    components: [
+      { type: 1, components: [{
+        type: 4, custom_id: "f_reason",
+        label: "Alasan Penolakan (min. 10 kata)",
+        style: 2,
+        placeholder: "Jelaskan alasan penolakan pengajuan ini dengan detail...",
+        required: true, min_length: 50
+      }]}
+    ]
+  });
+  return true;
+}
+
+async function handleRejectModalSubmit(interaction, logId) {
+  const reason   = interaction.fields.getTextInputValue("f_reason");
+  const database = await getDb();
+
+  let record = await database.collection("pending_partnership").findOne({ logId });
+  let coll   = "pending_partnership";
+  if (!record) { record = await database.collection("pending_events").findOne({ logId }); coll = "pending_events"; }
+  if (!record) { record = await database.collection("pending_repost").findOne({ logId }); coll = "pending_repost"; }
+
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+
+  // DM user
+  const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
+  if (dmUser) {
+    await dmUser.send({
+      ...cv2([
+        text("## ❌ Pengajuan Ditolak"),
+        SEP,
+        text(`Pengajuan **${record.type === "posting_events" ? "Posting Events" : record.type === "reposting_partner" ? "Re-Posting Partnership" : "Partnership"}** kamu telah ditolak.\n\n**Alasan:**\n> ${reason}`),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    }).catch(() => {});
+  }
+
+  await database.collection(coll).deleteOne({ logId });
+
+  await interaction.update({
+    ...cv2([
+      text("## ❌ Ditolak"),
+      SEP,
+      text(`**Reject oleh:** [${interaction.user.username}](https://discord.com/users/${interaction.user.id})\n**Alasan:** ${reason}`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+// ─── ADMIN EDIT PESAN ─────────────────────────────────────────────────────────
+async function handleAdminEdit(interaction, logId) {
+  const database = await getDb();
+  let record = await database.collection("pending_partnership").findOne({ logId });
+  if (!record) { record = await database.collection("pending_events").findOne({ logId }); }
+  if (!record) { record = await database.collection("pending_repost").findOne({ logId }); }
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+
+  await interaction.showModal({
+    title: "Edit Pesan",
+    custom_id: `admin_edit_modal_${logId}`,
+    components: [
+      { type: 1, components: [{ type: 4, custom_id: "f_nama",  label: "Nama Server",     style: 1, value: record.nama,  required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_desc",  label: "Deskripsi",        style: 2, value: record.desc,  required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_link",  label: "Link Server",      style: 1, value: record.link,  required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_banner",label: "Banner (opsional)",style: 1, value: record.banners?.join(", ") || "", required: false }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_color", label: "Sidebar Color",    style: 1, value: record.color ? record.color.toString(16) : "", required: false }] },
+    ]
+  });
+  return true;
+}
+
+async function handleEditModalSubmit(interaction, logId) {
+  const database = await getDb();
+  const update = {
+    nama:    interaction.fields.getTextInputValue("f_nama"),
+    desc:    interaction.fields.getTextInputValue("f_desc"),
+    link:    interaction.fields.getTextInputValue("f_link"),
+    banners: parseBanners(interaction.fields.getTextInputValue("f_banner") || ""),
+    color:   parseColorHex(interaction.fields.getTextInputValue("f_color") || ""),
+  };
+
+  for (const coll of ["pending_partnership", "pending_events", "pending_repost"]) {
+    const r = await database.collection(coll).findOne({ logId });
+    if (r) { await database.collection(coll).updateOne({ logId }, { $set: update }); break; }
+  }
+
+  await interaction.reply({
+    ...cv2([
+      text("## ✅ Pesan Diperbarui"),
+      SEP,
+      text("Pesan pengajuan berhasil diedit. Gunakan tombol **Accept** untuk mempostingnya."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+// ─── STOP PARTNERSHIP ────────────────────────────────────────────────────────
+async function handleStopPartnership(interaction, member) {
+  if (!hasPartnerRole(member)) {
+    return interaction.followUp({
+      ...cv2([
+        text("## Berpartnership Terlebih dahulu"),
+        SEP,
+        text("Kamu belum memiliki role **Partner**. Tidak ada partnership yang perlu dihentikan."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ]),
+      ephemeral: true
+    });
+  }
+
+  await interaction.followUp({
+    ...cv2([
+      text("## 🛑 Berhenti Partnership"),
+      SEP,
+      text("Apakah kamu yakin ingin mengakhiri partnership?\nSilakan isi formulir alasan di bawah ini."),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 2, label: "Alasan Berhenti", custom_id: "stop_form" }
+        ]
+      },
+      SEP,
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+async function handleStopForm(interaction) {
+  await interaction.showModal({
+    title: "Formulir Berhenti Partnership",
+    custom_id: "stop_modal",
+    components: [
+      { type: 1, components: [{ type: 4, custom_id: "f_nama",   label: "Nama Server",   style: 1, placeholder: "Nama server kamu", required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_link",   label: "Link Server",   style: 1, placeholder: "https://discord.gg/...", required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_reason", label: "Alasan Berhenti Partnership", style: 2,
+        placeholder: "Pilih alasan:\n• Sudah tidak aktif\n• Ingin fokus komunitas sendiri\n• Perbedaan visi\n• Lainnya (jelaskan)",
+        required: true }] },
+    ]
+  });
+  return true;
+}
+
+async function handleStopModalSubmit(interaction) {
+  const user    = interaction.user;
+  const member  = interaction.member;
+  const nama    = interaction.fields.getTextInputValue("f_nama");
+  const link    = interaction.fields.getTextInputValue("f_link");
+  const reason  = interaction.fields.getTextInputValue("f_reason");
+  const logId   = `STP-${Date.now()}-${user.id}`;
+
+  const database = await getDb();
+  await database.collection("stop_requests").insertOne({
+    logId, userId: user.id, userName: user.username, displayName: member.displayName,
+    nama, link, reason, requestedAt: Date.now()
+  });
+
+  // Send to admin log
+  const logChannel = interaction.guild.channels.cache.get(CHANNEL.LOG_ADMIN);
+  if (logChannel) {
+    await logChannel.send({
+      ...cv2([
+        text("## 🛑 Permintaan Berhenti Partnership"),
+        SEP,
+        text(`**👤 Informasi User**\n> **Username:** [${user.username}](https://discord.com/users/${user.id})\n> **ID:** \`${user.id}\`\n> **Display Name:** ${member.displayName}`),
+        SEP,
+        text(`**📋 Detail**\n> **Nama Server:** ${nama}\n> **Link Server:** ${link}\n> **Alasan:**\n${reason}`),
+        SEP,
+        {
+          type: 1,
+          components: [
+            { type: 2, style: 3, label: "Accept (Berhenti)", custom_id: `stop_accept_${logId}` },
+            { type: 2, style: 4, label: "Reject",            custom_id: `stop_reject_${logId}` },
+          ]
+        },
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    });
+  }
+
+  await interaction.reply({
+    ...cv2([
+      text("## ✅ Permintaan Terkirim"),
+      SEP,
+      text("Permintaan berhenti partnership kamu telah dikirim ke admin. Harap tunggu konfirmasi."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+async function handleStopAccept(interaction, logId) {
+  await interaction.showModal({
+    title: "Pesan Penutup Partnership",
+    custom_id: `stop_accept_modal_${logId}`,
+    components: [
+      { type: 1, components: [{ type: 4, custom_id: "f_msg", label: "Pesan untuk partner",
+        style: 2, placeholder: "Tulis pesan penutup untuk partner (ucapan terima kasih, dll.)",
+        required: true }] }
+    ]
+  });
+  return true;
+}
+
+async function handleStopAcceptModal(interaction, logId) {
+  const database = await getDb();
+  const record   = await database.collection("stop_requests").findOne({ logId });
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+
+  const msg    = interaction.fields.getTextInputValue("f_msg");
+  const admin  = interaction.user;
+
+  // DM user
+  const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
+  if (dmUser) {
+    await dmUser.send({
+      ...cv2([
+        text("## 👋 Terima Kasih Sudah Berpartnership"),
+        SEP,
+        text(msg),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    }).catch(() => {});
+  }
+
+  // Remove partner role
+  const guildMember = await interaction.guild.members.fetch(record.userId).catch(() => null);
+  if (guildMember) await guildMember.roles.remove(ROLE.PARTNER).catch(() => {});
+
+  await database.collection("stop_requests").deleteOne({ logId });
+
+  await interaction.update({
+    ...cv2([
+      text("## ✅ Partnership Dihentikan"),
+      SEP,
+      text(`Role Partner dicabut dari <@${record.userId}>. DM penutup sudah terkirim.`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+async function handleStopReject(interaction, logId) {
+  const database = await getDb();
+  const record   = await database.collection("stop_requests").findOne({ logId });
+  if (!record) return interaction.reply({ content: "❌ Data tidak ditemukan!", ephemeral: true });
+
+  // Create private channel in STOP_CAT
+  const guild = interaction.guild;
+  const stopChannel = await guild.channels.create({
+    name: `stop-${record.userName.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+    parent: CHANNEL.STOP_CAT,
+    permissionOverwrites: [
+      { id: guild.id,       deny: ["ViewChannel"] },
+      { id: record.userId,  allow: ["ViewChannel", "SendMessages", "ReadMessageHistory"] },
+      { id: interaction.client.user.id, allow: ["ViewChannel", "SendMessages", "ReadMessageHistory", "ManageChannels"] },
+    ]
+  });
+
+  // DM user
+  const dmUser = await interaction.client.users.fetch(record.userId).catch(() => null);
+  if (dmUser) {
+    await dmUser.send({
+      ...cv2([
+        text("## 💬 Diskusi Berhenti Partnership"),
+        SEP,
+        text(`Permintaan kamu untuk berhenti partnership belum dapat diproses langsung. Mohon kunjungi kanal <#${stopChannel.id}> untuk mendiskusikan lebih lanjut alasan kamu ingin berhenti partnership.`),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ])
+    }).catch(() => {});
+  }
+
+  // Send context to the new channel
+  await stopChannel.send({
+    ...cv2([
+      text(`## 🛑 Diskusi Pemberhentian Partnership — <@${record.userId}>`),
+      SEP,
+      text(`**Alasan yang diajukan:**\n> ${record.reason}`),
+      SEP,
+      text("Silakan jelaskan kembali alasan kamu dengan lebih detail. Admin akan menanggapi sesegera mungkin."),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+
+  await database.collection("stop_requests").deleteOne({ logId });
+
+  await interaction.update({
+    ...cv2([
+      text("## ↩️ Permintaan Ditolak — Channel Dibuat"),
+      SEP,
+      text(`Channel diskusi dibuat di <#${stopChannel.id}>. DM notifikasi sudah dikirim.`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+// ─── LIST PARTNERSHIP ─────────────────────────────────────────────────────────
+const LIST_PER_PAGE = 10;
+
+async function handleListPartnership(interaction, member) {
+  const database   = await getDb();
+  const partners   = await database.collection("partners").find({}).toArray();
+  const total      = partners.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIST_PER_PAGE));
+  const page       = 0;
+
+  await interaction.followUp({
+    ...buildListEmbed(partners, page, totalPages, total),
+    ephemeral: true
+  });
+  return true;
+}
+
+function buildListEmbed(partners, page, totalPages, total) {
+  const start  = page * LIST_PER_PAGE;
+  const slice  = partners.slice(start, start + LIST_PER_PAGE);
+
+  let listText = "";
+  for (let i = 0; i < LIST_PER_PAGE; i++) {
+    const idx = start + i + 1;
+    const p   = slice[i];
+    if (p) {
+      listText += `**${idx}.** <@${p.userId}>\n-# <:00:1360567203325542431>Server Link: [${p.nama}](${p.link})\n`;
+    } else {
+      listText += `**${idx}.** @none\n-# <:00:1360567203325542431>Server Link: \`none\`\n`;
+    }
+  }
+
+  const nowTs = Math.floor(Date.now() / 1000);
+  const pageStr = `${page + 1}/${totalPages}`;
+
+  return cv2([
+    text("## 📜 List Partnership"),
+    SEP,
+    {
+      type: 9,
+      components: [text(listText.trimEnd())],
+      accessory: { type: 2, style: 2, label: "Search", custom_id: `list_search_${page}` }
+    },
+    SEP,
+    text(`-# Terakhir diperbarui: <t:${nowTs}:R> • Total partnership: ${total}`),
+    {
+      type: 1,
+      components: [
+        { type: 2, style: 2, label: "◀◀", custom_id: `list_page_first_${page}_${totalPages}` },
+        { type: 2, style: 2, label: "◀",  custom_id: `list_page_prev_${page}_${totalPages}`  },
+        { type: 2, style: 2, label: pageStr, custom_id: `list_page_info`, disabled: true },
+        { type: 2, style: 2, label: "▶",  custom_id: `list_page_next_${page}_${totalPages}`  },
+        { type: 2, style: 2, label: "▶▶", custom_id: `list_page_last_${page}_${totalPages}`  },
+      ]
+    },
+    SEP,
+    text("-# © Guild Partnership - EmpireBS"),
+  ]);
+}
+
+async function handleListPage(interaction, action, page, totalPages) {
+  const database = await getDb();
+  const partners = await database.collection("partners").find({}).toArray();
+  const total    = partners.length;
+  const maxPage  = Math.max(0, Math.ceil(total / LIST_PER_PAGE) - 1);
+  let newPage    = page;
+
+  if      (action === "next")  newPage = page >= maxPage ? maxPage : page + 1;
+  else if (action === "prev")  newPage = page <= 0       ? 0       : page - 1;
+  else if (action === "first") newPage = page <= 0       ? maxPage : Math.max(0, page - 5);
+  else if (action === "last")  newPage = page >= maxPage ? 0       : Math.min(maxPage, page + 5);
+
+  await interaction.update(buildListEmbed(partners, newPage, totalPages, total));
+  return true;
+}
+
+async function handleListSearch(interaction) {
+  await interaction.showModal({
+    title: "Cari Partnership",
+    custom_id: "list_search_modal",
+    components: [
+      { type: 1, components: [{ type: 4, custom_id: "f_nama",   label: "Nama Server (Opsional)",         style: 1, required: false, placeholder: "Cari berdasarkan nama server" }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_link",   label: "Link Server (Opsional)",         style: 1, required: false, placeholder: "https://discord.gg/..." }] },
+      { type: 1, components: [{ type: 4, custom_id: "f_partby", label: "Partnership By (Opsional)", style: 1, required: false, placeholder: "Username yang accept" }] },
+    ]
+  });
+  return true;
+}
+
+async function handleListSearchModal(interaction) {
+  const nama   = interaction.fields.getTextInputValue("f_nama")   || "";
+  const link   = interaction.fields.getTextInputValue("f_link")   || "";
+  const partBy = interaction.fields.getTextInputValue("f_partby") || "";
+
+  if (!nama && !link && !partBy) {
+    return interaction.reply({ content: "❌ Minimal isi 1 field pencarian!", ephemeral: true });
+  }
+
+  const database = await getDb();
+  const query = {};
+  if (nama)   query.nama    = { $regex: nama,   $options: "i" };
+  if (link)   query.link    = { $regex: link,   $options: "i" };
+  if (partBy) query.acceptedBy = { $regex: partBy, $options: "i" };
+
+  const results = await database.collection("partners").find(query).toArray();
+
+  if (!results.length) {
+    return interaction.reply({
+      ...cv2([
+        text("## 🔍 Hasil Pencarian"),
+        SEP,
+        text("Tidak ada partner yang ditemukan dengan kriteria tersebut."),
+        SEP,
+        text("-# © Guild Partnership - EmpireBS"),
+      ]),
+      ephemeral: true
+    });
+  }
+
+  let listText = "";
+  results.slice(0, 15).forEach((p, i) => {
+    listText += `**${i + 1}.** <@${p.userId}>\n-# <:00:1360567203325542431>Server Link: [${p.nama}](${p.link})\n`;
+  });
+
+  await interaction.reply({
+    ...cv2([
+      text("## 🔍 Hasil Pencarian"),
+      SEP,
+      text(listText.trimEnd()),
+      SEP,
+      text(`-# Ditemukan: ${results.length} partner`),
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ]),
+    ephemeral: true
+  });
+  return true;
+}
+
+// ─── DM NOTIF YES/NO ─────────────────────────────────────────────────────────
+async function handleNotifYesNo(interaction, logId, isYes) {
+  await interaction.update({
+    ...cv2([
+      text("## 🔈 Notifikasi DM"),
+      SEP,
+      text(`> Saat pilih tombol **Iya Pake** bot <@1364585069812912148> akan kirim DM notifikasi.\n> postingan events sudah kekirim di <#1502206484489175101>\n\nNote: Saat ini tombol **${isYes ? "Iya Pake" : "Tidak Pake"}**`),
+      SEP,
+      {
+        type: 1,
+        components: [
+          { type: 2, style: 3, label: "Iya Pake",   custom_id: `notif_yes_${logId}`, disabled:  isYes },
+          { type: 2, style: 4, label: "Tidak Pake", custom_id: `notif_no_${logId}`,  disabled: !isYes },
+        ]
+      },
+      SEP,
+      text("-# © Guild Partnership - EmpireBS"),
+    ])
+  });
+  return true;
+}
+
+// ─── MAIN INTERACTION ROUTER ─────────────────────────────────────────────────
+async function handlePartnershipInteraction(interaction) {
+  try {
+    const id = interaction.customId || "";
+
+    // SELECT MENU
+    if (interaction.isStringSelectMenu() && id === "partner_menu") return handleMenu(interaction);
+
+    // BUTTONS
+    if (interaction.isButton()) {
+      if (id === "partner_ketentuan")   return handleKetentuan(interaction);
+      if (id === "partner_benefit")     return handleBenefit(interaction);
+      if (id === "events_yes" || id === "events_no")     return handleEventsYesNo(interaction);
+      if (id === "events_form")         return handleEventsForm(interaction);
+      if (id === "repost_yes" || id === "repost_no")     return handleRepostYesNo(interaction);
+      if (id === "repost_form")         return handleRepostForm(interaction);
+      if (id === "stop_form")           return handleStopForm(interaction);
+      if (id === "ticket_partner_yes" || id === "ticket_partner_no") return handleTicketYesNo(interaction);
+      if (id === "ticket_partner_form") return handleTicketPartnerForm(interaction);
+
+      if (id.startsWith("admin_accept_")) return handleAdminAccept(interaction, id.replace("admin_accept_", ""));
+      if (id.startsWith("admin_reject_")) return handleAdminReject(interaction, id.replace("admin_reject_", ""));
+      if (id.startsWith("admin_edit_"))   return handleAdminEdit(interaction,   id.replace("admin_edit_",   ""));
+
+      if (id.startsWith("stop_accept_")) return handleStopAccept(interaction, id.replace("stop_accept_", ""));
+      if (id.startsWith("stop_reject_")) return handleStopReject(interaction, id.replace("stop_reject_", ""));
+
+      if (id.startsWith("notif_yes_")) return handleNotifYesNo(interaction, id.replace("notif_yes_", ""), true);
+      if (id.startsWith("notif_no_"))  return handleNotifYesNo(interaction, id.replace("notif_no_",  ""), false);
+
+      if (id.startsWith("list_page_")) {
+        const parts  = id.split("_");
+        const action = parts[2]; // next/prev/first/last
+        const page   = parseInt(parts[3]);
+        const total  = parseInt(parts[4]);
+        return handleListPage(interaction, action, page, total);
+      }
+      if (id.startsWith("list_search_")) return handleListSearch(interaction);
+    }
+
+    // MODALS
+    if (interaction.isModalSubmit()) {
+      if (id === "events_modal_embed")           return handleEventsModalSubmit(interaction, true);
+      if (id === "events_modal_plain")           return handleEventsModalSubmit(interaction, false);
+      if (id === "repost_modal_embed")           return handleRepostModalSubmit(interaction, true);
+      if (id === "repost_modal_plain")           return handleRepostModalSubmit(interaction, false);
+      if (id === "ticket_partner_modal_embed")   return handleTicketPartnerModalSubmit(interaction, true);
+      if (id === "ticket_partner_modal_plain")   return handleTicketPartnerModalSubmit(interaction, false);
+      if (id === "stop_modal")                   return handleStopModalSubmit(interaction);
+      if (id === "list_search_modal")            return handleListSearchModal(interaction);
+
+      if (id.startsWith("admin_reject_modal_"))  return handleRejectModalSubmit(interaction, id.replace("admin_reject_modal_", ""));
+      if (id.startsWith("admin_edit_modal_"))    return handleEditModalSubmit(interaction,   id.replace("admin_edit_modal_",   ""));
+      if (id.startsWith("stop_accept_modal_"))   return handleStopAcceptModal(interaction,   id.replace("stop_accept_modal_",  ""));
+    }
+  } catch (err) {
+    console.error("❌ Partnership interaction error:", err);
+    try {
+      const errMsg = { content: "❌ Terjadi kesalahan. Coba lagi.", ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(errMsg);
+      else await interaction.reply(errMsg);
+    } catch (_) {}
+  }
+  return false;
+}
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-function init(client) {
+async function initPartnership(client) {
+  console.log("✅ Partnership Module Initializing...");
+  client.partnershipReady = true;
+
+  // Send/update dashboard
+  try {
+    const guild = client.guilds.cache.get("1347233781391560837");
+    if (!guild) return;
+    const dashCh = guild.channels.cache.get(CHANNEL.DASHBOARD);
+    if (dashCh) {
+      const msgs = await dashCh.messages.fetch({ limit: 10 });
+      const existing = msgs.find(m => m.author.id === client.user.id && m.flags.has(32768));
+      if (!existing) await sendDashboard(dashCh);
+    }
+  } catch (err) {
+    console.error("❌ Partnership dashboard error:", err.message);
+  }
+
   console.log("✅ Partnership Module Active");
 }
 
-// ─── EXPORTS ──────────────────────────────────────────────────────────────────
 module.exports = {
-  init,
-  handleInteraction,
+  initPartnership,
+  handlePartnershipInteraction,
   handlePartnerCommand,
   sendDashboard,
 };
