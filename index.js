@@ -1,6 +1,5 @@
-// index.js
 require("dotenv").config();
-require("./modules/globalLogger");
+require("./modules/globalLogger"); 
 const { Client, GatewayIntentBits, Collection } = require("discord.js");
 const fs = require("fs");
 const express = require("express");
@@ -15,31 +14,30 @@ const { handleInitialRoles, handleVerificationUpdate } = require("./modules/auto
 const { handleSuggestionMessage, handleSuggestionButtons } = require('./modules/suggestionSystem');
 const { handleFeedbackButtons, handleFeedbackModal } = require('./modules/feedbackSystem');
 const generator = require('./modules/generator.js');
-const partnership = require('./modules/partnership');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.GuildPresences, 
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildInvites,
+    GatewayIntentBits.GuildInvites, 
   ],
 });
 
-require('./modules/rateLimiter')(client);
+require('./modules/rateLimiter')(client);     
 
 client.commands = new Collection();
 
 const inviteCache = new Collection();
-const firstMessageCache = new Collection();
+const firstMessageCache = new Collection(); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(express.json()); 
 
 module.exports = app;
 
@@ -101,14 +99,6 @@ client.on("messageCreate", guard("messageCreate", async (message) => {
     console.error('❌ Suggestion error:', err);
   }
 
-  // ✅ PARTNERSHIP COMMAND
-  try {
-    const handled = await partnership.handlePartnerCommand(message);
-    if (handled) return;
-  } catch (err) {
-    console.error("❌ Partnership cmd error:", err);
-  }
-
   // ✅ VERIFY INVITE COMMAND
   if (message.content.toLowerCase() === "bs!verify invite") {
     try {
@@ -146,6 +136,18 @@ client.on("messageCreate", guard("messageCreate", async (message) => {
       }
     } catch (err) {
       console.error("❌ Bonus error:", err);
+    }
+    return;
+  }
+
+  // ✅ PARTNERSHIP COMMAND
+  if (message.content.toLowerCase().startsWith("!partner")) {
+    try {
+      if (client.partnershipSystem) {
+        await client.partnershipSystem.handleCommand(message);
+      }
+    } catch (err) {
+      console.error("❌ Partnership error:", err);
     }
     return;
   }
@@ -226,16 +228,22 @@ client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
 
 client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
   try {
-    // ✅ FIX: Ganti handleInteraction jadi handlePartnershipInteraction
-    const isPartnership = await partnership.handlePartnershipInteraction(interaction);
-    if (isPartnership) return;
+    // Check partnership interactions first
+    if (client.partnershipSystem) {
+      const handled = await client.partnershipSystem.handleInteraction(interaction);
+      if (handled) return;
+
+      // Handle modal submissions
+      if (interaction.isModalSubmit()) {
+        const modalHandled = await client.partnershipSystem.handleModalSubmit(interaction);
+        if (modalHandled) return;
+      }
+    }
 
     const isSuggestion = await handleSuggestionButtons(interaction);
     if (isSuggestion) return;
-
     const isFeedback = await handleFeedbackButtons(interaction);
     if (isFeedback) return;
-
     const isFeedbackModal = await handleFeedbackModal(interaction);
     if (isFeedbackModal) return;
   } catch (err) {
@@ -263,11 +271,18 @@ process.on('SIGTERM', async () => {
     console.error("Error closing MongoDB:", err);
   }
   try {
+    if (client.partnershipSystem) {
+      await client.partnershipSystem.close();
+    }
+  } catch (err) {
+    console.error("Error closing Partnership MongoDB:", err);
+  }
+  try {
     const logChannel = await client.channels.fetch("1352800131933802547");
     if (logChannel) {
       await logChannel.send({
         embeds: [{
-          color: 0xe74c3c,
+          color: 0xe74c3c, 
           description: "🛑 **Status:** Offline / Sedang Restart.",
           timestamp: new Date()
         }]
