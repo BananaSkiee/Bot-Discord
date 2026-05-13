@@ -1,6 +1,6 @@
 // modules/partnership.js
 // Guild Partnership System - EmpireBS
-// Component V2 + MongoDB | Fixed: strict single-acknowledge, no double-defer
+// Component V2 + MongoDB | Fixed: single ack, optional banner, search modal
 
 const { MongoClient } = require("mongodb");
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require("discord.js");
@@ -415,7 +415,7 @@ function buildPartnerModal(useEmbed, type) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder().setCustomId("field_banner").setLabel("Banner / Gambar (URL)")
           .setPlaceholder("https://cdn.discordapp.com/...")
-          .setStyle(TextInputStyle.Short).setRequired(true)
+          .setStyle(TextInputStyle.Short).setRequired(false)  // ❗ OPSIONAL
       ),
       new ActionRowBuilder().addComponents(
         new TextInputBuilder().setCustomId("field_link").setLabel("Link Server")
@@ -467,6 +467,28 @@ function buildEditModal(currentDesc) {
   return modal;
 }
 
+function buildSearchModal() {
+  const modal = new ModalBuilder().setTitle("Cari Partnership").setCustomId("partner_search_modal");
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId("search_name").setLabel("Nama Server")
+        .setPlaceholder("Ketik nama server...")
+        .setStyle(TextInputStyle.Short).setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId("search_link").setLabel("Link Server (opsional)")
+        .setPlaceholder("https://discord.gg/...")
+        .setStyle(TextInputStyle.Short).setRequired(false)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId("search_user").setLabel("Nama Yg berpartner (opsional)")
+        .setPlaceholder("Ketik nama user...")
+        .setStyle(TextInputStyle.Short).setRequired(false)
+    ),
+  );
+  return modal;
+}
+
 // ─── INTERACTION HANDLER (STRICT SINGLE-ACKNOWLEDGE) ──────────────────────────
 async function handleInteraction(interaction) {
   if (!interaction.guild) return false;
@@ -500,16 +522,18 @@ async function handleInteraction(interaction) {
         editCtx.set(interaction.user.id, pending || { logId, desc: "" });
         return interaction.showModal(buildEditModal(pending?.desc || ""));
       }
+      if (id === "partner_search") {
+        return interaction.showModal(buildSearchModal());
+      }
     }
 
-    // 2) Tombol yang hanya update pesan (Yes/No, List pagination, Search, Info) -> deferUpdate
+    // 2) Tombol yang hanya update pesan (Yes/No, List pagination, Info) -> deferUpdate
     if (interaction.isButton()) {
       const isToggle = id.endsWith("_yes") || id.endsWith("_no");
       const isList   = id.startsWith("partner_list_");
-      const isSearchOrInfo = id === "partner_search" || id.startsWith("partner_info_");
-      if (isToggle || isList || isSearchOrInfo) {
+      const isInfo   = id.startsWith("partner_info_");
+      if (isToggle || isList || isInfo) {
         await interaction.deferUpdate();
-        // Toggle
         if (id === "partner_events_yes") { embedState.set(`events_${interaction.user.id}`, true); return interaction.editReply(msgPostingEvents(true)); }
         if (id === "partner_events_no")  { embedState.set(`events_${interaction.user.id}`, false); return interaction.editReply(msgPostingEvents(false)); }
         if (id === "partner_repost_yes") { embedState.set(`repost_${interaction.user.id}`, true); return interaction.editReply(msgRepostingPartner(true)); }
@@ -518,10 +542,8 @@ async function handleInteraction(interaction) {
         if (id === "partner_open_no")    { embedState.set(`open_${interaction.user.id}`, false); return interaction.editReply(msgGuildForm(false)); }
         if (id === "partner_dm_yes")     { return interaction.editReply(msgDMNotifikasi(true)); }
         if (id === "partner_dm_no")      { return interaction.editReply(msgDMNotifikasi(false)); }
-        // List
         if (isList) return handleListPagination(interaction);
-        // Search / Info
-        if (isSearchOrInfo) return interaction.editReply({});
+        if (isInfo) return interaction.editReply({});
       }
     }
 
@@ -566,8 +588,9 @@ async function handleInteraction(interaction) {
     if (interaction.isModalSubmit()) {
       await interaction.deferReply({ flags: 64 });
       if (id.startsWith("partner_modal_")) return handleFormSubmit(interaction);
-      if (id === "partner_reject_modal") return handleRejectModal(interaction);
-      if (id === "partner_edit_modal")   return handleEditModal(interaction);
+      if (id === "partner_reject_modal")   return handleRejectModal(interaction);
+      if (id === "partner_edit_modal")     return handleEditModal(interaction);
+      if (id === "partner_search_modal")   return handleSearchModalSubmit(interaction);
     }
 
     return false;
@@ -629,7 +652,7 @@ async function handleFormSubmit(interaction) {
   const title  = interaction.fields.getTextInputValue("field_title");
   const desc   = interaction.fields.getTextInputValue("field_desc");
   const link   = interaction.fields.getTextInputValue("field_link");
-  const banner = useEmbed ? interaction.fields.getTextInputValue("field_banner") : null;
+  const banner = useEmbed ? interaction.fields.getTextInputValue("field_banner") || null : null;
   const color  = useEmbed ? interaction.fields.getTextInputValue("field_color")  : null;
 
   const logId     = generateLogId(interaction.user.id);
@@ -723,9 +746,10 @@ async function handleAccept(interaction) {
   );
 
   if (type === "open") {
+    const username = member?.user.username || pending.senderTag;
     await db2.collection("partners").updateOne(
       { userId },
-      { $set: { userId, serverName: pending.title, serverLink: pending.link, addedAt: Date.now() } },
+      { $set: { userId, username, serverName: pending.title, serverLink: pending.link, addedAt: Date.now() } },
       { upsert: true }
     );
   }
@@ -807,6 +831,41 @@ async function handleEditModal(interaction) {
   }
 
   return interaction.editReply({ content: "✅ Pesan berhasil diedit." });
+}
+
+// ─── SEARCH MODAL ─────────────────────────────────────────────────────────────
+async function handleSearchModalSubmit(interaction) {
+  const nameFilter = interaction.fields.getTextInputValue("search_name").toLowerCase();
+  const linkFilter = interaction.fields.getTextInputValue("search_link").toLowerCase() || "";
+  const userFilter = interaction.fields.getTextInputValue("search_user").toLowerCase() || "";
+
+  const db2      = await getDB();
+  const all      = await db2.collection("partners").find({}).toArray();
+
+  const filtered = all.filter(p => {
+    const matchName  = nameFilter ? (p.serverName?.toLowerCase().includes(nameFilter)) : true;
+    const matchLink  = linkFilter ? (p.serverLink?.toLowerCase().includes(linkFilter)) : true;
+    const matchUser  = userFilter ? (p.username?.toLowerCase().includes(userFilter) || p.userId?.includes(userFilter)) : true;
+    return matchName && matchLink && matchUser;
+  });
+
+  if (filtered.length === 0) {
+    return interaction.editReply({ content: "🔎 Tidak ditemukan partner dengan kriteria tersebut.", flags: 64 });
+  }
+
+  const list = filtered.slice(0, 10).map((p, i) =>
+    `**${i + 1}.** <@${p.userId}> — ${p.serverName}\n-# <:00:1360567203325542431>[${p.serverLink}](${p.serverLink})`
+  ).join("\n");
+
+  const msg = makeV2([
+    txt("## 🔍 Hasil Pencarian Partnership"),
+    SEP,
+    txt(list),
+    SEP,
+    txt(`-# Ditemukan ${filtered.length} partner.`),
+  ]);
+
+  return interaction.editReply(msg);
 }
 
 // ─── FORUM LOG ────────────────────────────────────────────────────────────────
