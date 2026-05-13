@@ -14,8 +14,7 @@ const {
   ComponentType,
   ForumLayoutType
 } = require("discord.js");
-const mongoose = require("mongoose");
-const { ObjectId } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
@@ -34,91 +33,29 @@ const CONFIG = {
   MONGODB_URI: process.env.MONGODB_URI || "mongodb+srv://AeroX:AeroX@aerox.cgfxn4x.mongodb.net/partnership_akira?retryWrites=true&w=majority&appName=AeroX"
 };
 
-// ==================== MONGOOSE SCHEMAS ====================
+// ==================== DATABASE CONNECTION ====================
+let dbClient = null;
+let db = null;
 let isConnected = false;
 
-const partnershipSchema = new mongoose.Schema({
-  userId: String,
-  username: String,
-  serverName: String,
-  serverDescription: String,
-  serverLink: String,
-  bannerUrls: [String],
-  sidebarColor: { type: Number, default: null },
-  useEmbed: { type: Boolean, default: true },
-  messageId: String,
-  channelId: String,
-  forumThreadId: String,
-  status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
-  acceptedBy: String,
-  acceptedAt: Date,
-  createdAt: { type: Date, default: Date.now },
-  repostCount: { type: Number, default: 0 },
-  lastRepostAt: Date,
-  dmNotifications: { type: Boolean, default: false }
-});
-
-const eventSchema = new mongoose.Schema({
-  userId: String,
-  username: String,
-  serverName: String,
-  eventDescription: String,
-  serverLink: String,
-  bannerUrls: [String],
-  sidebarColor: { type: Number, default: null },
-  useEmbed: { type: Boolean, default: true },
-  eventLink: String,
-  messageId: String,
-  channelId: String,
-  status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
-  acceptedBy: String,
-  acceptedAt: Date,
-  createdAt: { type: Date, default: Date.now }
-});
-
-const stopRequestSchema = new mongoose.Schema({
-  userId: String,
-  username: String,
-  userTag: String,
-  serverName: String,
-  serverLink: String,
-  reason: String,
-  status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
-  discussionChannelId: String,
-  handledBy: String,
-  createdAt: { type: Date, default: Date.now }
-});
-
-const logSchema = new mongoose.Schema({
-  type: { type: String, enum: ["partnership", "event", "repost", "stop"], required: true },
-  userId: String,
-  username: String,
-  serverName: String,
-  action: String,
-  performedBy: String,
-  duration: String,
-  messageId: String,
-  createdAt: { type: Date, default: Date.now }
-});
-
-let Partnership, EventPost, StopRequest, PartnershipLog;
-
-// ==================== DATABASE CONNECTION ====================
 async function connectDatabase() {
-  if (isConnected) return;
+  if (isConnected && db) return db;
   try {
-    await mongoose.connect(CONFIG.MONGODB_URI);
+    dbClient = new MongoClient(CONFIG.MONGODB_URI);
+    await dbClient.connect();
+    db = dbClient.db("partnership_akira");
     isConnected = true;
-    console.log("✅ Partnership MongoDB Connected");
-
-    Partnership = mongoose.model("Partnership", partnershipSchema);
-    EventPost = mongoose.model("EventPost", eventSchema);
-    StopRequest = mongoose.model("StopRequest", stopRequestSchema);
-    PartnershipLog = mongoose.model("PartnershipLog", logSchema);
+    console.log("✅ Partnership MongoDB Connected (Native Driver)");
+    return db;
   } catch (err) {
     console.error("❌ Partnership MongoDB Error:", err.message);
     throw err;
   }
+}
+
+function getCollection(name) {
+  if (!db) throw new Error("Database not connected");
+  return db.collection(name);
 }
 
 // ==================== COMPONENT V2 HELPERS ====================
@@ -206,8 +143,7 @@ function getDashboardTemplate() {
   return buildV2Message([
     textComponent("## <:1_:1486297322848653425> Partnership Requirement<:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431><:00:1360567203325542431>"),
     separatorComponent(),
-    textComponent("> - Member dan Staff server aktif\n> - Tidak mengandung konten NSFW.\n> - Tiada minimal jumlah member server.\n> - Gunakan channels partner bukan forum.\n> - Tidak menerima server khusus berjualan.\n> - Bebas dari konflik dengan komunitas lain."
-    ),
+    textComponent("> - Member dan Staff server aktif\n> - Tidak mengandung konten NSFW.\n> - Tiada minimal jumlah member server.\n> - Gunakan channels partner bukan forum.\n> - Tidak menerima server khusus berjualan.\n> - Bebas dari konflik dengan komunitas lain."),
     separatorComponent(),
     actionRowComponent([
       {
@@ -475,22 +411,22 @@ function getDmToggleTemplate() {
 class PartnershipSystem {
   constructor(client) {
     this.client = client;
-    this.userChannels = new Map(); // Track user created channels count
+    this.userChannels = new Map();
   }
 
   async initialize() {
     await connectDatabase();
-    console.log("✅ Partnership System Initialized");
+    console.log("✅ Partnership System Initialized (Native MongoDB)");
   }
 
   async close() {
-    if (isConnected) {
-      await mongoose.disconnect();
+    if (dbClient) {
+      await dbClient.close();
       isConnected = false;
+      db = null;
     }
   }
 
-  // ==================== ROLE CHECKERS ====================
   hasPartnerRole(member) {
     return member.roles.cache.has(CONFIG.PARTNER_ROLE_ID);
   }
@@ -499,49 +435,41 @@ class PartnershipSystem {
     return member.roles.cache.has(CONFIG.ADMIN_ROLE_ID);
   }
 
-  // ==================== INTERACTION HANDLER ====================
   async handleInteraction(interaction) {
     if (!interaction.isStringSelectMenu() && !interaction.isButton() && !interaction.isModalSubmit()) return false;
 
     const customId = interaction.customId;
 
-    // Dashboard select menu
     if (customId === "p_301362246674550785") {
       await this.handleDashboardSelect(interaction);
       return true;
     }
 
-    // Button handlers
     if (customId.startsWith("partnership_")) {
       await this.handlePartnershipButton(interaction);
       return true;
     }
 
-    // Admin action buttons
     if (customId.startsWith("admin_accept_") || customId.startsWith("admin_reject_") || customId.startsWith("admin_edit_")) {
       await this.handleAdminAction(interaction);
       return true;
     }
 
-    // Stop request admin buttons
     if (customId.startsWith("stop_accept_") || customId.startsWith("stop_reject_")) {
       await this.handleStopAdminAction(interaction);
       return true;
     }
 
-    // Pagination buttons
     if (customId.startsWith("list_page_")) {
       await this.handleListPagination(interaction);
       return true;
     }
 
-    // Search button
     if (customId === "partnership_search") {
       await this.handleSearch(interaction);
       return true;
     }
 
-    // DM toggle
     if (customId === "partnership_dm_yes" || customId === "partnership_dm_no") {
       await this.handleDmToggle(interaction);
       return true;
@@ -550,13 +478,12 @@ class PartnershipSystem {
     return false;
   }
 
-  // ==================== DASHBOARD SELECT ====================
   async handleDashboardSelect(interaction) {
     const value = interaction.values[0];
     const member = interaction.member;
 
     switch (value) {
-      case "2X4OAiLrez": // Open Partnership
+      case "2X4OAiLrez":
         if (this.hasPartnerRole(member)) {
           await interaction.reply({ ...getAlreadyPartnerTemplate(), ephemeral: true });
         } else {
@@ -564,7 +491,7 @@ class PartnershipSystem {
         }
         break;
 
-      case "5rSW3aoXFw": // Posting Events
+      case "5rSW3aoXFw":
         if (!this.hasPartnerRole(member)) {
           await interaction.reply({ ...getNeedPartnerFirstTemplate(), ephemeral: true });
         } else {
@@ -572,7 +499,7 @@ class PartnershipSystem {
         }
         break;
 
-      case "Vrv9pE1vwp": // Re-Posting Partner
+      case "Vrv9pE1vwp":
         if (!this.hasPartnerRole(member)) {
           await interaction.reply({ ...getNeedPartnerFirstTemplate(), ephemeral: true });
         } else {
@@ -580,11 +507,11 @@ class PartnershipSystem {
         }
         break;
 
-      case "IoA1YxsT8u": // List Partnership
+      case "IoA1YxsT8u":
         await this.showList(interaction, 1);
         break;
 
-      case "ASH11sgG4x": // Berhenti Partnership
+      case "ASH11sgG4x":
         if (!this.hasPartnerRole(member)) {
           await interaction.reply({ ...getNeedPartnerFirstTemplate(), ephemeral: true });
         } else {
@@ -594,12 +521,9 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== BUTTON HANDLER ====================
   async handlePartnershipButton(interaction) {
     const customId = interaction.customId;
-    const member = interaction.member;
 
-    // Open Partnership buttons
     if (customId === "partnership_benefit") {
       await interaction.reply({ ...getBenefitTemplate(), ephemeral: true });
       return;
@@ -610,7 +534,6 @@ class PartnershipSystem {
       return;
     }
 
-    // Yes/No toggles for Event
     if (customId === "partnership_event_yes") {
       await interaction.update({
         ...buildV2Message([
@@ -651,7 +574,6 @@ class PartnershipSystem {
       return;
     }
 
-    // Yes/No toggles for Repost
     if (customId === "partnership_repost_yes") {
       await interaction.update({
         ...buildV2Message([
@@ -692,7 +614,6 @@ class PartnershipSystem {
       return;
     }
 
-    // Yes/No toggles for Command
     if (customId === "partnership_cmd_yes") {
       await interaction.update({
         ...buildV2Message([
@@ -733,51 +654,12 @@ class PartnershipSystem {
       return;
     }
 
-    // Form buttons - Show modals
     if (customId.includes("_form")) {
       await this.showFormModal(interaction, customId);
       return;
     }
   }
 
-  // ==================== MODAL HANDLER ====================
-  async handleModalSubmit(interaction) {
-    const customId = interaction.customId;
-
-    if (customId.startsWith("modal_")) {
-      await this.processFormSubmission(interaction);
-      return true;
-    }
-
-    if (customId.startsWith("edit_modal_")) {
-      await this.processEditSubmission(interaction);
-      return true;
-    }
-
-    if (customId.startsWith("reject_modal_")) {
-      await this.processRejectionSubmission(interaction);
-      return true;
-    }
-
-    if (customId.startsWith("stop_modal_")) {
-      await this.processStopSubmission(interaction);
-      return true;
-    }
-
-    if (customId.startsWith("stop_admin_modal_")) {
-      await this.processStopAdminSubmission(interaction);
-      return true;
-    }
-
-    if (customId === "search_modal") {
-      await this.processSearchSubmission(interaction);
-      return true;
-    }
-
-    return false;
-  }
-
-  // ==================== SHOW FORM MODAL ====================
   async showFormModal(interaction, customId) {
     let modal;
 
@@ -876,7 +758,42 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== PROCESS FORM SUBMISSIONS ====================
+  async handleModalSubmit(interaction) {
+    const customId = interaction.customId;
+
+    if (customId.startsWith("modal_")) {
+      await this.processFormSubmission(interaction);
+      return true;
+    }
+
+    if (customId.startsWith("edit_modal_")) {
+      await this.processEditSubmission(interaction);
+      return true;
+    }
+
+    if (customId.startsWith("reject_modal_")) {
+      await this.processRejectionSubmission(interaction);
+      return true;
+    }
+
+    if (customId.startsWith("stop_modal_")) {
+      await this.processStopSubmission(interaction);
+      return true;
+    }
+
+    if (customId.startsWith("stop_admin_modal_")) {
+      await this.processStopAdminSubmission(interaction);
+      return true;
+    }
+
+    if (customId === "search_modal") {
+      await this.processSearchSubmission(interaction);
+      return true;
+    }
+
+    return false;
+  }
+
   async processFormSubmission(interaction) {
     const customId = interaction.customId;
     const fields = interaction.fields;
@@ -895,14 +812,14 @@ class PartnershipSystem {
           sidebarColor: this.parseColor(fields.getTextInputValue("sidebar_color")),
           useEmbed,
           eventLink: fields.getTextInputValue("event_link") || "",
-          status: "pending"
+          status: "pending",
+          createdAt: new Date()
         };
 
-        const eventPost = new EventPost(data);
-        await eventPost.save();
+        const result = await getCollection("event_posts").insertOne(data);
+        data._id = result.insertedId;
 
-        // Send to admin review
-        await this.sendToAdminReview(interaction, eventPost, "event");
+        await this.sendToAdminReview(interaction, data, "event");
 
         await interaction.reply({
           ...buildV2Message([
@@ -918,7 +835,7 @@ class PartnershipSystem {
 
       if (customId.startsWith("modal_repost_")) {
         const useEmbed = customId.endsWith("yes");
-        const existing = await Partnership.findOne({ userId: user.id, status: "accepted" });
+        const existing = await getCollection("partnerships").findOne({ userId: user.id, status: "accepted" });
 
         if (!existing) {
           await interaction.reply({
@@ -934,7 +851,6 @@ class PartnershipSystem {
           return;
         }
 
-        // Check cooldown (1 week)
         if (existing.lastRepostAt && (Date.now() - existing.lastRepostAt.getTime()) < 7 * 24 * 60 * 60 * 1000) {
           await interaction.reply({
             ...buildV2Message([
@@ -959,12 +875,14 @@ class PartnershipSystem {
           sidebarColor: this.parseColor(fields.getTextInputValue("sidebar_color")),
           useEmbed,
           status: "pending",
-          originalId: existing._id
+          originalId: existing._id,
+          createdAt: new Date()
         };
 
-        // Create temporary repost object for review
-        const repostData = { ...data, _id: new ObjectId() };
-        await this.sendToAdminReview(interaction, repostData, "repost");
+        const result = await getCollection("partnerships").insertOne(data);
+        data._id = result.insertedId;
+
+        await this.sendToAdminReview(interaction, data, "repost");
 
         await interaction.reply({
           ...buildV2Message([
@@ -989,13 +907,14 @@ class PartnershipSystem {
           bannerUrls: this.parseBannerUrls(fields.getTextInputValue("banner")),
           sidebarColor: this.parseColor(fields.getTextInputValue("sidebar_color")),
           useEmbed,
-          status: "pending"
+          status: "pending",
+          createdAt: new Date()
         };
 
-        const partnership = new Partnership(data);
-        await partnership.save();
+        const result = await getCollection("partnerships").insertOne(data);
+        data._id = result.insertedId;
 
-        await this.sendToAdminReview(interaction, partnership, "partnership");
+        await this.sendToAdminReview(interaction, data, "partnership");
 
         await interaction.reply({
           ...buildV2Message([
@@ -1023,7 +942,6 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== PROCESS STOP SUBMISSION ====================
   async processStopSubmission(interaction) {
     const fields = interaction.fields;
     const user = interaction.user;
@@ -1035,13 +953,13 @@ class PartnershipSystem {
       serverName: fields.getTextInputValue("server_name"),
       serverLink: fields.getTextInputValue("server_link"),
       reason: fields.getTextInputValue("reason"),
-      status: "pending"
+      status: "pending",
+      createdAt: new Date()
     };
 
-    const stopRequest = new StopRequest(data);
-    await stopRequest.save();
+    const result = await getCollection("stop_requests").insertOne(data);
+    data._id = result.insertedId;
 
-    // Send to admin channel
     const adminChannel = await this.client.channels.fetch(CONFIG.ADMIN_REVIEW_CHANNEL_ID);
     if (adminChannel) {
       const components = [
@@ -1052,8 +970,8 @@ class PartnershipSystem {
         textComponent(`**📊 Detail Permintaan**\n> **Nama Server:** ${data.serverName}\n> **Link Server:** ${data.serverLink}\n> **Alasan:** ${data.reason}`),
         separatorComponent(),
         actionRowComponent([
-          buttonComponent({ style: 3, label: "Accept", customId: `stop_accept_${stopRequest._id}` }),
-          buttonComponent({ style: 4, label: "Reject", customId: `stop_reject_${stopRequest._id}` })
+          buttonComponent({ style: 3, label: "Accept", customId: `stop_accept_${data._id}` }),
+          buttonComponent({ style: 4, label: "Reject", customId: `stop_reject_${data._id}` })
         ]),
         separatorComponent(),
         textComponent("-# © Guild Partnership - EmpireBS")
@@ -1074,7 +992,6 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== ADMIN REVIEW SENDER ====================
   async sendToAdminReview(interaction, data, type) {
     const adminChannel = await this.client.channels.fetch(CONFIG.ADMIN_REVIEW_CHANNEL_ID);
     if (!adminChannel) return;
@@ -1113,7 +1030,6 @@ class PartnershipSystem {
 
       await adminChannel.send(buildV2MessageWithAccent(components, accentColor));
     } else {
-      // No embed - plain text format
       const plainText = `# ${data.serverName}\n**${data.serverDescription || data.eventDescription}**\n\n📎 | Server Link: [Invite](<${data.serverLink}>)\n🏷️ | Partner By: <@${user.id}>`;
 
       components = [
@@ -1133,10 +1049,11 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== ADMIN ACTION HANDLER ====================
   async handleAdminAction(interaction) {
     const customId = interaction.customId;
-    const [action, type, id] = customId.replace("admin_", "").split("_");
+    const parts = customId.replace("admin_", "").split("_");
+    const type = parts[0];
+    const id = parts[parts.length - 1];
 
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages) && !this.hasAdminRole(interaction.member)) {
       await interaction.reply({
@@ -1153,11 +1070,11 @@ class PartnershipSystem {
     }
 
     try {
-      if (action === "accept") {
+      if (parts[0] === "accept") {
         await this.handleAccept(interaction, type, id);
-      } else if (action === "reject") {
+      } else if (parts[0] === "reject") {
         await this.handleReject(interaction, type, id);
-      } else if (action === "edit") {
+      } else if (parts[0] === "edit") {
         await this.handleEdit(interaction, type, id);
       }
     } catch (err) {
@@ -1175,105 +1092,87 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== ACCEPT HANDLER ====================
   async handleAccept(interaction, type, id) {
     const startTime = Date.now();
+    const objId = new ObjectId(id);
 
     if (type === "partnership") {
-      const partnership = await Partnership.findById(id);
+      const partnership = await getCollection("partnerships").findOne({ _id: objId });
       if (!partnership) return;
 
-      partnership.status = "accepted";
-      partnership.acceptedBy = interaction.user.id;
-      partnership.acceptedAt = new Date();
-      await partnership.save();
+      await getCollection("partnerships").updateOne(
+        { _id: objId },
+        { $set: { status: "accepted", acceptedBy: interaction.user.id, acceptedAt: new Date() } }
+      );
 
-      // Send to partner channel
       const partnerChannel = await this.client.channels.fetch(CONFIG.SERVER_PARTNER_CHANNEL_ID);
       if (partnerChannel) {
         const message = await this.sendPartnerMessage(partnerChannel, partnership);
-        partnership.messageId = message.id;
-        partnership.channelId = message.channelId;
-        await partnership.save();
+        await getCollection("partnerships").updateOne(
+          { _id: objId },
+          { $set: { messageId: message.id, channelId: message.channelId } }
+        );
       }
 
-      // Add partner role
       const guild = interaction.guild;
       const member = await guild.members.fetch(partnership.userId).catch(() => null);
       if (member) {
         await member.roles.add(CONFIG.PARTNER_ROLE_ID).catch(() => {});
       }
 
-      // Create forum log
       await this.createForumLog(interaction, partnership, "partnership", startTime);
-
-      // DM User
       await this.sendAcceptDm(partnership.userId, partnership, interaction.user, "partnership");
 
     } else if (type === "event") {
-      const eventPost = await EventPost.findById(id);
+      const eventPost = await getCollection("event_posts").findOne({ _id: objId });
       if (!eventPost) return;
 
-      eventPost.status = "accepted";
-      eventPost.acceptedBy = interaction.user.id;
-      eventPost.acceptedAt = new Date();
-      await eventPost.save();
+      await getCollection("event_posts").updateOne(
+        { _id: objId },
+        { $set: { status: "accepted", acceptedBy: interaction.user.id, acceptedAt: new Date() } }
+      );
 
-      // Send to event channel
       const eventChannel = await this.client.channels.fetch(CONFIG.EVENT_PARTNER_CHANNEL_ID);
       if (eventChannel) {
         const message = await this.sendEventMessage(eventChannel, eventPost);
-        eventPost.messageId = message.id;
-        eventPost.channelId = message.channelId;
-        await eventPost.save();
+        await getCollection("event_posts").updateOne(
+          { _id: objId },
+          { $set: { messageId: message.id, channelId: message.channelId } }
+        );
       }
 
-      // Create forum log
       await this.createForumLog(interaction, eventPost, "event", startTime);
-
-      // DM User with notification toggle
       await this.sendEventDm(eventPost, interaction.user, startTime);
 
     } else if (type === "repost") {
-      const partnership = await Partnership.findOne({ userId: interaction.message?.interaction?.user?.id || interaction.user.id, status: "accepted" });
+      const partnership = await getCollection("partnerships").findOne({ userId: interaction.user.id, status: "accepted" });
       if (!partnership) return;
 
-      // Update partnership data
-      const message = await this.findMessageById(partnership.messageId, partnership.channelId);
-      if (message) {
-        await message.delete().catch(() => {});
+      if (partnership.messageId && partnership.channelId) {
+        const oldMessage = await this.findMessageById(partnership.messageId, partnership.channelId);
+        if (oldMessage) {
+          await oldMessage.delete().catch(() => {});
+        }
       }
 
-      // Get data from the interaction message
-      const newData = await this.extractDataFromMessage(interaction.message);
-      if (newData) {
-        partnership.serverDescription = newData.description || partnership.serverDescription;
-        partnership.bannerUrls = newData.bannerUrls || partnership.bannerUrls;
-        partnership.sidebarColor = newData.sidebarColor || partnership.sidebarColor;
-        partnership.useEmbed = newData.useEmbed !== undefined ? newData.useEmbed : partnership.useEmbed;
-      }
+      await getCollection("partnerships").updateOne(
+        { _id: partnership._id },
+        { $inc: { repostCount: 1 }, $set: { lastRepostAt: new Date() } }
+      );
 
-      partnership.repostCount += 1;
-      partnership.lastRepostAt = new Date();
-      await partnership.save();
-
-      // Send new message
       const partnerChannel = await this.client.channels.fetch(CONFIG.SERVER_PARTNER_CHANNEL_ID);
       if (partnerChannel) {
         const newMessage = await this.sendPartnerMessage(partnerChannel, partnership);
-        partnership.messageId = newMessage.id;
-        partnership.channelId = newMessage.channelId;
-        await partnership.save();
+        await getCollection("partnerships").updateOne(
+          { _id: partnership._id },
+          { $set: { messageId: newMessage.id, channelId: newMessage.channelId } }
+        );
       }
 
-      // Create forum log (comment in existing thread)
       await this.createForumLog(interaction, partnership, "repost", startTime);
-
-      // DM User
       await this.sendAcceptDm(partnership.userId, partnership, interaction.user, "repost");
     }
 
-    // Update admin message
     await interaction.update({
       ...buildV2Message([
         textComponent("## ✅ Diterima"),
@@ -1286,7 +1185,6 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== REJECT HANDLER ====================
   async handleReject(interaction, type, id) {
     const modal = new ModalBuilder()
       .setCustomId(`reject_modal_${type}_${id}`)
@@ -1306,10 +1204,11 @@ class PartnershipSystem {
     await interaction.showModal(modal);
   }
 
-  // ==================== PROCESS REJECTION ====================
   async processRejectionSubmission(interaction) {
     const customId = interaction.customId;
-    const [type, id] = customId.replace("reject_modal_", "").split("_");
+    const parts = customId.replace("reject_modal_", "").split("_");
+    const type = parts[0];
+    const id = parts[1];
     const reason = interaction.fields.getTextInputValue("reject_reason");
 
     if (reason.split(/\s+/).length < 10) {
@@ -1326,23 +1225,24 @@ class PartnershipSystem {
       return;
     }
 
-    let data, collection;
+    let data, collectionName;
     if (type === "partnership") {
-      data = await Partnership.findById(id);
-      collection = Partnership;
+      collectionName = "partnerships";
     } else if (type === "event") {
-      data = await EventPost.findById(id);
-      collection = EventPost;
+      collectionName = "event_posts";
     } else if (type === "repost") {
-      data = await Partnership.findById(id);
-      collection = Partnership;
+      collectionName = "partnerships";
     }
 
-    if (data) {
-      data.status = "rejected";
-      await data.save();
+    const objId = new ObjectId(id);
+    data = await getCollection(collectionName).findOne({ _id: objId });
 
-      // DM User
+    if (data) {
+      await getCollection(collectionName).updateOne(
+        { _id: objId },
+        { $set: { status: "rejected" } }
+      );
+
       try {
         const user = await this.client.users.fetch(data.userId);
         if (user) {
@@ -1372,7 +1272,6 @@ class PartnershipSystem {
       ephemeral: true
     });
 
-    // Update original message
     await interaction.message.edit({
       ...buildV2Message([
         textComponent("## ❌ Ditolak"),
@@ -1385,7 +1284,6 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== EDIT HANDLER ====================
   async handleEdit(interaction, type, id) {
     const modal = new ModalBuilder()
       .setCustomId(`edit_modal_${type}_${id}`)
@@ -1405,17 +1303,19 @@ class PartnershipSystem {
     await interaction.showModal(modal);
   }
 
-  // ==================== PROCESS EDIT ====================
   async processEditSubmission(interaction) {
     const customId = interaction.customId;
-    const [type, id] = customId.replace("edit_modal_", "").split("_");
+    const parts = customId.replace("edit_modal_", "").split("_");
+    const type = parts[0];
+    const id = parts[1];
     const newContent = interaction.fields.getTextInputValue("edit_content");
 
     let data;
+    const objId = new ObjectId(id);
     if (type === "partnership" || type === "repost") {
-      data = await Partnership.findById(id);
+      data = await getCollection("partnerships").findOne({ _id: objId });
     } else if (type === "event") {
-      data = await EventPost.findById(id);
+      data = await getCollection("event_posts").findOne({ _id: objId });
     }
 
     if (data && data.messageId && data.channelId) {
@@ -1423,7 +1323,6 @@ class PartnershipSystem {
       if (channel) {
         const message = await channel.messages.fetch(data.messageId).catch(() => null);
         if (message) {
-          // Update the message with new content
           const accentColor = data.sidebarColor || 0x3498db;
           const components = [
             textComponent(`# ${data.serverName}`),
@@ -1464,10 +1363,11 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== STOP ADMIN HANDLER ====================
   async handleStopAdminAction(interaction) {
     const customId = interaction.customId;
-    const [action, id] = customId.replace("stop_", "").split("_");
+    const parts = customId.replace("stop_", "").split("_");
+    const action = parts[0];
+    const id = parts[1];
 
     if (!this.hasAdminRole(interaction.member)) {
       await interaction.reply({
@@ -1483,11 +1383,11 @@ class PartnershipSystem {
       return;
     }
 
-    const stopRequest = await StopRequest.findById(id);
+    const objId = new ObjectId(id);
+    const stopRequest = await getCollection("stop_requests").findOne({ _id: objId });
     if (!stopRequest) return;
 
     if (action === "accept") {
-      // Show modal for thank you message
       const modal = new ModalBuilder()
         .setCustomId(`stop_admin_modal_${id}`)
         .setTitle("Pesan Terima Kasih");
@@ -1506,7 +1406,6 @@ class PartnershipSystem {
 
       await interaction.showModal(modal);
     } else if (action === "reject") {
-      // Create discussion channel
       const category = await this.client.channels.fetch(CONFIG.STOP_DISCUSSION_CATEGORY_ID);
       if (category && category.type === ChannelType.GuildCategory) {
         const channelName = `stop-discussion-${stopRequest.username.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
@@ -1521,12 +1420,11 @@ class PartnershipSystem {
           ]
         });
 
-        stopRequest.discussionChannelId = channel.id;
-        stopRequest.status = "rejected";
-        stopRequest.handledBy = interaction.user.id;
-        await stopRequest.save();
+        await getCollection("stop_requests").updateOne(
+          { _id: objId },
+          { $set: { discussionChannelId: channel.id, status: "rejected", handledBy: interaction.user.id } }
+        );
 
-        // Send message in channel
         await channel.send({
           ...buildV2Message([
             textComponent("## 💬 Diskusi Penghentian Partnership"),
@@ -1537,7 +1435,6 @@ class PartnershipSystem {
           ])
         });
 
-        // DM User
         try {
           const user = await this.client.users.fetch(stopRequest.userId);
           if (user) {
@@ -1569,29 +1466,27 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== PROCESS STOP ACCEPT ====================
   async processStopAdminSubmission(interaction) {
     const id = interaction.customId.replace("stop_admin_modal_", "");
     const thankYouMsg = interaction.fields.getTextInputValue("thank_you_msg");
 
-    const stopRequest = await StopRequest.findById(id);
+    const objId = new ObjectId(id);
+    const stopRequest = await getCollection("stop_requests").findOne({ _id: objId });
     if (!stopRequest) return;
 
-    stopRequest.status = "accepted";
-    stopRequest.handledBy = interaction.user.id;
-    await stopRequest.save();
+    await getCollection("stop_requests").updateOne(
+      { _id: objId },
+      { $set: { status: "accepted", handledBy: interaction.user.id } }
+    );
 
-    // Remove partner role
     const guild = interaction.guild;
     const member = await guild.members.fetch(stopRequest.userId).catch(() => null);
     if (member) {
       await member.roles.remove(CONFIG.PARTNER_ROLE_ID).catch(() => {});
     }
 
-    // Delete partnership data
-    await Partnership.deleteOne({ userId: stopRequest.userId, status: "accepted" });
+    await getCollection("partnerships").deleteOne({ userId: stopRequest.userId, status: "accepted" });
 
-    // DM User
     try {
       const user = await this.client.users.fetch(stopRequest.userId);
       if (user) {
@@ -1621,18 +1516,19 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== LIST PARTNERSHIP ====================
   async showList(interaction, page) {
     const perPage = 10;
-    const total = await Partnership.countDocuments({ status: "accepted" });
+    const total = await getCollection("partnerships").countDocuments({ status: "accepted" });
     const totalPages = Math.ceil(total / perPage) || 1;
 
     if (page < 1) page = totalPages;
     if (page > totalPages) page = 1;
 
-    const partnerships = await Partnership.find({ status: "accepted" })
+    const partnerships = await getCollection("partnerships")
+      .find({ status: "accepted" })
       .skip((page - 1) * perPage)
-      .limit(perPage);
+      .limit(perPage)
+      .toArray();
 
     let listText = "";
     for (let i = 0; i < 10; i++) {
@@ -1674,7 +1570,6 @@ class PartnershipSystem {
     await this.showList(interaction, page);
   }
 
-  // ==================== SEARCH ====================
   async handleSearch(interaction) {
     const modal = new ModalBuilder()
       .setCustomId("search_modal")
@@ -1719,7 +1614,7 @@ class PartnershipSystem {
     if (link) query.serverLink = { $regex: link, $options: "i" };
     if (by) query.username = { $regex: by, $options: "i" };
 
-    const results = await Partnership.find(query).limit(10);
+    const results = await getCollection("partnerships").find(query).limit(10).toArray();
 
     let resultText = "## 🔍 Hasil Pencarian\n\n";
     if (results.length === 0) {
@@ -1740,15 +1635,16 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== DM TOGGLE ====================
   async handleDmToggle(interaction) {
     const customId = interaction.customId;
     const userId = interaction.user.id;
 
-    const partnership = await Partnership.findOne({ userId, status: "accepted" });
+    const partnership = await getCollection("partnerships").findOne({ userId, status: "accepted" });
     if (partnership) {
-      partnership.dmNotifications = customId === "partnership_dm_yes";
-      await partnership.save();
+      await getCollection("partnerships").updateOne(
+        { _id: partnership._id },
+        { $set: { dmNotifications: customId === "partnership_dm_yes" } }
+      );
     }
 
     const isYes = customId === "partnership_dm_yes";
@@ -1769,7 +1665,6 @@ class PartnershipSystem {
     });
   }
 
-  // ==================== MESSAGE SENDERS ====================
   async sendPartnerMessage(channel, data) {
     const isEmbed = data.useEmbed !== false;
     const accentColor = data.sidebarColor || 0x3498db;
@@ -1846,7 +1741,6 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== FORUM LOG ====================
   async createForumLog(interaction, data, type, startTime) {
     try {
       const forumChannel = await this.client.channels.fetch(CONFIG.FORUM_LOG_CHANNEL_ID);
@@ -1858,11 +1752,9 @@ class PartnershipSystem {
       const createdAt = Math.floor(user.createdTimestamp / 1000);
       const daysSince = Math.floor((Date.now() - user.createdTimestamp) / (1000 * 60 * 60 * 24));
 
-      // Find or create thread
       const threadName = `1) ${data.serverName}`;
       let thread;
 
-      // Check existing threads
       const activeThreads = await forumChannel.threads.fetchActive();
       const archivedThreads = await forumChannel.threads.fetchArchived();
 
@@ -1882,10 +1774,8 @@ class PartnershipSystem {
       ];
 
       if (thread) {
-        // Post in existing thread
         await thread.send(buildV2Message(logComponents));
       } else {
-        // Create new thread
         const newThread = await forumChannel.threads.create({
           name: threadName,
           message: buildV2Message(logComponents),
@@ -1893,8 +1783,10 @@ class PartnershipSystem {
         });
 
         if (type === "partnership") {
-          data.forumThreadId = newThread.id;
-          await data.save();
+          await getCollection("partnerships").updateOne(
+            { _id: data._id },
+            { $set: { forumThreadId: newThread.id } }
+          );
         }
       }
     } catch (err) {
@@ -1902,7 +1794,6 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== DM SENDERS ====================
   async sendAcceptDm(userId, data, acceptor, type) {
     try {
       const user = await this.client.users.fetch(userId);
@@ -1930,7 +1821,7 @@ class PartnershipSystem {
       const user = await this.client.users.fetch(eventPost.userId);
       if (!user) return;
 
-      const partnership = await Partnership.findOne({ userId: eventPost.userId, status: "accepted" });
+      const partnership = await getCollection("partnerships").findOne({ userId: eventPost.userId, status: "accepted" });
       if (partnership && partnership.dmNotifications) {
         await user.send({
           ...getDmNotificationTemplate(eventPost.messageId, acceptor.id)
@@ -1941,7 +1832,6 @@ class PartnershipSystem {
     }
   }
 
-  // ==================== COMMAND HANDLER (!partner) ====================
   async handleCommand(message) {
     if (!message.content.toLowerCase().startsWith("!partner")) return false;
 
@@ -1954,7 +1844,6 @@ class PartnershipSystem {
       return true;
     }
 
-    // Count user channels in category
     const category = await this.client.channels.fetch(CONFIG.PARTNER_CATEGORY_ID);
     if (!category || category.type !== ChannelType.GuildCategory) {
       await message.reply("Kategori tidak ditemukan!");
@@ -1973,7 +1862,6 @@ class PartnershipSystem {
       return true;
     }
 
-    // Create channel
     const channelName = `partner-${message.author.username.toLowerCase().replace(/[^a-z0-9]/g, "")}-${userChannels.size + 1}`;
     const channel = await message.guild.channels.create({
       name: channelName,
@@ -2005,7 +1893,6 @@ class PartnershipSystem {
     return true;
   }
 
-  // ==================== UTILITY FUNCTIONS ====================
   parseBannerUrls(bannerString) {
     if (!bannerString) return [];
     return bannerString.split(",").map(url => url.trim()).filter(url => url.length > 0);
@@ -2038,7 +1925,6 @@ class PartnershipSystem {
   }
 
   async extractDataFromMessage(message) {
-    // Extract data from V2 message components
     try {
       const container = message.components?.[0];
       if (!container || container.type !== 17) return null;
@@ -2059,5 +1945,4 @@ class PartnershipSystem {
   }
 }
 
-// ==================== EXPORT ====================
 module.exports = PartnershipSystem;
