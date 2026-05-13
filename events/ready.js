@@ -30,8 +30,11 @@ module.exports = {
     try { banManager(client); } catch (err) { console.error("❌ Gagal inisialisasi BanManager:", err); }
     // try { await sendInitialCard(client, '1498935928994140253'); } catch (err) { console.error("❌ Intro Card gagal dipicu:", err.message); }
     // try { await sendFeedbackPrompt(client); } catch (err) { console.error("❌ Feedback prompt error:", err); }
-    try { partnership.init(client); } catch (err) { console.error("❌ Partnership Module error:", err); }
-
+try {
+  partnership.init(client);
+  await partnership.sendDashboard(client);
+} catch (err) { console.error("❌ Partnership Module error:", err); }
+    
     try {
       welcomeHandler(client);
       console.log("✅ Welcome Module Active");
