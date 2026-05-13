@@ -1,4 +1,3 @@
-// events/ready.js
 const autoGreeting = require("../modules/autoGreeting");
 const slashCommandSetup = require("../modules/slashCommandSetup");
 const VerifySystem = require("../modules/verify");
@@ -11,11 +10,13 @@ const sociabuzz = require("../modules/sociabuzz");
 const welcomeHandler = require("../modules/welcomeHandler");
 const banManager = require("../modules/banManager");
 const beritaModule = require("../modules/autoNews");
-const partnership = require('../modules/partnership');
+// const autoSendMeme = require("../modules/autoMeme");
+const PartnershipSystem = require("../modules/partnership");
 const app = require("../index");
 
 const verifySystem = new VerifySystem();
 let verifyInviteSystem = null;
+let partnershipSystem = null;
 
 module.exports = {
   name: "ready",
@@ -23,20 +24,28 @@ module.exports = {
   async execute(client) {
     console.log(`🤖 ${client.user.tag} siap melayani BananaSkiee Community!`);
 
+    // Initialize Partnership System
+    try {
+      partnershipSystem = new PartnershipSystem(client);
+      await partnershipSystem.initialize();
+      client.partnershipSystem = partnershipSystem;
+      console.log("✅ Partnership System Active");
+    } catch (err) { 
+      console.error("❌ Gagal inisialisasi Partnership System:", err); 
+    }
+
     try { beritaModule(client); } catch (err) { console.error("❌ Auto berita error:", err); }
     try { banManager(client); } catch (err) { console.error("❌ Gagal inisialisasi BanManager:", err); }
 
-    // ✅ Partnership module init + dashboard
-    try {
-      partnership.initPartnership(client);
-      const dashboardChannel = client.channels.cache.get('1498934645096448010');
-      if (dashboardChannel) {
-        await partnership.sendDashboard(dashboardChannel);
-        console.log('✅ Partnership Dashboard terkirim');
-      } else {
-        console.warn('⚠️ Dashboard channel tidak ditemukan');
-      }
-    } catch (err) { console.error("❌ Partnership Module error:", err); }
+    try { 
+      const { sendInitialCard } = require('../modules/introCard');
+      await sendInitialCard(client, '1498935928994140253'); 
+    } catch (err) { console.error("❌ Intro Card gagal dipicu:", err.message); }
+
+    try { 
+      const { sendFeedbackPrompt } = require("../modules/feedbackSystem");
+      await sendFeedbackPrompt(client); 
+    } catch (err) { console.error("❌ Feedback prompt error:", err); }
 
     try {
       welcomeHandler(client);
@@ -91,5 +100,19 @@ module.exports = {
     }
 
     try { await setInitialBotRoles(client); } catch (err) { console.error("❌ Auto Bot Role error:", err); }
+
+ /*   const memeChannelId = process.env.MEME_CHANNEL_ID;
+    if (memeChannelId) {
+      const memeChannel = client.channels.cache.get(memeChannelId);
+      if (memeChannel) {
+        autoSendMeme(memeChannel);
+        setInterval(() => autoSendMeme(memeChannel), 10_800_000);
+        console.log("✅ Fitur auto meme aktif.");
+      } else {
+        console.warn("⚠️ Channel meme tidak ditemukan.");
+      }
+    } else {
+      console.warn("⚠️ MEME_CHANNEL_ID tidak dikonfigurasi di .env.");
+    }*/
   },
 };
