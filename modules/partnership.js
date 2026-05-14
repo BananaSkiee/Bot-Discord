@@ -78,7 +78,8 @@ function actionRowComponent(components) {
 }
 
 function buttonComponent({ style, label, customId, url = null, disabled = false, emoji = null }) {
-  const btn = { type: 2, style, label, custom_id: customId, disabled, flow: { actions: [] } };
+  const btn = { type: 2, style, label, disabled, flow: { actions: [] } };
+  if (customId) btn.custom_id = customId;
   if (url) btn.url = url;
   if (emoji) btn.emoji = emoji;
   return btn;
@@ -149,7 +150,7 @@ function getOpenPartnershipTemplate() {
     textComponent("> - Pencet tombol **Open Tiket** di bawah dan pilih Request Partner\n> - Antri dan tertib tunggu diproses sesuai urutan, mohon bersabar\n> - Dilarang spam pesan berulang atau mention, demi kenyamanan"),
     separatorComponent(),
     actionRowComponent([
-      buttonComponent({ style: 5, label: "Open Ticket", emoji: { name: "📫" }, url: "https://discord.com/channels/1347233781391560837/1498935151441219584", customId: "p_301255507480416258" }),
+      buttonComponent({ style: 5, label: "Open Ticket", emoji: { name: "📫" }, url: "https://discord.com/channels/1347233781391560837/1498935151441219584", customId: null }),
       buttonComponent({ style: 3, label: "Benefit", emoji: { name: "🎀" }, customId: "partnership_benefit" }),
       buttonComponent({ style: 1, label: "Ketentuan Partner", emoji: { name: "📋" }, customId: "partnership_rules" })
     ]),
@@ -818,10 +819,10 @@ class PartnershipSystem {
           serverName: fields.getTextInputValue("server_name"),
           eventDescription: fields.getTextInputValue("description"),
           serverLink: fields.getTextInputValue("server_link"),
-          bannerUrls: this.parseBannerUrls(fields.getTextInputValue("banner")),
+          bannerUrls: useEmbed ? this.parseBannerUrls(fields.getTextInputValue("banner")) : [],
           sidebarColor: useEmbed ? this.parseColor(fields.getTextInputValue("sidebar_color")) : null,
           useEmbed,
-          eventLink: fields.getTextInputValue("event_link") || "",
+          eventLink: useEmbed ? "" : (fields.getTextInputValue("event_link") || ""),
           status: "pending",
           createdAt: new Date()
         };
@@ -1175,9 +1176,15 @@ class PartnershipSystem {
       await this.sendEventDm(eventPost, interaction.user, startTime);
 
     } else if (type === "repost") {
-      const partnership = await getCollection("partnerships").findOne({ userId: interaction.user.id, status: "accepted" });
+      const repostData = await getCollection("partnerships").findOne({ _id: objId });
+      if (!repostData) {
+        await interaction.reply({ content: "❌ Data repost tidak ditemukan.", ephemeral: true });
+        return;
+      }
+
+      const partnership = await getCollection("partnerships").findOne({ userId: repostData.userId, status: "accepted" });
       if (!partnership) {
-        await interaction.reply({ content: "❌ Partnership tidak ditemukan.", ephemeral: true });
+        await interaction.reply({ content: "❌ Partnership aktif tidak ditemukan.", ephemeral: true });
         return;
       }
 
@@ -1590,23 +1597,26 @@ class PartnershipSystem {
     const id = interaction.customId.replace("stop_admin_modal_", "");
     const thankYouMsg = interaction.fields.getTextInputValue("thank_you_msg");
 
+    // Defer reply immediately to avoid Unknown interaction timeout
+    await interaction.deferUpdate();
+
     let objId;
     try {
       objId = new ObjectId(id);
     } catch (e) {
-      await interaction.reply({ content: "❌ ID tidak valid.", ephemeral: true });
+      await interaction.followUp({ content: "❌ ID tidak valid.", ephemeral: true });
       return;
     }
 
     const stopRequest = await getCollection("stop_requests").findOne({ _id: objId });
     if (!stopRequest) {
-      await interaction.reply({ content: "❌ Permintaan tidak ditemukan.", ephemeral: true });
+      await interaction.followUp({ content: "❌ Permintaan tidak ditemukan.", ephemeral: true });
       return;
     }
 
     // Check if already handled
     if (stopRequest.status !== "pending") {
-      await interaction.reply({
+      await interaction.followUp({
         ...buildV2Message([
           textComponent("## ⚠️ Sudah Diproses"),
           separatorComponent(),
@@ -1650,7 +1660,7 @@ class PartnershipSystem {
     }
 
     try {
-      await interaction.update({
+      await interaction.editReply({
         ...buildV2Message([
           textComponent("## ✅ Diterima - Partnership Dihentikan"),
           separatorComponent(),
@@ -1661,7 +1671,7 @@ class PartnershipSystem {
         components: []
       });
     } catch (err) {
-      await interaction.reply({ content: "✅ Diterima!", ephemeral: true });
+      console.error("Error editing reply:", err);
     }
   }
 
@@ -1702,9 +1712,9 @@ class PartnershipSystem {
         textComponent(`-# Terakhir diperbarui: <t:${Math.floor(Date.now() / 1000)}:R> • Total partnership: ${total}`),
         actionRowComponent([
           buttonComponent({ style: 2, label: "◀◀", customId: `list_page_${page === 1 ? totalPages : Math.max(1, page - 5)}` }),
-          buttonComponent({ style: 2, label: "◀", customId: `list_page_${page - 1}` }),
-          buttonComponent({ style: 2, label: `${page}/${totalPages}`, customId: `list_page_current`, disabled: true }),
-          buttonComponent({ style: 2, label: "▶", customId: `list_page_${page + 1}` }),
+          buttonComponent({ style: 2, label: "◀", customId: `list_page_prev_${page}` }),
+          buttonComponent({ style: 2, label: `${page}/${totalPages}`, customId: `list_page_info_${page}`, disabled: true }),
+          buttonComponent({ style: 2, label: "▶", customId: `list_page_next_${page}` }),
           buttonComponent({ style: 2, label: "▶▶", customId: `list_page_${page === totalPages ? 1 : Math.min(totalPages, page + 5)}` })
         ]),
         separatorComponent(),
@@ -1728,7 +1738,19 @@ class PartnershipSystem {
   }
 
   async handleListPagination(interaction) {
-    const page = parseInt(interaction.customId.replace("list_page_", ""));
+    const customId = interaction.customId;
+    let page;
+
+    if (customId.startsWith("list_page_prev_")) {
+      page = parseInt(customId.replace("list_page_prev_", "")) - 1;
+    } else if (customId.startsWith("list_page_next_")) {
+      page = parseInt(customId.replace("list_page_next_", "")) + 1;
+    } else if (customId.startsWith("list_page_info_")) {
+      return; // disabled button, should not trigger
+    } else {
+      page = parseInt(customId.replace("list_page_", ""));
+    }
+
     if (isNaN(page)) return;
     await this.showList(interaction, page);
   }
