@@ -226,30 +226,8 @@ client.on("guildMemberRemove", guard("guildMemberRemove", async (member) => {
   }
 }));
 
-client.on('interactionCreate', guard("interactionCreate", async (interaction) => {
-  try {
-    // Check partnership interactions first
-    if (client.partnershipSystem) {
-      const handled = await client.partnershipSystem.handleInteraction(interaction);
-      if (handled) return;
-
-      // Handle modal submissions
-      if (interaction.isModalSubmit()) {
-        const modalHandled = await client.partnershipSystem.handleModalSubmit(interaction);
-        if (modalHandled) return;
-      }
-    }
-
-    const isSuggestion = await handleSuggestionButtons(interaction);
-    if (isSuggestion) return;
-    const isFeedback = await handleFeedbackButtons(interaction);
-    if (isFeedback) return;
-    const isFeedbackModal = await handleFeedbackModal(interaction);
-    if (isFeedbackModal) return;
-  } catch (err) {
-    console.error('❌ Interaction error:', err);
-  }
-}));
+// NOTE: interactionCreate handler is now in events/interactionCreate.js
+// to avoid duplicate handlers and conflicts
 
 process.on("unhandledRejection", (err) => {
   console.error("🚨 Unhandled Error:", err);
