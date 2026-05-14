@@ -1646,7 +1646,7 @@ class PartnershipSystem {
       ...buildV2Message([
         textComponent("## ✅ Berhasil"),
         separatorComponent(),
-        textComponent(`Pengajuan ${type} telah berhasil diterima."),
+        textComponent(`Pengajuan ${type} telah berhasil diterima.`),
         separatorComponent(),
         textComponent("-# © Guild Partnership - EmpireBS")
       ])
