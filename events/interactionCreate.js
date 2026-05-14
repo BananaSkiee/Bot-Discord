@@ -15,6 +15,10 @@ const { gameManager } = require('../commands/shotgunCommand');
 // ✅ TAMBAHAN: Import introCard handler
 const { handleIntroInteractions } = require('../modules/introCard');
 
+// ✅ TAMBAHAN: Import suggestion and feedback handlers
+const { handleSuggestionButtons } = require('../modules/suggestionSystem');
+const { handleFeedbackButtons, handleFeedbackModal } = require('../modules/feedbackSystem');
+
 function saveTaggedUsers(data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
@@ -25,19 +29,48 @@ module.exports = {
     try {
       console.log("👉 Interaction diterima:", interaction.type, interaction.customId);
 
-      // ✅ TAMBAHAN: Skip jika ini suggestion/feedback interaction (dihandle di index.js)
-      const externalHandlers = ['suggest_', 'feedback_'];
-      const isExternal = interaction.isButton() && 
-          externalHandlers.some(id => interaction.customId?.startsWith(id));
-      
-      if (isExternal) {
-        console.log('⏭️ Skipping to external handler (suggestion/feedback)');
-        return;
+      // ✅ PARTNERSHIP SYSTEM HANDLER (PRIORITAS TINGGI)
+      if (interaction.client.partnershipSystem) {
+        const partnershipHandled = await interaction.client.partnershipSystem.handleInteraction(interaction);
+        if (partnershipHandled) {
+          console.log('✅ Partnership interaction handled');
+          return;
+        }
+
+        // Handle modal submissions for partnership
+        if (interaction.isModalSubmit()) {
+          const modalHandled = await interaction.client.partnershipSystem.handleModalSubmit(interaction);
+          if (modalHandled) {
+            console.log('✅ Partnership modal handled');
+            return;
+          }
+        }
       }
-      
-      if (interaction.isModalSubmit() && interaction.customId === 'feedback_modal_submit') {
-        console.log('⏭️ Skipping to external handler (feedback modal)');
-        return;
+
+      // ✅ SUGGESTION SYSTEM HANDLER
+      if (interaction.isButton()) {
+        const isSuggestion = await handleSuggestionButtons(interaction);
+        if (isSuggestion) {
+          console.log('✅ Suggestion button handled');
+          return;
+        }
+      }
+
+      // ✅ FEEDBACK SYSTEM HANDLER
+      if (interaction.isButton()) {
+        const isFeedback = await handleFeedbackButtons(interaction);
+        if (isFeedback) {
+          console.log('✅ Feedback button handled');
+          return;
+        }
+      }
+
+      if (interaction.isModalSubmit()) {
+        const isFeedbackModal = await handleFeedbackModal(interaction);
+        if (isFeedbackModal) {
+          console.log('✅ Feedback modal handled');
+          return;
+        }
       }
 
       // ========== SLASH COMMANDS HANDLER ==========
@@ -47,36 +80,33 @@ module.exports = {
         return await command.execute(interaction);
       }
 
-      // ========== INTRO CARD HANDLER (TAMBAHAN) ==========
-      // ✅ Panggil introCard handler di sini, sebelum handler lain
+      // ========== INTRO CARD HANDLER ==========
       if (interaction.isButton() || interaction.isModalSubmit()) {
         const introIds = ['open_intro_modal', 'intro_modal_form', 'info_user_'];
         const isIntroInteraction = introIds.some(id => 
           interaction.customId === id || interaction.customId?.startsWith(id)
         );
-        
+
         if (isIntroInteraction) {
           console.log(`🎴 Intro Card interaction: ${interaction.customId}`);
           return await handleIntroInteractions(interaction);
         }
       }
 
-// ========== VERIFY SYSTEM HANDLERS ==========
+      // ========== VERIFY SYSTEM HANDLERS ==========
       if (interaction.isButton()) {
         const { customId } = interaction;
         console.log(`🔘 Button clicked: ${customId}`);
 
-        // ✅ HANDLER BARU UNTUK SISTEM KODE VERIFIKASI
         if (customId === 'verify_account') return await verifySystem.handleVerify(interaction);
         if (customId === 'input_verify_code') return await verifySystem.handleCodeInput(interaction);
         if (customId === 'resend_code') return await verifySystem.handleResendCode(interaction);
-        
-        // ✅ HANDLER LAMA (bisa dihapus jika tidak dipakai, tapi tetap ada untuk kompatibilitas)
+
         if (customId === 'skip_verify') return await verifySystem.handleSkipVerify(interaction);
         if (customId === 'continue_verify') return await verifySystem.handleContinueVerify(interaction);
         if (customId === 'next_verify') return await verifySystem.handleNextVerify(interaction);
         if (customId === 'see_mission') return await verifySystem.handleSeeMission(interaction);
-        
+
         if (customId === 'auto_welcome') {
           console.log("⚠️ handleAutoWelcome tidak diimplementasikan.");
           return interaction.reply({ content: "⚠️ Fitur Auto Welcome belum aktif.", ephemeral: true });
@@ -86,13 +116,12 @@ module.exports = {
           console.log("⚠️ handleWelcomeSelection tidak diimplementasikan.");
           return interaction.reply({ content: "⚠️ Fitur Welcome Selection belum aktif.", ephemeral: true });
         }
-        
+
         if (customId === 'custom_message') {
           console.log("⚠️ handleCustomMessage tidak diimplementasikan.");
           return interaction.reply({ content: "⚠️ Fitur Custom Message belum aktif.", ephemeral: true });
         }
-        
-        // Handler lama (rating, faqs, feedback) - bisa dihapus nanti
+
         if (customId === 'input_rating') return await verifySystem.handleInputRating(interaction);
         if (customId === 'give_feedback') return await verifySystem.handleGiveFeedback(interaction);
         if (customId === 'next_final') return await verifySystem.handleNextFinal(interaction);
@@ -105,11 +134,8 @@ module.exports = {
       // ✅ MODAL SUBMIT INTERACTIONS
       if (interaction.isModalSubmit()) {
         const { customId } = interaction;
-        
-        // ✅ HANDLER BARU UNTUK KODE VERIFIKASI
+
         if (customId === 'verify_code_modal') return await verifySystem.handleCodeSubmit(interaction);
-        
-        // Handler lama
         if (customId === 'input_rating_modal') return await verifySystem.handleRatingSubmit(interaction);
         if (customId === 'give_feedback_modal') return await verifySystem.handleFeedbackSubmit(interaction);
         if (customId === 'custom_message_modal') {
@@ -117,24 +143,22 @@ module.exports = {
         }
       }  
 
-      // ========== SHOTGUN DUELS HANDLER (V2) - FIXED & OPTIMIZED ==========
+      // ========== SHOTGUN DUELS HANDLER ==========
       if (interaction.isButton() && interaction.customId?.startsWith('sg_')) {
           const parts = interaction.customId.split('_');
-          const action = parts[1]; // accept, reject, ready, shoot, item, surrender, dec, done, empty
+          const action = parts[1];
           const gameId = parts[2];
 
           console.log(`🔫 Shotgun action: ${action} for game ${gameId}`);
 
-          // 1. Handle Accept/Reject (Bebas Turn)
           if (action === 'accept') {
               return await gameManager.acceptDuel(gameId, interaction, parts[3], parts[4]);
           }
-          
+
           if (action === 'reject') {
               return await gameManager.rejectDuel(gameId, interaction);
           }
 
-          // 2. Load Game Data
           const game = gameManager.getGame(gameId);
           if (!game) {
               return await interaction.reply({ 
@@ -143,17 +167,14 @@ module.exports = {
               });
           }
 
-          // 3. Handle Ready (Sebelum game mulai)
           if (action === 'ready') {
               return await gameManager.handleReady(gameId, interaction);
           }
 
-          // 4. Handle decorative/empty buttons (ignore)
           if (action === 'dec' || action === 'done' || action === 'empty') {
               return await interaction.deferUpdate();
           }
 
-          // 5. Check Turn (Hanya pemain giliran, kecuali surrender)
           const turnPlayer = game.players[game.currentPlayer];
           if (action !== 'surrender' && interaction.user.id !== turnPlayer.id) {
               return await interaction.reply({ 
@@ -162,28 +183,27 @@ module.exports = {
               });
           }
 
-          // 6. Execute Action
           if (action === 'shoot') {
-              const target = parts[3]; // target: self / opp
+              const target = parts[3];
               return await gameManager.handleShoot(gameId, target, interaction);
           }
-          
+
           if (action === 'item') {
               const itemIndex = parseInt(parts[3]);
               if (isNaN(itemIndex)) return;
               return await gameManager.handleItem(gameId, itemIndex, interaction);
           }
-          
+
           if (action === 'surrender') {
               return await gameManager.handleSurrender(gameId, interaction);
           }
-          
+
           return;
       }
-      
-      // ========== EXISTING CODE - TAG SYSTEM MAHAL (TIDAK DIUBAH) ==========
+
+      // ========== TAG SYSTEM ==========
       if (!interaction.isButton()) return;
-      
+
       const username = interaction.user.globalName ?? interaction.user.username;
       const guild = interaction.client.guilds.cache.get(guildId);
       if (!guild) return;
@@ -235,18 +255,18 @@ module.exports = {
         }
       }
 
-      // ✅ PERBAIKAN: Handler Unknown Button - tambahkan pengecekan introCard
+      // Handler Unknown Button
       const verifyPrefixes = ['verify_', 'skip_', 'continue_', 'next_', 'welcome_', 'rate_', 'faqs_', 'give_', 'back_', 'auto_', 'custom_'];
       const introPrefixes = ['open_intro_modal', 'intro_modal_form', 'info_user_'];
       const externalPrefixes = ['suggest_', 'feedback_'];
-      
-      // Cek apakah button sudah dihandle oleh introCard atau sistem lain
+      const partnershipPrefixes = ['partnership_', 'admin_', 'stop_', 'list_page_', 'p_'];
+
       const isHandled = introPrefixes.some(p => customId === p || customId.startsWith(p)) ||
                        verifyPrefixes.some(p => customId.startsWith(p)) ||
-                       externalPrefixes.some(p => customId.startsWith(p));
-      
+                       externalPrefixes.some(p => customId.startsWith(p)) ||
+                       partnershipPrefixes.some(p => customId.startsWith(p));
+
       if (!isHandled) {
-        // ✅ PERBAIKAN: Cek dulu apakah sudah direspon
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: "⚠️ Tombol tidak dikenali.", ephemeral: true });
         }
@@ -254,7 +274,6 @@ module.exports = {
 
     } catch (err) {
       console.error("❌ ERROR GLOBAL:", err);
-      // ✅ PERBAIKAN: Cek dengan benar sebelum reply error
       if (!interaction.replied && !interaction.deferred) {
         try {
           await interaction.reply({ content: "❌ Terjadi error internal.", ephemeral: true });
